@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, Check, X, Download } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, Check, X, Download, BarChart2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 import { fmt, fmtShort, fmtDate, uid, buildMonthlyTable, getAvailableYears, getMonthName, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS, GASTO_CATEGORIAS, METODO_PAGO_LABELS, calcIVA, useYearMonth } from '../utils/helpers';
 import { Modal } from '../components/ui/Modal';
+import { EventoDetailModal } from '../components/ui/EventoDetailModal';
 import { useConfirmStore } from '../store/useConfirmStore';
 import type { Ingreso, Gasto, Suplido } from '../types';
 
@@ -136,10 +137,12 @@ const ResumenTab = ({ ingresos, gastos }: { ingresos: Ingreso[]; gastos: Gasto[]
 };
 
 const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingreso[]; onAdd: (i: Omit<Ingreso, 'id' | 'createdAt'>) => void; onUpdate: (id: string, i: Partial<Ingreso>) => void; onDelete: (id: string) => void }) => {
+  const { gastosEvento, pagosEvento } = useStore();
   const { year, setYear, month, prevMonth, nextMonth, years } = useYearMonth(ingresos);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Omit<Ingreso, 'id' | 'createdAt'>>(emptyIngreso());
   const [editId, setEditId] = useState<string | null>(null);
+  const [detailIngreso, setDetailIngreso] = useState<Ingreso | null>(null);
   const showConfirm = useConfirmStore((s) => s.show);
 
   const filtered = useMemo(() => ingresos.filter((i) => { const d = new Date(i.fechaEvento); return d.getFullYear() === year && d.getMonth() + 1 === month; }), [ingresos, year, month]);
@@ -157,6 +160,7 @@ const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingres
 
   const openNew = () => { setForm(emptyIngreso()); setEditId(null); setModal(true); };
   const openEdit = (i: Ingreso) => { setForm({ ...i }); setEditId(i.id); setModal(true); };
+  const openDetail = (i: Ingreso) => setDetailIngreso(i);
   const setField = (k: keyof typeof form, v: any) => setForm((f) => {
     const next = { ...f, [k]: v };
     if (k === 'baseImponible' || k === 'porcentajeIVA') { const r = calcIVA(Number(next.baseImponible), Number(next.porcentajeIVA)); return { ...next, ...r }; }
@@ -172,7 +176,10 @@ const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingres
           <span>Base: <span className="text-purple-400 font-semibold">{fmt(totBase)}</span></span>
           <span>Total c/IVA: <span className="text-white font-semibold">{fmt(totTotal)}</span></span>
         </div>
-        <button onClick={openNew} className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
+        <div className="ml-auto flex gap-2">
+          <button onClick={exportXlsx} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-700 border border-surface-400/30 text-zinc-300 text-sm rounded-lg hover:text-white"><Download size={13} />Excel</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
+        </div>
       </div>
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
         {filtered.length === 0 ? <div className="p-12 text-center text-zinc-500">Sin ingresos en {getMonthName(month)} {year}</div> : (
@@ -182,23 +189,38 @@ const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingres
               <th className="text-left px-4 py-3 text-zinc-500">Tipo</th>
               <th className="text-right px-4 py-3 text-zinc-500">Base imp.</th>
               <th className="text-right px-4 py-3 text-zinc-500">Total</th>
+              <th className="text-right px-4 py-3 text-zinc-500">Cobrado</th>
+              <th className="text-right px-4 py-3 text-zinc-500">Costes</th>
+              <th className="text-right px-4 py-3 text-zinc-500">Beneficio</th>
+              <th className="text-right px-4 py-3 text-zinc-500">Margen</th>
               <th className="text-left px-4 py-3 text-zinc-500">Estado</th>
               <th className="px-4 py-3"></th>
             </tr></thead>
             <tbody>
-              {filtered.map((i) => (
-                <tr key={i.id} className="border-b border-surface-400/10 hover:bg-surface-700/50">
-                  <td className="px-4 py-3"><p className="text-white font-medium">{i.concepto}</p><p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p></td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${EVENT_TYPE_COLORS[i.tipoEvento] ?? 'bg-zinc-500/10 text-zinc-400'}`}>{EVENT_TYPE_LABELS[i.tipoEvento]}</span></td>
-                  <td className="px-4 py-3 text-right text-purple-400 font-medium">{fmt(i.baseImponible)}</td>
-                  <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${PAYMENT_STATUS_COLORS[i.estadoPago]}`}>{PAYMENT_STATUS_LABELS[i.estadoPago]}</span></td>
-                  <td className="px-4 py-3"><div className="flex gap-1">
-                    <button onClick={() => openEdit(i)} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={13} /></button>
-                    <button onClick={() => showConfirm('¿Eliminar este ingreso? Esta acción no se puede deshacer.', () => onDelete(i.id))} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
-                  </div></td>
-                </tr>
-              ))}
+              {filtered.map((i) => {
+                const costes = gastosEvento.filter((g) => g.ingresoId === i.id).reduce((s, g) => s + g.importe, 0);
+                const cobrado = pagosEvento.filter((p) => p.ingresoId === i.id).reduce((s, p) => s + p.importe, 0);
+                const beneficio = i.baseImponible - costes;
+                const margen = i.baseImponible > 0 ? (beneficio / i.baseImponible) * 100 : 0;
+                return (
+                  <tr key={i.id} className="border-b border-surface-400/10 hover:bg-surface-700/50">
+                    <td className="px-4 py-3"><p className="text-white font-medium">{i.concepto}</p><p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p></td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${EVENT_TYPE_COLORS[i.tipoEvento] ?? 'bg-zinc-500/10 text-zinc-400'}`}>{EVENT_TYPE_LABELS[i.tipoEvento]}</span></td>
+                    <td className="px-4 py-3 text-right text-purple-400 font-medium">{fmt(i.baseImponible)}</td>
+                    <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
+                    <td className="px-4 py-3 text-right text-blue-400">{cobrado > 0 ? fmt(cobrado) : <span className="text-zinc-600">—</span>}</td>
+                    <td className="px-4 py-3 text-right text-red-400">{costes > 0 ? fmt(costes) : <span className="text-zinc-600">—</span>}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${costes > 0 ? (beneficio >= 0 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>{costes > 0 ? fmt(beneficio) : '—'}</td>
+                    <td className={`px-4 py-3 text-right text-xs font-semibold ${costes > 0 ? (margen >= 30 ? 'text-green-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>{costes > 0 ? `${margen.toFixed(0)}%` : '—'}</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${PAYMENT_STATUS_COLORS[i.estadoPago]}`}>{PAYMENT_STATUS_LABELS[i.estadoPago]}</span></td>
+                    <td className="px-4 py-3"><div className="flex gap-1">
+                      <button onClick={() => openDetail(i)} className="p-1.5 rounded text-zinc-500 hover:text-gold-400 hover:bg-gold-500/10" title="Ver detalle financiero"><BarChart2 size={13} /></button>
+                      <button onClick={() => openEdit(i)} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={13} /></button>
+                      <button onClick={() => showConfirm('¿Eliminar este ingreso? Esta acción no se puede deshacer.', () => onDelete(i.id))} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
+                    </div></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -221,6 +243,12 @@ const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingres
           </div>
         </div>
       </Modal>
+
+      <EventoDetailModal
+        ingreso={detailIngreso}
+        onClose={() => setDetailIngreso(null)}
+        onEdit={(i) => { setDetailIngreso(null); openEdit(i); }}
+      />
     </div>
   );
 };

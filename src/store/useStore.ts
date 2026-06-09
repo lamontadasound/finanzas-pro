@@ -14,19 +14,21 @@ import { db } from '../lib/db';
 export const useStore = create<AppState>()((set, get) => ({
 
   // ── Estado inicial vacío (se llena con initData) ──────────────────────────
-  eventos:  [],
-  ingresos: [],
-  gastos:   [],
-  suplidos: [],
-  facturas: [],
-  equipo:   [],
-  _loaded:  false,
-  _error:   null,
+  eventos:      [],
+  ingresos:     [],
+  gastos:       [],
+  suplidos:     [],
+  facturas:     [],
+  equipo:       [],
+  gastosEvento: [],
+  pagosEvento:  [],
+  _loaded:      false,
+  _error:       null,
 
   // ── Carga inicial desde Supabase ──────────────────────────────────────────
   initData: async () => {
     try {
-      const [eventos, ingresos, gastos, suplidos, facturas, equipo] =
+      const [eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento] =
         await Promise.all([
           db.eventos.getAll(),
           db.ingresos.getAll(),
@@ -34,8 +36,10 @@ export const useStore = create<AppState>()((set, get) => ({
           db.suplidos.getAll(),
           db.facturas.getAll(),
           db.equipo.getAll(),
+          db.gastosEvento.getAll(),
+          db.pagosEvento.getAll(),
         ]);
-      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, _loaded: true, _error: null });
+      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento, _loaded: true, _error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[Store] Error al cargar datos:', msg);
@@ -131,5 +135,35 @@ export const useStore = create<AppState>()((set, get) => ({
   deleteEquipo: (id) => {
     set((s) => ({ equipo: s.equipo.filter((x) => x.id !== id) }));
     db.equipo.delete(id).catch((err) => console.error('[Store] deleteEquipo:', err));
+  },
+
+  // ── GASTOS EVENTO ─────────────────────────────────────────────────────────
+  addGastoEvento: (g) => {
+    set((s) => ({ gastosEvento: [...s.gastosEvento, g] }));
+    db.gastosEvento.insert(g).catch((err) => console.error('[Store] addGastoEvento:', err));
+  },
+  updateGastoEvento: (id, partial) => {
+    set((s) => ({ gastosEvento: s.gastosEvento.map((x) => (x.id === id ? { ...x, ...partial } : x)) }));
+    const updated = get().gastosEvento.find((x) => x.id === id);
+    if (updated) db.gastosEvento.upsert(updated).catch((err) => console.error('[Store] updateGastoEvento:', err));
+  },
+  deleteGastoEvento: (id) => {
+    set((s) => ({ gastosEvento: s.gastosEvento.filter((x) => x.id !== id) }));
+    db.gastosEvento.delete(id).catch((err) => console.error('[Store] deleteGastoEvento:', err));
+  },
+
+  // ── PAGOS EVENTO ──────────────────────────────────────────────────────────
+  addPagoEvento: (p) => {
+    set((s) => ({ pagosEvento: [...s.pagosEvento, p] }));
+    db.pagosEvento.insert(p).catch((err) => console.error('[Store] addPagoEvento:', err));
+  },
+  updatePagoEvento: (id, partial) => {
+    set((s) => ({ pagosEvento: s.pagosEvento.map((x) => (x.id === id ? { ...x, ...partial } : x)) }));
+    const updated = get().pagosEvento.find((x) => x.id === id);
+    if (updated) db.pagosEvento.upsert(updated).catch((err) => console.error('[Store] updatePagoEvento:', err));
+  },
+  deletePagoEvento: (id) => {
+    set((s) => ({ pagosEvento: s.pagosEvento.filter((x) => x.id !== id) }));
+    db.pagosEvento.delete(id).catch((err) => console.error('[Store] deletePagoEvento:', err));
   },
 }));

@@ -12,6 +12,8 @@ import type {
   Suplido,
   Factura,
   Equipo,
+  GastoEvento,
+  PagoEvento,
 } from '../types';
 
 // ── Tipos raw de las filas de Supabase ──────────────────────────────────────
@@ -61,6 +63,18 @@ type RawEquipo = {
   base_imponible: number; porcentaje_iva: number; importe_iva: number;
   total: number; fecha_compra: string; proveedor: string | null;
   factura_recibida: boolean; observaciones: string | null; created_at: string;
+};
+
+type RawGastoEvento = {
+  id: string; ingreso_id: string; area: string; fecha: string;
+  concepto: string; categoria: string; importe: number;
+  observaciones: string | null; created_at: string;
+};
+
+type RawPagoEvento = {
+  id: string; ingreso_id: string; area: string; fecha: string;
+  importe: number; metodo_pago: string; concepto: string;
+  observaciones: string | null; created_at: string;
 };
 
 // ── Mappers DB → TS ─────────────────────────────────────────────────────────
@@ -230,6 +244,39 @@ const toDbFactura = (f: Factura): RawFactura => ({
   notas: f.notas ?? null,
 });
 
+const mapGastoEvento = (r: RawGastoEvento): GastoEvento => ({
+  id: r.id, ingresoId: r.ingreso_id, area: r.area as GastoEvento['area'],
+  fecha: r.fecha, concepto: r.concepto,
+  categoria: r.categoria as GastoEvento['categoria'],
+  importe: Number(r.importe),
+  observaciones: r.observaciones ?? undefined,
+  createdAt: r.created_at,
+});
+
+const mapPagoEvento = (r: RawPagoEvento): PagoEvento => ({
+  id: r.id, ingresoId: r.ingreso_id, area: r.area as PagoEvento['area'],
+  fecha: r.fecha, importe: Number(r.importe),
+  metodoPago: r.metodo_pago as PagoEvento['metodoPago'],
+  concepto: r.concepto,
+  observaciones: r.observaciones ?? undefined,
+  createdAt: r.created_at,
+});
+
+const toDbGastoEvento = (g: GastoEvento): RawGastoEvento => ({
+  id: g.id, ingreso_id: g.ingresoId, area: g.area,
+  fecha: g.fecha, concepto: g.concepto, categoria: g.categoria,
+  importe: g.importe, observaciones: g.observaciones ?? null,
+  created_at: g.createdAt,
+});
+
+const toDbPagoEvento = (p: PagoEvento): RawPagoEvento => ({
+  id: p.id, ingreso_id: p.ingresoId, area: p.area,
+  fecha: p.fecha, importe: p.importe,
+  metodo_pago: p.metodoPago, concepto: p.concepto,
+  observaciones: p.observaciones ?? null,
+  created_at: p.createdAt,
+});
+
 const toDbEquipo = (e: Equipo): RawEquipo => ({
   id: e.id, area: e.area, nombre: e.nombre, categoria: e.categoria,
   base_imponible: e.baseImponible,
@@ -291,10 +338,12 @@ function makeCrud<T, R>(
 // ── API pública ──────────────────────────────────────────────────────────────
 
 export const db = {
-  eventos:  makeCrud<Evento,  RawEvento>  ('eventos',  mapEvento,  toDbEvento,  'fecha'),
-  ingresos: makeCrud<Ingreso, RawIngreso> ('ingresos', mapIngreso, toDbIngreso, 'fecha_evento'),
-  gastos:   makeCrud<Gasto,   RawGasto>   ('gastos',   mapGasto,   toDbGasto,   'fecha'),
-  suplidos: makeCrud<Suplido, RawSuplido> ('suplidos', mapSuplido, toDbSuplido, 'fecha'),
-  facturas: makeCrud<Factura, RawFactura> ('facturas', mapFactura, toDbFactura, 'fecha'),
-  equipo:   makeCrud<Equipo,  RawEquipo>  ('equipo',   mapEquipo,  toDbEquipo,  'fecha_compra'),
+  eventos:      makeCrud<Evento,      RawEvento>      ('eventos',      mapEvento,      toDbEvento,      'fecha'),
+  ingresos:     makeCrud<Ingreso,     RawIngreso>     ('ingresos',     mapIngreso,     toDbIngreso,     'fecha_evento'),
+  gastos:       makeCrud<Gasto,       RawGasto>       ('gastos',       mapGasto,       toDbGasto,       'fecha'),
+  suplidos:     makeCrud<Suplido,     RawSuplido>     ('suplidos',     mapSuplido,     toDbSuplido,     'fecha'),
+  facturas:     makeCrud<Factura,     RawFactura>     ('facturas',     mapFactura,     toDbFactura,     'fecha'),
+  equipo:       makeCrud<Equipo,      RawEquipo>      ('equipo',       mapEquipo,      toDbEquipo,      'fecha_compra'),
+  gastosEvento: makeCrud<GastoEvento, RawGastoEvento> ('gastos_evento', mapGastoEvento, toDbGastoEvento, 'fecha'),
+  pagosEvento:  makeCrud<PagoEvento,  RawPagoEvento>  ('pagos_evento',  mapPagoEvento,  toDbPagoEvento,  'fecha'),
 };

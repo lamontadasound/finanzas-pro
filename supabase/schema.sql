@@ -116,10 +116,39 @@ CREATE TABLE IF NOT EXISTS equipo (
   created_at       TEXT    NOT NULL
 );
 
+-- ── GASTOS EVENTO ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS gastos_evento (
+  id            TEXT    PRIMARY KEY,
+  ingreso_id    TEXT    NOT NULL,
+  area          TEXT    NOT NULL,
+  fecha         TEXT    NOT NULL,
+  concepto      TEXT    NOT NULL,
+  categoria     TEXT    NOT NULL,
+  importe       NUMERIC NOT NULL DEFAULT 0,
+  observaciones TEXT,
+  created_at    TEXT    NOT NULL
+);
+
+-- ── PAGOS EVENTO ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS pagos_evento (
+  id            TEXT    PRIMARY KEY,
+  ingreso_id    TEXT    NOT NULL,
+  area          TEXT    NOT NULL,
+  fecha         TEXT    NOT NULL,
+  importe       NUMERIC NOT NULL DEFAULT 0,
+  metodo_pago   TEXT    NOT NULL,
+  concepto      TEXT    NOT NULL,
+  observaciones TEXT,
+  created_at    TEXT    NOT NULL
+);
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
 -- App de usuario único — permitir todas las operaciones con la clave anon
 -- ══════════════════════════════════════════════════════════════════════════════
+ALTER TABLE gastos_evento ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pagos_evento  ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE eventos  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ingresos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gastos   ENABLE ROW LEVEL SECURITY;
@@ -133,4 +162,6 @@ CREATE POLICY "acceso_total" ON ingresos FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "acceso_total" ON gastos   FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "acceso_total" ON suplidos FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "acceso_total" ON facturas FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "acceso_total" ON equipo   FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total" ON equipo        FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total" ON gastos_evento FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total" ON pagos_evento  FOR ALL USING (true) WITH CHECK (true);

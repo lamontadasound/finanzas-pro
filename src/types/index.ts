@@ -32,6 +32,18 @@ export type GastoCategoria =
   | 'Publicidad'
   | 'Otros';
 
+export type GastoEventoCategoria =
+  | 'DJ'
+  | 'Técnico'
+  | 'Fotomatón'
+  | 'Gasolina'
+  | 'Hotel'
+  | 'Alquiler material'
+  | 'Catering'
+  | 'Peajes'
+  | 'Dietas'
+  | 'Otros';
+
 export interface Ingreso {
   id: string;
   area: Area;
@@ -129,6 +141,30 @@ export interface Factura {
   notas?: string;
 }
 
+export interface GastoEvento {
+  id: string;
+  ingresoId: string;
+  area: Area;
+  fecha: string;
+  concepto: string;
+  categoria: GastoEventoCategoria;
+  importe: number;
+  observaciones?: string;
+  createdAt: string;
+}
+
+export interface PagoEvento {
+  id: string;
+  ingresoId: string;
+  area: Area;
+  fecha: string;
+  importe: number;
+  metodoPago: PaymentMethod;
+  concepto: string;
+  observaciones?: string;
+  createdAt: string;
+}
+
 export interface Equipo {
   id: string;
   area: Area;
@@ -153,6 +189,8 @@ export interface AppState {
   suplidos: Suplido[];
   facturas: Factura[];
   equipo: Equipo[];
+  gastosEvento: GastoEvento[];
+  pagosEvento: PagoEvento[];
 
   // ── estado de carga ────────────────────────────────────────────────────────
   _loaded: boolean;
@@ -182,4 +220,12 @@ export interface AppState {
   addEquipo: (e: Equipo) => void;
   updateEquipo: (id: string, e: Partial<Equipo>) => void;
   deleteEquipo: (id: string) => void;
+
+  addGastoEvento: (g: GastoEvento) => void;
+  updateGastoEvento: (id: string, g: Partial<GastoEvento>) => void;
+  deleteGastoEvento: (id: string) => void;
+
+  addPagoEvento: (p: PagoEvento) => void;
+  updatePagoEvento: (id: string, p: Partial<PagoEvento>) => void;
+  deletePagoEvento: (id: string) => void;
 }
