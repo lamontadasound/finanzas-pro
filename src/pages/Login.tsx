@@ -38,7 +38,8 @@ export const Login = () => {
   const handleReset = (e: FormEvent) => {
     e.preventDefault();
     setResetError('');
-    if (resetEmail === import.meta.env.VITE_ADMIN_EMAIL) {
+    const envEmail = (import.meta.env.VITE_ADMIN_EMAIL ?? '').trim();
+    if (resetEmail.trim() === envEmail) {
       setResetDone(true);
     } else {
       setResetError('No existe ninguna cuenta con ese email.');
