@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Receipt, Clock, CheckCircle, CreditCard, FileText } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Receipt, Clock, CheckCircle, CreditCard, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { AreaChart, Area as RechartArea, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useStore } from '../store/useStore';
-import { fmt, fmtShort, buildMonthlyTable, getAvailableYears, getMonthName } from '../utils/helpers';
+import { fmt, fmtShort, fmtDate, buildMonthlyTable, getAvailableYears, getMonthName } from '../utils/helpers';
 import type { Area as AreaType } from '../types';
 
 type AreaFilter = 'todos' | AreaType;
@@ -21,7 +21,8 @@ const KPI = ({ label, value, sub, icon: Icon, color }: { label: string; value: s
 );
 
 export const Dashboard = () => {
-  const { ingresos, gastos, facturas } = useStore();
+  const { ingresos, gastos, facturas, gastosEvento } = useStore();
+  const [cobrosOpen, setCobrosOpen] = useState<number | null>(null);
   const allYears = useMemo(() => getAvailableYears([...ingresos, ...gastos]), [ingresos, gastos]);
   const [year, setYear] = useState(allYears[0] ?? new Date().getFullYear());
   const [month, setMonth] = useState<number | 'all'>('all');
@@ -62,10 +63,32 @@ export const Dashboard = () => {
   const ivaRep = filteredIngresos.reduce((s, i) => s + i.importeIVA, 0);
   const ivaSop = filteredGastos.filter((g) => g.deducible).reduce((s, g) => s + g.importeIVA, 0);
   const ivaLiquidar = ivaRep - ivaSop;
-  const pendienteCobro = filteredIngresos.filter((i) => i.estadoPago !== 'pagado').reduce((s, i) => s + (i.total - i.pagosRecibidos), 0);
+  const pendienteCobro = filteredIngresos.filter((i) => i.estadoPago !== 'pagado').reduce((s, i) => s + Math.max(0, i.total - i.pagosRecibidos), 0);
   const facturasEmitidas = filteredFacturas.filter((f) => f.tipo === 'emitida').length;
   const facturasRecibidas = filteredFacturas.filter((f) => f.tipo === 'recibida').length;
   const facturasNoPagadas = filteredFacturas.filter((f) => f.tipo === 'emitida' && !f.pagada).length;
+
+  // Beneficio real = base imponible ingresos − costes de eventos
+  const filteredIngresoIds = useMemo(() => new Set(filteredIngresos.map((i) => i.id)), [filteredIngresos]);
+  const costesEventoTotal  = useMemo(
+    () => gastosEvento.filter((g) => filteredIngresoIds.has(g.ingresoId)).reduce((s, g) => s + g.importe, 0),
+    [gastosEvento, filteredIngresoIds],
+  );
+  const beneficioReal = totalIngresos - costesEventoTotal;
+
+  // Cobros por mes (año seleccionado, área filtrada)
+  const ingresosAnio = useMemo(() => (area === 'todos' ? ingresos : ingresos.filter((i) => i.area === area))
+    .filter((i) => new Date(i.fechaEvento).getFullYear() === year), [ingresos, area, year]);
+
+  const cobrosMensuales = useMemo(() => Array.from({ length: 12 }, (_, idx) => {
+    const num = idx + 1;
+    const ingMes    = ingresosAnio.filter((i) => new Date(i.fechaEvento).getMonth() + 1 === num);
+    const cobrados  = ingMes.filter((i) => i.estadoPago === 'pagado');
+    const pendientes = ingMes.filter((i) => i.estadoPago !== 'pagado');
+    const totalCobrado   = cobrados.reduce((s, i) => s + i.total, 0);
+    const totalPendiente = pendientes.reduce((s, i) => s + Math.max(0, i.total - i.pagosRecibidos), 0);
+    return { num, label: getMonthName(num), ingMes, cobrados, pendientes, totalCobrado, totalPendiente };
+  }).filter((r) => r.ingMes.length > 0), [ingresosAnio]);
 
   const monthlyData = useMemo(() => buildMonthlyTable(
     area === 'todos' ? ingresos : ingresos.filter((i) => i.area === area),
@@ -102,12 +125,13 @@ export const Dashboard = () => {
       </div>
 
       {/* KPIs row 1 */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <KPI label="Ingresos (s/IVA)" value={fmtShort(totalIngresos)} icon={TrendingUp} color="bg-green-500/10 text-green-400" />
         <KPI label="Gastos (s/IVA)" value={fmtShort(totalGastos)} icon={TrendingDown} color="bg-red-500/10 text-red-400" />
         <KPI label="Beneficio bruto" value={fmtShort(beneficioBruto)} sub="Sin impuestos" icon={DollarSign} color={beneficioBruto >= 0 ? 'bg-gold-500/10 text-gold-400' : 'bg-red-500/10 text-red-400'} />
+        <KPI label="Benef. real eventos" value={fmtShort(beneficioReal)} sub={`Costes ev: ${fmtShort(costesEventoTotal)}`} icon={DollarSign} color={beneficioReal >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'} />
         <KPI label="Beneficio (IS 25%)" value={fmtShort(beneficioNeto)} sub={`IS estimado: ${fmtShort(is25)}`} icon={DollarSign} color="bg-blue-500/10 text-blue-400" />
-        <KPI label="Pendiente cobro" value={fmtShort(pendienteCobro)} icon={Clock} color="bg-yellow-500/10 text-yellow-400" />
+        <KPI label="Pendiente cobro" value={fmtShort(pendienteCobro)} sub={`${ingresosAnio.filter((i) => i.estadoPago !== 'pagado').length} evento(s)`} icon={Clock} color={pendienteCobro > 0 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-green-500/10 text-green-400'} />
       </div>
 
       {/* KPIs row 2 */}
@@ -155,10 +179,89 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Cobros pendientes del año */}
+      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-surface-400/20 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Cobros pendientes {year}</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Estado de cobro por mes y evento</p>
+          </div>
+          {pendienteCobro > 0 && (
+            <span className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm font-semibold rounded-lg">
+              {fmt(pendienteCobro)} por cobrar
+            </span>
+          )}
+          {pendienteCobro === 0 && cobrosMensuales.length > 0 && (
+            <span className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold rounded-lg">✓ Todo cobrado</span>
+          )}
+        </div>
+        {cobrosMensuales.length === 0 ? (
+          <p className="p-8 text-center text-zinc-600 text-sm">Sin ingresos en {year}</p>
+        ) : (
+          <div className="divide-y divide-surface-400/10">
+            {cobrosMensuales.map((row) => (
+              <div key={row.num}>
+                <button
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-surface-700/40 transition-colors text-left"
+                  onClick={() => setCobrosOpen(cobrosOpen === row.num ? null : row.num)}
+                >
+                  <div className="flex items-center gap-3">
+                    {cobrosOpen === row.num
+                      ? <ChevronDown size={14} className="text-zinc-500" />
+                      : <ChevronRight size={14} className="text-zinc-500" />}
+                    <span className="text-sm font-medium text-zinc-300">{row.label}</span>
+                    <span className="text-xs text-zinc-500">{row.ingMes.length} evento(s)</span>
+                    {row.pendientes.length > 0 && (
+                      <span className="px-2 py-0.5 bg-yellow-500/10 text-yellow-400 text-xs rounded-full font-medium">{row.pendientes.length} pendiente(s)</span>
+                    )}
+                    {row.pendientes.length === 0 && (
+                      <span className="px-2 py-0.5 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">✓ Cobrado</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-5 text-sm">
+                    <span className="text-zinc-500">Cobrado: <span className="text-green-400 font-semibold">{fmt(row.totalCobrado)}</span></span>
+                    {row.totalPendiente > 0 && (
+                      <span className="text-zinc-500">Pendiente: <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span></span>
+                    )}
+                  </div>
+                </button>
+                {cobrosOpen === row.num && (
+                  <div className="bg-surface-700/20 border-t border-surface-400/10 divide-y divide-surface-400/5">
+                    {[...row.cobrados, ...row.pendientes].sort((a, b) => b.fechaEvento.localeCompare(a.fechaEvento)).map((i) => {
+                      const pagado = i.estadoPago === 'pagado';
+                      const isParcial = i.estadoPago === 'parcial';
+                      const restante = Math.max(0, i.total - i.pagosRecibidos);
+                      return (
+                        <div key={i.id} className="flex items-center justify-between px-8 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pagado ? 'bg-green-400' : isParcial ? 'bg-orange-400' : 'bg-red-400'}`} />
+                            <div>
+                              <p className="text-sm text-zinc-200">{i.concepto}</p>
+                              <p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)} · {i.area === 'montada' ? 'La Montada' : 'DJ'}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-white">{fmt(i.total)}</p>
+                            {pagado && <p className="text-xs text-green-400">Cobrado ✓</p>}
+                            {isParcial && <p className="text-xs text-orange-400">{fmt(i.pagosRecibidos)} cobrado · {fmt(restante)} pendiente</p>}
+                            {!pagado && !isParcial && <p className="text-xs text-red-400">Sin cobrar</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Monthly summary table */}
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
         <div className="p-5 border-b border-surface-400/20">
           <h3 className="text-sm font-semibold text-white">Resumen mensual — base imponible (sin IVA)</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Benef. real = base ingresos − costes de eventos registrados</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

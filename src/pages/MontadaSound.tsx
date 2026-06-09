@@ -24,7 +24,7 @@ import {
 import { Modal } from '../components/ui/Modal';
 import { EventoDetailModal } from '../components/ui/EventoDetailModal';
 import { useConfirmStore } from '../store/useConfirmStore';
-import type { Ingreso, Gasto } from '../types';
+import type { Ingreso, Gasto, GastoEvento } from '../types';
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -54,11 +54,12 @@ const emptyGasto = (): Omit<Gasto, 'id' | 'createdAt'> => ({
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export const MontadaSound = () => {
-  const { ingresos, gastos, addIngreso, updateIngreso, deleteIngreso, addGasto, updateGasto, deleteGasto } = useStore();
+  const { ingresos, gastos, gastosEvento, addIngreso, updateIngreso, deleteIngreso, addGasto, updateGasto, deleteGasto } = useStore();
   const [tab, setTab] = useState<Tab>('ingresos');
 
-  const montadaIngresos = useMemo(() => ingresos.filter((i) => i.area === 'montada'), [ingresos]);
-  const montadaGastos   = useMemo(() => gastos.filter((g) => g.area === 'montada'), [gastos]);
+  const montadaIngresos     = useMemo(() => ingresos.filter((i) => i.area === 'montada'), [ingresos]);
+  const montadaGastos       = useMemo(() => gastos.filter((g) => g.area === 'montada'), [gastos]);
+  const montadaGastosEvento = useMemo(() => gastosEvento.filter((g) => g.area === 'montada'), [gastosEvento]);
 
   return (
     <div className="p-6 space-y-5">
@@ -79,7 +80,7 @@ export const MontadaSound = () => {
       </div>
 
       {tab === 'resumen' && (
-        <ResumenTab ingresos={montadaIngresos} gastos={montadaGastos} />
+        <ResumenTab ingresos={montadaIngresos} gastos={montadaGastos} gastosEvento={montadaGastosEvento} />
       )}
       {tab === 'ingresos' && (
         <IngresosTab
@@ -103,25 +104,75 @@ export const MontadaSound = () => {
 
 // ── Resumen ───────────────────────────────────────────────────────────────────
 
-const ResumenTab = ({ ingresos, gastos }: { ingresos: Ingreso[]; gastos: Gasto[] }) => {
+const ResumenTab = ({
+  ingresos,
+  gastos,
+  gastosEvento,
+}: {
+  ingresos: Ingreso[];
+  gastos: Gasto[];
+  gastosEvento: GastoEvento[];
+}) => {
   const years   = useMemo(() => getAvailableYears([...ingresos, ...gastos]), [ingresos, gastos]);
-  const [year, setYear] = useState(years[0] ?? new Date().getFullYear());
-  const monthly = useMemo(() => buildMonthlyTable(ingresos, gastos, year), [ingresos, gastos, year]);
-  const chartData = monthly.map((r) => ({ mes: r.label.slice(0, 3), ingresos: r.ing, gastos: r.gTotal }));
-  const totIng = monthly.reduce((s, r) => s + r.ing, 0);
-  const totGas = monthly.reduce((s, r) => s + r.gTotal, 0);
+  const [year, setYear]           = useState(years[0] ?? new Date().getFullYear());
+  const [cobrosOpen, setCobrosOpen] = useState<number | null>(null); // mes expandido en cobros
+  const monthly   = useMemo(() => buildMonthlyTable(ingresos, gastos, year), [ingresos, gastos, year]);
+
+  // Enriquecer cada fila mensual con costes de evento, beneficio real y cobros
+  const monthlyEnriched = useMemo(() => monthly.map((row) => {
+    const ingMes = ingresos.filter((i) => {
+      const d = new Date(i.fechaEvento);
+      return d.getFullYear() === year && d.getMonth() + 1 === row.num;
+    });
+    const costesEvento  = ingMes.reduce((s, i) =>
+      s + gastosEvento.filter((g) => g.ingresoId === i.id).reduce((s2, g) => s2 + g.importe, 0), 0);
+    const beneficioReal = ingMes.reduce((s, i) => s + i.baseImponible, 0) - costesEvento;
+    const cobrados      = ingMes.filter((i) => i.estadoPago === 'pagado');
+    const pendientes    = ingMes.filter((i) => i.estadoPago !== 'pagado');
+    const totalCobrado  = cobrados.reduce((s, i) => s + i.total, 0);
+    const totalPendiente = pendientes.reduce((s, i) => s + Math.max(0, i.total - i.pagosRecibidos), 0);
+    return { ...row, costesEvento, beneficioReal, cobrados, pendientes, totalCobrado, totalPendiente, ingMes };
+  }), [monthly, ingresos, gastosEvento, year]);
+
+  const totIng          = monthlyEnriched.reduce((s, r) => s + r.ing, 0);
+  const totGas          = monthlyEnriched.reduce((s, r) => s + r.gTotal, 0);
+  const totBenefReal    = monthlyEnriched.reduce((s, r) => s + r.beneficioReal, 0);
+  const totPendiente    = monthlyEnriched.reduce((s, r) => s + r.totalPendiente, 0);
+  const chartData       = monthlyEnriched.map((r) => ({ mes: r.label.slice(0, 3), ingresos: r.ing, gastos: r.gTotal, 'benef. real': r.beneficioReal }));
   let acum = 0;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* ── KPIs rápidos ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-zinc-500 mb-1">Ingresos (base)</p>
+          <p className="text-lg font-bold text-green-400">{fmt(totIng)}</p>
+        </div>
+        <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-zinc-500 mb-1">Gastos gles.</p>
+          <p className="text-lg font-bold text-red-400">{fmt(totGas)}</p>
+        </div>
+        <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-zinc-500 mb-1">Beneficio real eventos</p>
+          <p className={`text-lg font-bold ${totBenefReal >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totBenefReal)}</p>
+          <p className="text-xs text-zinc-600 mt-0.5">Base − costes evento</p>
+        </div>
+        <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-zinc-500 mb-1">Pendiente de cobro</p>
+          <p className={`text-lg font-bold ${totPendiente > 0 ? 'text-yellow-400' : 'text-green-400'}`}>{fmt(totPendiente)}</p>
+          <p className="text-xs text-zinc-600 mt-0.5">{monthlyEnriched.flatMap((r) => r.pendientes).length} evento(s)</p>
+        </div>
+      </div>
+
+      {/* Selector de año */}
+      <div>
         <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="bg-surface-700 border border-surface-400/30 text-white text-sm rounded-lg px-3 py-1.5 outline-none">
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <span className="text-sm text-zinc-400">Ingresos: <span className="text-green-400 font-semibold">{fmt(totIng)}</span></span>
-        <span className="text-sm text-zinc-400">Gastos gles: <span className="text-red-400 font-semibold">{fmt(totGas)}</span></span>
-        <span className="text-sm text-zinc-400">Balance: <span className={`font-semibold ${totIng - totGas >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totIng - totGas)}</span></span>
       </div>
+
+      {/* Gráfico */}
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-5">
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData} barGap={2}>
@@ -132,27 +183,41 @@ const ResumenTab = ({ ingresos, gastos }: { ingresos: Ingreso[]; gastos: Gasto[]
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="ingresos" name="Ingresos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             <Bar dataKey="gastos"   name="Gastos gles" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="benef. real" name="Benef. real" fill="#22c55e" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+
+      {/* Tabla mensual enriquecida */}
+      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
           <thead><tr className="border-b border-surface-400/20">
             <th className="text-left px-4 py-3 text-zinc-500">Mes</th>
             <th className="text-right px-4 py-3 text-zinc-500">Ingresos</th>
-            <th className="text-right px-4 py-3 text-zinc-500">G. Fijos</th>
-            <th className="text-right px-4 py-3 text-zinc-500">G. Variables</th>
-            <th className="text-right px-4 py-3 text-zinc-500">Balance</th>
+            <th className="text-right px-4 py-3 text-zinc-500">Costes ev.</th>
+            <th className="text-right px-4 py-3 text-zinc-500">Benef. real</th>
+            <th className="text-right px-4 py-3 text-zinc-500">G. Gles</th>
+            <th className="text-right px-4 py-3 text-zinc-500">Cobrado</th>
+            <th className="text-right px-4 py-3 text-zinc-500">Pendiente</th>
             <th className="text-right px-4 py-3 text-zinc-500">Acumulado</th>
           </tr></thead>
           <tbody>
-            {monthly.map((row) => { acum += row.balance; return (
-              <tr key={row.num} className={`border-b border-surface-400/10 hover:bg-surface-700/50 ${row.ing === 0 && row.gTotal === 0 ? 'opacity-40' : ''}`}>
+            {monthlyEnriched.map((row) => { acum += row.balance; const hasData = row.ing > 0 || row.gTotal > 0; return (
+              <tr key={row.num} className={`border-b border-surface-400/10 hover:bg-surface-700/50 ${!hasData ? 'opacity-40' : ''}`}>
                 <td className="px-4 py-2.5 text-zinc-300 font-medium">{row.label}</td>
                 <td className="px-4 py-2.5 text-right text-green-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
-                <td className="px-4 py-2.5 text-right text-zinc-400">{row.gFijo > 0 ? fmt(row.gFijo) : '—'}</td>
-                <td className="px-4 py-2.5 text-right text-zinc-400">{row.gVar > 0 ? fmt(row.gVar) : '—'}</td>
-                <td className={`px-4 py-2.5 text-right font-semibold ${row.balance >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{row.ing > 0 || row.gTotal > 0 ? fmt(row.balance) : '—'}</td>
+                <td className="px-4 py-2.5 text-right text-red-400">{row.costesEvento > 0 ? fmt(row.costesEvento) : '—'}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold ${row.ing > 0 ? (row.beneficioReal >= 0 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>
+                  {row.ing > 0 ? fmt(row.beneficioReal) : '—'}
+                </td>
+                <td className="px-4 py-2.5 text-right text-zinc-400">{row.gTotal > 0 ? fmt(row.gTotal) : '—'}</td>
+                <td className="px-4 py-2.5 text-right text-green-400">{row.totalCobrado > 0 ? fmt(row.totalCobrado) : '—'}</td>
+                <td className="px-4 py-2.5 text-right">
+                  {row.totalPendiente > 0
+                    ? <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span>
+                    : <span className="text-zinc-600">—</span>
+                  }
+                </td>
                 <td className={`px-4 py-2.5 text-right font-semibold ${acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(acum)}</td>
               </tr>
             ); })}
@@ -160,12 +225,103 @@ const ResumenTab = ({ ingresos, gastos }: { ingresos: Ingreso[]; gastos: Gasto[]
           <tfoot><tr className="bg-surface-700/50 font-semibold">
             <td className="px-4 py-3 text-zinc-300">TOTAL</td>
             <td className="px-4 py-3 text-right text-green-400">{fmt(totIng)}</td>
-            <td className="px-4 py-3 text-right text-zinc-400">{fmt(monthly.reduce((s, r) => s + r.gFijo, 0))}</td>
-            <td className="px-4 py-3 text-right text-zinc-400">{fmt(monthly.reduce((s, r) => s + r.gVar, 0))}</td>
-            <td className={`px-4 py-3 text-right ${totIng - totGas >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totIng - totGas)}</td>
+            <td className="px-4 py-3 text-right text-red-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.costesEvento, 0))}</td>
+            <td className={`px-4 py-3 text-right ${totBenefReal >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totBenefReal)}</td>
+            <td className="px-4 py-3 text-right text-zinc-400">{fmt(totGas)}</td>
+            <td className="px-4 py-3 text-right text-green-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.totalCobrado, 0))}</td>
+            <td className={`px-4 py-3 text-right ${totPendiente > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>{fmt(totPendiente)}</td>
             <td className="px-4 py-3 text-right text-blue-400">{fmt(acum)}</td>
           </tr></tfoot>
         </table>
+      </div>
+
+      {/* ── Cobros pendientes por mes ── */}
+      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-surface-400/20 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white">Cobros pendientes {year}</h3>
+          {totPendiente > 0 && (
+            <span className="px-3 py-1 bg-yellow-500/10 text-yellow-400 text-sm font-semibold rounded-lg">{fmt(totPendiente)} por cobrar</span>
+          )}
+        </div>
+        {monthlyEnriched.filter((r) => r.pendientes.length > 0 || r.cobrados.length > 0).length === 0 ? (
+          <p className="p-8 text-center text-zinc-600 text-sm">Sin ingresos registrados en {year}</p>
+        ) : (
+          <div className="divide-y divide-surface-400/10">
+            {monthlyEnriched.filter((r) => r.ingMes.length > 0).map((row) => (
+              <div key={row.num}>
+                {/* Cabecera del mes */}
+                <button
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-surface-700/40 transition-colors text-left"
+                  onClick={() => setCobrosOpen(cobrosOpen === row.num ? null : row.num)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-zinc-300">{row.label}</span>
+                    <span className="text-xs text-zinc-500">{row.ingMes.length} evento(s)</span>
+                    {row.pendientes.length > 0 && (
+                      <span className="px-2 py-0.5 bg-yellow-500/10 text-yellow-400 text-xs rounded-full font-medium">
+                        {row.pendientes.length} pendiente(s)
+                      </span>
+                    )}
+                    {row.pendientes.length === 0 && row.cobrados.length > 0 && (
+                      <span className="px-2 py-0.5 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">✓ Todo cobrado</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-zinc-500">Cobrado: <span className="text-green-400 font-medium">{fmt(row.totalCobrado)}</span></span>
+                    {row.totalPendiente > 0 && (
+                      <span className="text-zinc-500">Pendiente: <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span></span>
+                    )}
+                    <span className={`text-zinc-400 transition-transform ${cobrosOpen === row.num ? 'rotate-90' : ''}`}>›</span>
+                  </div>
+                </button>
+
+                {/* Detalle del mes */}
+                {cobrosOpen === row.num && (
+                  <div className="bg-surface-700/30 px-5 py-3 space-y-2">
+                    {/* Cobrados */}
+                    {row.cobrados.map((i) => (
+                      <div key={i.id} className="flex items-center justify-between py-1.5 border-b border-surface-400/5 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm text-zinc-200">{i.concepto}</p>
+                            <p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-green-400">{fmt(i.total)}</p>
+                          <p className="text-xs text-green-400/70">Cobrado ✓</p>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Pendientes */}
+                    {row.pendientes.map((i) => {
+                      const restante = Math.max(0, i.total - i.pagosRecibidos);
+                      const isParcial = i.estadoPago === 'parcial';
+                      return (
+                        <div key={i.id} className="flex items-center justify-between py-1.5 border-b border-surface-400/5 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isParcial ? 'bg-orange-400' : 'bg-red-400'}`} />
+                            <div>
+                              <p className="text-sm text-zinc-200">{i.concepto}</p>
+                              <p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-white">{fmt(i.total)}</p>
+                            <p className={`text-xs font-medium ${isParcial ? 'text-orange-400' : 'text-red-400'}`}>
+                              {isParcial ? `${fmt(i.pagosRecibidos)} cobrado · ${fmt(restante)} pendiente` : 'Sin cobrar'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
