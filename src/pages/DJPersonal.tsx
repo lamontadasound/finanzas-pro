@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, Check, X, Download, BarChart2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, Check, X, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
@@ -62,7 +62,7 @@ export const DJPersonal = () => {
         ))}
       </div>
       {tab === 'resumen' && <ResumenTab ingresos={djIngresos} gastos={djGastos} />}
-      {tab === 'ingresos' && <IngresosTab ingresos={djIngresos} onAdd={(i) => addIngreso({ ...i, id: uid(), createdAt: new Date().toISOString().slice(0, 10) })} onUpdate={updateIngreso} onDelete={deleteIngreso} />}
+      {tab === 'ingresos' && <IngresosTab ingresos={djIngresos} onAdd={addIngreso} onUpdate={updateIngreso} onDelete={deleteIngreso} />}
       {tab === 'gastos' && <GastosTab gastos={djGastos} onAdd={(g) => addGasto({ ...g, id: uid(), createdAt: new Date().toISOString().slice(0, 10) })} onUpdate={updateGasto} onDelete={deleteGasto} />}
       {tab === 'suplidos' && <SuplidosTab suplidos={djSuplidos} onAdd={(s) => addSuplido({ ...s, id: uid(), createdAt: new Date().toISOString().slice(0, 10) })} onUpdate={updateSuplido} onDelete={deleteSuplido} />}
     </div>
@@ -136,88 +136,109 @@ const ResumenTab = ({ ingresos, gastos }: { ingresos: Ingreso[]; gastos: Gasto[]
   );
 };
 
-const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingreso[]; onAdd: (i: Omit<Ingreso, 'id' | 'createdAt'>) => void; onUpdate: (id: string, i: Partial<Ingreso>) => void; onDelete: (id: string) => void }) => {
-  const { gastosEvento, pagosEvento } = useStore();
+const IngresosTab = ({
+  ingresos, onAdd, onUpdate, onDelete,
+}: {
+  ingresos: Ingreso[];
+  onAdd: (i: Ingreso) => void;
+  onUpdate: (id: string, i: Partial<Ingreso>) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const { gastosEvento } = useStore();
   const { year, setYear, month, prevMonth, nextMonth, years } = useYearMonth(ingresos);
+  const showConfirm = useConfirmStore((s) => s.show);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Omit<Ingreso, 'id' | 'createdAt'>>(emptyIngreso());
-  const [editId, setEditId] = useState<string | null>(null);
   const [detailIngreso, setDetailIngreso] = useState<Ingreso | null>(null);
-  const showConfirm = useConfirmStore((s) => s.show);
 
-  const filtered = useMemo(() => ingresos.filter((i) => { const d = new Date(i.fechaEvento); return d.getFullYear() === year && d.getMonth() + 1 === month; }), [ingresos, year, month]);
-  const totBase = filtered.reduce((s, i) => s + i.baseImponible, 0);
+  const filtered = useMemo(() =>
+    ingresos
+      .filter((i) => { const d = new Date(i.fechaEvento); return d.getFullYear() === year && d.getMonth() + 1 === month; })
+      .sort((a, b) => b.fechaEvento.localeCompare(a.fechaEvento)),
+    [ingresos, year, month],
+  );
+  const totBase  = filtered.reduce((s, i) => s + i.baseImponible, 0);
+  const totIVA   = filtered.reduce((s, i) => s + i.importeIVA, 0);
   const totTotal = filtered.reduce((s, i) => s + i.total, 0);
 
   const exportXlsx = () => {
     const all = ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === year);
-    const rows = all.map((i) => ({ Fecha: i.fechaEvento, Concepto: i.concepto, Cliente: i.cliente, 'Base imp.': i.baseImponible, 'IVA %': i.porcentajeIVA, IVA: i.importeIVA, Total: i.total, Estado: i.estadoPago }));
+    const rows = all.map((i) => {
+      const costes = gastosEvento.filter((g) => g.ingresoId === i.id).reduce((s, g) => s + g.importe, 0);
+      return { Fecha: i.fechaEvento, Concepto: i.concepto, Cliente: i.cliente, 'Base imp.': i.baseImponible, 'IVA %': i.porcentajeIVA, IVA: i.importeIVA, Total: i.total, Factura: i.facturaEmitida ? 'Sí' : 'No', Estado: i.estadoPago, Costes: costes, Beneficio: i.baseImponible - costes };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Ingresos DJ');
     XLSX.writeFile(wb, `dj-ingresos-${year}.xlsx`);
   };
 
-  const openNew = () => { setForm(emptyIngreso()); setEditId(null); setModal(true); };
-  const openEdit = (i: Ingreso) => { setForm({ ...i }); setEditId(i.id); setModal(true); };
-  const openDetail = (i: Ingreso) => setDetailIngreso(i);
-  const setField = (k: keyof typeof form, v: any) => setForm((f) => {
+  const setField = (k: keyof typeof form, v: unknown) => setForm((f) => {
     const next = { ...f, [k]: v };
     if (k === 'baseImponible' || k === 'porcentajeIVA') { const r = calcIVA(Number(next.baseImponible), Number(next.porcentajeIVA)); return { ...next, ...r }; }
     return next;
   });
-  const save = () => { if (editId) onUpdate(editId, form); else onAdd(form); setModal(false); };
+
+  const saveNew = () => {
+    const newId = uid();
+    const newIngreso: Ingreso = { ...form, id: newId, createdAt: new Date().toISOString().slice(0, 10) };
+    onAdd(newIngreso);
+    setModal(false);
+    setForm(emptyIngreso());
+    setDetailIngreso(newIngreso);
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <MonthNav year={year} years={years} month={month} prevMonth={prevMonth} nextMonth={nextMonth} setYear={setYear} />
-        <div className="flex gap-3 ml-2 text-sm text-zinc-400">
+        <div className="flex gap-3 ml-1 text-sm text-zinc-400">
           <span>Base: <span className="text-purple-400 font-semibold">{fmt(totBase)}</span></span>
-          <span>Total c/IVA: <span className="text-white font-semibold">{fmt(totTotal)}</span></span>
+          <span>IVA: <span className="text-zinc-300">{fmt(totIVA)}</span></span>
+          <span>Total: <span className="text-white font-semibold">{fmt(totTotal)}</span></span>
         </div>
         <div className="ml-auto flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-700 border border-surface-400/30 text-zinc-300 text-sm rounded-lg hover:text-white"><Download size={13} />Excel</button>
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
+          <button onClick={() => { setForm(emptyIngreso()); setModal(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
         </div>
       </div>
-      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
+      <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden overflow-x-auto">
         {filtered.length === 0 ? <div className="p-12 text-center text-zinc-500">Sin ingresos en {getMonthName(month)} {year}</div> : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[860px]">
             <thead><tr className="border-b border-surface-400/20">
               <th className="text-left px-4 py-3 text-zinc-500">Concepto / Cliente</th>
               <th className="text-left px-4 py-3 text-zinc-500">Tipo</th>
               <th className="text-right px-4 py-3 text-zinc-500">Base imp.</th>
+              <th className="text-right px-4 py-3 text-zinc-500">IVA</th>
               <th className="text-right px-4 py-3 text-zinc-500">Total</th>
-              <th className="text-right px-4 py-3 text-zinc-500">Cobrado</th>
+              <th className="text-center px-4 py-3 text-zinc-500">Factura</th>
+              <th className="text-left px-4 py-3 text-zinc-500">Estado</th>
               <th className="text-right px-4 py-3 text-zinc-500">Costes</th>
               <th className="text-right px-4 py-3 text-zinc-500">Beneficio</th>
-              <th className="text-right px-4 py-3 text-zinc-500">Margen</th>
-              <th className="text-left px-4 py-3 text-zinc-500">Estado</th>
-              <th className="px-4 py-3"></th>
+              <th className="px-4 py-3 w-16"></th>
             </tr></thead>
             <tbody>
               {filtered.map((i) => {
-                const costes = gastosEvento.filter((g) => g.ingresoId === i.id).reduce((s, g) => s + g.importe, 0);
-                const cobrado = pagosEvento.filter((p) => p.ingresoId === i.id).reduce((s, p) => s + p.importe, 0);
+                const costes    = gastosEvento.filter((g) => g.ingresoId === i.id).reduce((s, g) => s + g.importe, 0);
                 const beneficio = i.baseImponible - costes;
-                const margen = i.baseImponible > 0 ? (beneficio / i.baseImponible) * 100 : 0;
+                const hasCostes = costes > 0;
                 return (
-                  <tr key={i.id} className="border-b border-surface-400/10 hover:bg-surface-700/50">
+                  <tr key={i.id} className="border-b border-surface-400/10 hover:bg-surface-700/40 cursor-pointer" onClick={() => setDetailIngreso(i)}>
                     <td className="px-4 py-3"><p className="text-white font-medium">{i.concepto}</p><p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p></td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${EVENT_TYPE_COLORS[i.tipoEvento] ?? 'bg-zinc-500/10 text-zinc-400'}`}>{EVENT_TYPE_LABELS[i.tipoEvento]}</span></td>
                     <td className="px-4 py-3 text-right text-purple-400 font-medium">{fmt(i.baseImponible)}</td>
+                    <td className="px-4 py-3 text-right text-zinc-400 text-xs">{i.porcentajeIVA}%<br />{fmt(i.importeIVA)}</td>
                     <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
-                    <td className="px-4 py-3 text-right text-blue-400">{cobrado > 0 ? fmt(cobrado) : <span className="text-zinc-600">—</span>}</td>
-                    <td className="px-4 py-3 text-right text-red-400">{costes > 0 ? fmt(costes) : <span className="text-zinc-600">—</span>}</td>
-                    <td className={`px-4 py-3 text-right font-semibold ${costes > 0 ? (beneficio >= 0 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>{costes > 0 ? fmt(beneficio) : '—'}</td>
-                    <td className={`px-4 py-3 text-right text-xs font-semibold ${costes > 0 ? (margen >= 30 ? 'text-green-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>{costes > 0 ? `${margen.toFixed(0)}%` : '—'}</td>
+                    <td className="px-4 py-3 text-center">{i.facturaEmitida ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/15 text-green-400">{i.numeroFactura ?? 'Sí'}</span> : <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/10 text-zinc-500">No</span>}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${PAYMENT_STATUS_COLORS[i.estadoPago]}`}>{PAYMENT_STATUS_LABELS[i.estadoPago]}</span></td>
-                    <td className="px-4 py-3"><div className="flex gap-1">
-                      <button onClick={() => openDetail(i)} className="p-1.5 rounded text-zinc-500 hover:text-gold-400 hover:bg-gold-500/10" title="Ver detalle financiero"><BarChart2 size={13} /></button>
-                      <button onClick={() => openEdit(i)} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={13} /></button>
-                      <button onClick={() => showConfirm('¿Eliminar este ingreso? Esta acción no se puede deshacer.', () => onDelete(i.id))} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
-                    </div></td>
+                    <td className="px-4 py-3 text-right">{hasCostes ? <span className="text-red-400 font-medium">{fmt(costes)}</span> : <span className="text-zinc-600 text-xs">—</span>}</td>
+                    <td className="px-4 py-3 text-right">{hasCostes ? <span className={`font-semibold ${beneficio >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(beneficio)}</span> : <span className="text-zinc-600 text-xs">—</span>}</td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button onClick={(e) => { e.stopPropagation(); setDetailIngreso(i); }} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600" title="Ver detalle"><Edit2 size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); showConfirm('¿Eliminar este ingreso?', () => onDelete(i.id)); }} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -225,29 +246,40 @@ const IngresosTab = ({ ingresos, onAdd, onUpdate, onDelete }: { ingresos: Ingres
           </table>
         )}
       </div>
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar ingreso' : 'Nuevo ingreso DJ'} width="max-w-2xl">
+      <p className="text-xs text-zinc-600">Haz clic en cualquier fila para editar, añadir costes y ver el resumen financiero.</p>
+
+      <Modal open={modal} onClose={() => setModal(false)} title="Nuevo ingreso DJ" width="max-w-2xl">
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2"><label className="text-xs text-zinc-400 mb-1 block">Concepto *</label><input value={form.concepto} onChange={(e) => setField('concepto', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" /></div>
+          <div className="col-span-2"><label className="text-xs text-zinc-400 mb-1 block">Concepto *</label><input value={form.concepto} onChange={(e) => setField('concepto', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" placeholder="Ej: DJ Set boda, Actuación festival..." /></div>
           <div><label className="text-xs text-zinc-400 mb-1 block">Cliente *</label><input value={form.cliente} onChange={(e) => setField('cliente', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" /></div>
           <div><label className="text-xs text-zinc-400 mb-1 block">Tipo</label><select value={form.tipoEvento} onChange={(e) => setField('tipoEvento', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none">{Object.entries(EVENT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
           <div><label className="text-xs text-zinc-400 mb-1 block">Fecha *</label><input type="date" value={form.fechaEvento} onChange={(e) => setField('fechaEvento', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" /></div>
-          <div><label className="text-xs text-zinc-400 mb-1 block">Base imponible (€)</label><input type="number" value={form.baseImponible} onChange={(e) => setField('baseImponible', Number(e.target.value))} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" /></div>
+          <div><label className="text-xs text-zinc-400 mb-1 block">Base imponible (€)</label><input type="number" value={form.baseImponible || ''} onChange={(e) => setField('baseImponible', Number(e.target.value))} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none" placeholder="0.00" /></div>
           <div><label className="text-xs text-zinc-400 mb-1 block">% IVA</label><select value={form.porcentajeIVA} onChange={(e) => setField('porcentajeIVA', Number(e.target.value))} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none">{[0, 4, 10, 21].map((p) => <option key={p} value={p}>{p}%</option>)}</select></div>
           <div className="col-span-2 bg-surface-600/50 rounded-lg px-4 py-2 flex gap-6 text-sm"><span className="text-zinc-400">IVA: <span className="text-white">{fmt(form.importeIVA)}</span></span><span className="text-zinc-400">Total: <span className="text-gold-400 font-bold">{fmt(form.total)}</span></span></div>
           <div><label className="text-xs text-zinc-400 mb-1 block">Método pago</label><select value={form.metodoPago} onChange={(e) => setField('metodoPago', e.target.value)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none">{Object.entries(METODO_PAGO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-          <div><label className="text-xs text-zinc-400 mb-1 block">Estado</label><select value={form.estadoPago} onChange={(e) => setField('estadoPago', e.target.value as any)} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"><option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option></select></div>
-          <div className="col-span-2 flex items-center gap-2"><input type="checkbox" checked={form.facturaEmitida} onChange={(e) => setField('facturaEmitida', e.target.checked)} className="accent-gold-500" /><label className="text-sm text-zinc-300">Factura emitida</label></div>
+          <div><label className="text-xs text-zinc-400 mb-1 block">Estado</label><select value={form.estadoPago} onChange={(e) => setField('estadoPago', e.target.value as Ingreso['estadoPago'])} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"><option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Cobrado</option></select></div>
+          <div className="col-span-2 flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.facturaEmitida} onChange={(e) => setField('facturaEmitida', e.target.checked)} className="accent-gold-500 w-4 h-4" />
+              <span className="text-sm font-medium text-white">Factura emitida: <span className={form.facturaEmitida ? 'text-green-400' : 'text-zinc-500'}>{form.facturaEmitida ? 'Sí' : 'No'}</span></span>
+            </label>
+            {form.facturaEmitida && (
+              <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value)} className="flex-1 bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none font-mono" placeholder="Nº factura" />
+            )}
+          </div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar' : 'Añadir'}</button>
+            <button onClick={saveNew} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">Crear ingreso →</button>
           </div>
         </div>
+        <p className="text-xs text-zinc-600 mt-3 text-center">Al guardar podrás añadir costes del evento en el detalle</p>
       </Modal>
 
       <EventoDetailModal
         ingreso={detailIngreso}
         onClose={() => setDetailIngreso(null)}
-        onEdit={(i) => { setDetailIngreso(null); openEdit(i); }}
+        onUpdate={onUpdate}
       />
     </div>
   );
