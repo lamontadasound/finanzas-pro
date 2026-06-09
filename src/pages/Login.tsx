@@ -187,6 +187,37 @@ export const Login = () => {
         <p className="text-center text-xs text-zinc-700">
           Acceso restringido · Solo administrador
         </p>
+
+        {/* ── DIAGNÓSTICO TEMPORAL — borrar tras confirmar login ── */}
+        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 text-xs font-mono space-y-1">
+          <p className="text-zinc-500 font-sans font-semibold mb-2">🔧 Debug (borrar tras verificar)</p>
+          <p>
+            <span className="text-zinc-500">EMAIL env: </span>
+            <span className="text-yellow-400">
+              {import.meta.env.VITE_ADMIN_EMAIL
+                ? `"${import.meta.env.VITE_ADMIN_EMAIL}"`
+                : '❌ NO DEFINIDA'}
+            </span>
+          </p>
+          <p>
+            <span className="text-zinc-500">PASSWORD env: </span>
+            <span className="text-yellow-400">
+              {import.meta.env.VITE_ADMIN_PASSWORD
+                ? `✅ definida (${String(import.meta.env.VITE_ADMIN_PASSWORD).length} caracteres)`
+                : '❌ NO DEFINIDA'}
+            </span>
+          </p>
+          <p>
+            <span className="text-zinc-500">PASSWORD primeros 2 caracteres: </span>
+            <span className="text-orange-400">
+              {import.meta.env.VITE_ADMIN_PASSWORD
+                ? `"${String(import.meta.env.VITE_ADMIN_PASSWORD).slice(0, 2)}…"`
+                : '—'}
+            </span>
+          </p>
+        </div>
+        {/* ── FIN DIAGNÓSTICO ── */}
+
       </div>
     </div>
   );
