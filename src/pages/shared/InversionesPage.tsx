@@ -23,7 +23,8 @@ const EMPTY = (area: Area): Partial<Equipo> => ({
 });
 
 export const InversionesPage = ({ area }: Props) => {
-  const equipo       = useStore((s) => s.equipo.filter((e) => e.area === area));
+  const allEquipo    = useStore((s) => s.equipo);
+  const equipo       = useMemo(() => allEquipo.filter((e) => e.area === area), [allEquipo, area]);
   const addEquipo    = useStore((s) => s.addEquipo);
   const updateEquipo = useStore((s) => s.updateEquipo);
   const deleteEquipo = useStore((s) => s.deleteEquipo);

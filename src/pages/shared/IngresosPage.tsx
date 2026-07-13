@@ -34,7 +34,8 @@ const EMPTY = (area: Area): Partial<Ingreso> => ({
 });
 
 export const IngresosPage = ({ area }: Props) => {
-  const ingresos     = useStore((s) => s.ingresos.filter((i) => i.area === area));
+  const allIngresos  = useStore((s) => s.ingresos);
+  const ingresos     = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
   const addIngreso   = useStore((s) => s.addIngreso);
   const updateIngreso = useStore((s) => s.updateIngreso);
   const deleteIngreso = useStore((s) => s.deleteIngreso);

@@ -10,10 +10,14 @@ const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Juli
 interface Props { area: Area }
 
 export const InformesPage = ({ area }: Props) => {
-  const ingresos     = useStore((s) => s.ingresos.filter((i) => i.area === area));
-  const gastos       = useStore((s) => s.gastos.filter((g) => g.area === area));
-  const gastosEvento = useStore((s) => s.gastosEvento.filter((g) => g.area === area));
-  const equipo       = useStore((s) => s.equipo.filter((e) => e.area === area));
+  const allIngresos     = useStore((s) => s.ingresos);
+  const allGastos       = useStore((s) => s.gastos);
+  const allGastosEvento = useStore((s) => s.gastosEvento);
+  const allEquipo       = useStore((s) => s.equipo);
+  const ingresos     = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
+  const gastos       = useMemo(() => allGastos.filter((g) => g.area === area), [allGastos, area]);
+  const gastosEvento = useMemo(() => allGastosEvento.filter((g) => g.area === area), [allGastosEvento, area]);
+  const equipo       = useMemo(() => allEquipo.filter((e) => e.area === area), [allEquipo, area]);
 
   const [year, setYear] = useState(new Date().getFullYear());
 

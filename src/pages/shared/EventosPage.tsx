@@ -35,7 +35,8 @@ const EMPTY_GE = (eventoId: string, area: Area): Partial<GastoEvento> => ({
 });
 
 export const EventosPage = ({ area }: Props) => {
-  const eventos      = useStore((s) => s.eventos.filter((e) => e.area === area));
+  const allEventos   = useStore((s) => s.eventos);
+  const eventos      = useMemo(() => allEventos.filter((e) => e.area === area), [allEventos, area]);
   const gastosEvento = useStore((s) => s.gastosEvento);
   const pagosEvento  = useStore((s) => s.pagosEvento);
   const addEvento    = useStore((s) => s.addEvento);

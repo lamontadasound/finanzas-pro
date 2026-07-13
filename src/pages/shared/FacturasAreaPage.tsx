@@ -20,7 +20,8 @@ const EMPTY = (area: Area): Partial<Factura> => ({
 });
 
 export const FacturasAreaPage = ({ area }: Props) => {
-  const facturas      = useStore((s) => s.facturas.filter((f) => f.area === area));
+  const allFacturas   = useStore((s) => s.facturas);
+  const facturas      = useMemo(() => allFacturas.filter((f) => f.area === area), [allFacturas, area]);
   const addFactura    = useStore((s) => s.addFactura);
   const updateFactura = useStore((s) => s.updateFactura);
   const deleteFactura = useStore((s) => s.deleteFactura);

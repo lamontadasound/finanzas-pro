@@ -151,10 +151,14 @@ const CobrosMes = ({ ingresos }: { ingresos: Ingreso[] }) => {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export const ResumenPage = ({ area }: Props) => {
-  const ingresos     = useStore((s) => s.ingresos.filter((i) => i.area === area));
-  const gastos       = useStore((s) => s.gastos.filter((g) => g.area === area));
-  const gastosEvento = useStore((s) => s.gastosEvento.filter((g) => g.area === area));
-  const eventos      = useStore((s) => s.eventos.filter((e) => e.area === area));
+  const allIngresos     = useStore((s) => s.ingresos);
+  const allGastos       = useStore((s) => s.gastos);
+  const allGastosEvento = useStore((s) => s.gastosEvento);
+  const allEventos      = useStore((s) => s.eventos);
+  const ingresos     = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
+  const gastos       = useMemo(() => allGastos.filter((g) => g.area === area), [allGastos, area]);
+  const gastosEvento = useMemo(() => allGastosEvento.filter((g) => g.area === area), [allGastosEvento, area]);
+  const eventos      = useMemo(() => allEventos.filter((e) => e.area === area), [allEventos, area]);
 
   const [rango, setRango] = useState<Rango>('año');
   const [rangoYear, setRangoYear] = useState(new Date().getFullYear());

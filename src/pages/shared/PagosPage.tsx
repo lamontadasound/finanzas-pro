@@ -7,8 +7,10 @@ const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', curren
 interface Props { area: Area }
 
 export const PagosPage = ({ area }: Props) => {
-  const ingresos    = useStore((s) => s.ingresos.filter((i) => i.area === area));
-  const pagosEvento = useStore((s) => s.pagosEvento.filter((p) => p.area === area));
+  const allIngresos    = useStore((s) => s.ingresos);
+  const allPagosEvento = useStore((s) => s.pagosEvento);
+  const ingresos    = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
+  const pagosEvento = useMemo(() => allPagosEvento.filter((p) => p.area === area), [allPagosEvento, area]);
 
   const pendientes = useMemo(() =>
     ingresos.filter((i) => ['pendiente', 'parcial'].includes(i.estadoPago))

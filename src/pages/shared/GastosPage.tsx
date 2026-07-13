@@ -29,7 +29,8 @@ const EMPTY = (area: Area): Partial<Gasto> => ({
 });
 
 export const GastosPage = ({ area }: Props) => {
-  const gastos     = useStore((s) => s.gastos.filter((g) => g.area === area));
+  const allGastos  = useStore((s) => s.gastos);
+  const gastos     = useMemo(() => allGastos.filter((g) => g.area === area), [allGastos, area]);
   const addGasto   = useStore((s) => s.addGasto);
   const updateGasto = useStore((s) => s.updateGasto);
   const deleteGasto = useStore((s) => s.deleteGasto);
