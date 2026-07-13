@@ -120,7 +120,7 @@ export const IngresosPage = ({ area }: Props) => {
           <h1 className="text-2xl font-bold text-gray-900">Ingresos</h1>
           <p className="text-sm text-gray-500">{filtered.length} registros · Total: {fmt(totalFiltrado)}</p>
         </div>
-        {canCreate('montada') && (
+        {canCreate(area) && (
           <button
             onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors"
@@ -193,12 +193,12 @@ export const IngresosPage = ({ area }: Props) => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
-                      {canEdit('montada') && (
+                      {canEdit(area) && (
                         <button onClick={() => openEdit(i)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors">
                           <Edit2 size={13} />
                         </button>
                       )}
-                      {canDelete('montada') && (
+                      {canDelete(area) && (
                         <button onClick={() => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                           <Trash2 size={13} />
                         </button>

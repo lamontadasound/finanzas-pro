@@ -107,7 +107,7 @@ export const EventosPage = ({ area }: Props) => {
           <h1 className="text-2xl font-bold text-gray-900">{area === 'montada' ? 'Eventos' : 'Actuaciones'}</h1>
           <p className="text-sm text-gray-500">{filtered.length} registros</p>
         </div>
-        {canCreate('montada') && (
+        {canCreate(area) && (
           <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors">
             <Plus size={16} /> Nuevo evento
           </button>
@@ -149,8 +149,8 @@ export const EventosPage = ({ area }: Props) => {
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${estadoColor[ev.estado]}`}>{ev.estado}</span>
                 <div className="flex gap-1">
-                  {canEdit('montada') && <button onClick={() => openEdit(ev)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={13} /></button>}
-                  {canDelete('montada') && <button onClick={() => showConfirm('¿Eliminar este evento?', () => deleteEvento(ev.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
+                  {canEdit(area) && <button onClick={() => openEdit(ev)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={13} /></button>}
+                  {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar este evento?', () => deleteEvento(ev.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
                   <button onClick={() => setExpandedId(isOpen ? null : ev.id)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
                     {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                   </button>
@@ -164,7 +164,7 @@ export const EventosPage = ({ area }: Props) => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Costes del evento</p>
-                      {canCreate('montada') && (
+                      {canCreate(area) && (
                         <button onClick={() => setGeForm(EMPTY_GE(ev.id, area))} className="text-xs text-amber-600 hover:text-amber-500 font-medium">+ Añadir</button>
                       )}
                     </div>
@@ -176,7 +176,7 @@ export const EventosPage = ({ area }: Props) => {
                           <p className="text-[10px] text-gray-400">{g.categoria} · {g.fecha}</p>
                         </div>
                         <p className="text-xs font-mono font-semibold text-gray-700">{fmt(g.importe)}</p>
-                        {canDelete('montada') && <button onClick={() => showConfirm('¿Eliminar coste?', () => deleteGastoEvento(g.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
+                        {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar coste?', () => deleteGastoEvento(g.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
                       </div>
                     ))}
                     {gesEv.length > 0 && <p className="text-xs text-right font-semibold text-gray-700 mt-1">Total: {fmt(totalCostes)}</p>}
@@ -186,7 +186,7 @@ export const EventosPage = ({ area }: Props) => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Pagos recibidos</p>
-                      {canCreate('montada') && (
+                      {canCreate(area) && (
                         <button onClick={() => setPagoForm({ ingresoId: ev.id, area, fecha: new Date().toISOString().slice(0, 10), importe: 0, metodoPago: 'transferencia', concepto: 'Pago' })} className="text-xs text-amber-600 hover:text-amber-500 font-medium">+ Añadir</button>
                       )}
                     </div>
@@ -198,7 +198,7 @@ export const EventosPage = ({ area }: Props) => {
                           <p className="text-[10px] text-gray-400">{p.metodoPago} · {p.fecha}</p>
                         </div>
                         <p className="text-xs font-mono font-semibold text-green-700">{fmt(p.importe)}</p>
-                        {canDelete('montada') && <button onClick={() => showConfirm('¿Eliminar pago?', () => deletePagoEvento(p.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
+                        {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar pago?', () => deletePagoEvento(p.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
                       </div>
                     ))}
                     {pagEv.length > 0 && <p className="text-xs text-right font-semibold text-green-700 mt-1">Total: {fmt(totalPagos)}</p>}

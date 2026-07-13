@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
 import { useStore } from './store/useStore';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import type { AreaKey } from './types';
 
 // ── Lazy pages ────────────────────────────────────────────────────────────────
@@ -107,44 +108,54 @@ export default function App() {
           element={
             <RequireAuth>
               <Layout>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route index element={<Dashboard />} />
 
-                    {/* La Montada Sound */}
-                    <Route path="/montada" element={<Navigate to="/montada/resumen" replace />} />
-                    <Route path="/montada/resumen"     element={<RequirePerm area="montada"><ResumenPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/ingresos"    element={<RequirePerm area="montada"><IngresosPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/gastos"      element={<RequirePerm area="montada"><GastosPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/eventos"     element={<RequirePerm area="montada"><EventosPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/pagos"       element={<RequirePerm area="montada"><PagosPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/facturas"    element={<RequirePerm area="facturas"><FacturasAreaPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/inversiones" element={<RequirePerm area="inversiones"><InversionesPage area="montada" /></RequirePerm>} />
-                    <Route path="/montada/informes"    element={<RequirePerm area="informes"><InformesPage area="montada" /></RequirePerm>} />
+                      {/* La Montada Sound */}
+                      <Route path="montada" element={<Navigate to="/montada/resumen" replace />} />
+                      <Route path="montada/resumen"     element={<RequirePerm area="montada"><ResumenPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/ingresos"    element={<RequirePerm area="montada"><IngresosPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/gastos"      element={<RequirePerm area="montada"><GastosPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/eventos"     element={<RequirePerm area="montada"><EventosPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/pagos"       element={<RequirePerm area="montada"><PagosPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/facturas"    element={<RequirePerm area="facturas"><FacturasAreaPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/inversiones" element={<RequirePerm area="inversiones"><InversionesPage area="montada" /></RequirePerm>} />
+                      <Route path="montada/informes"    element={<RequirePerm area="informes"><InformesPage area="montada" /></RequirePerm>} />
 
-                    {/* DJ Personal */}
-                    <Route path="/dj" element={<Navigate to="/dj/resumen" replace />} />
-                    <Route path="/dj/resumen"     element={<RequirePerm area="dj"><ResumenPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/ingresos"    element={<RequirePerm area="dj"><IngresosPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/gastos"      element={<RequirePerm area="dj"><GastosPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/eventos"     element={<RequirePerm area="dj"><EventosPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/pagos"       element={<RequirePerm area="dj"><PagosPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/facturas"    element={<RequirePerm area="facturas"><FacturasAreaPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/inversiones" element={<RequirePerm area="inversiones"><InversionesPage area="dj" /></RequirePerm>} />
-                    <Route path="/dj/informes"    element={<RequirePerm area="informes"><InformesPage area="dj" /></RequirePerm>} />
+                      {/* DJ Personal */}
+                      <Route path="dj" element={<Navigate to="/dj/resumen" replace />} />
+                      <Route path="dj/resumen"     element={<RequirePerm area="dj"><ResumenPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/ingresos"    element={<RequirePerm area="dj"><IngresosPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/gastos"      element={<RequirePerm area="dj"><GastosPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/eventos"     element={<RequirePerm area="dj"><EventosPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/pagos"       element={<RequirePerm area="dj"><PagosPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/facturas"    element={<RequirePerm area="facturas"><FacturasAreaPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/inversiones" element={<RequirePerm area="inversiones"><InversionesPage area="dj" /></RequirePerm>} />
+                      <Route path="dj/informes"    element={<RequirePerm area="informes"><InformesPage area="dj" /></RequirePerm>} />
 
-                    {/* Admin */}
-                    <Route path="/admin/usuarios" element={<RequireAdmin><AdminUsuarios /></RequireAdmin>} />
-                    <Route path="/admin/ajustes"  element={<RequireAdmin><AdminAjustes /></RequireAdmin>} />
+                      {/* Admin */}
+                      <Route path="admin/usuarios" element={<RequireAdmin><AdminUsuarios /></RequireAdmin>} />
+                      <Route path="admin/ajustes"  element={<RequireAdmin><AdminAjustes /></RequireAdmin>} />
 
-                    {/* Rutas antiguas → redirect */}
-                    <Route path="/montada-sound" element={<Navigate to="/montada/resumen" replace />} />
-                    <Route path="/dj-personal"   element={<Navigate to="/dj/resumen" replace />} />
-                    <Route path="/facturas"       element={<Navigate to="/montada/facturas" replace />} />
-                    <Route path="/equipo"         element={<Navigate to="/montada/inversiones" replace />} />
-                    <Route path="/informes"       element={<Navigate to="/montada/informes" replace />} />
-                  </Routes>
-                </Suspense>
+                      {/* Rutas antiguas → redirect */}
+                      <Route path="montada-sound" element={<Navigate to="/montada/resumen" replace />} />
+                      <Route path="dj-personal"   element={<Navigate to="/dj/resumen" replace />} />
+                      <Route path="facturas"       element={<Navigate to="/montada/facturas" replace />} />
+                      <Route path="equipo"         element={<Navigate to="/montada/inversiones" replace />} />
+                      <Route path="informes"       element={<Navigate to="/montada/informes" replace />} />
+
+                      {/* Fallback visible en vez de página en blanco */}
+                      <Route path="*" element={
+                        <div className="py-16 text-center">
+                          <p className="text-gray-500 font-medium">Página no encontrada</p>
+                          <p className="text-gray-400 text-sm mt-1">La ruta solicitada no existe.</p>
+                        </div>
+                      } />
+                    </Routes>
+                  </Suspense>
+                </ErrorBoundary>
               </Layout>
             </RequireAuth>
           }
