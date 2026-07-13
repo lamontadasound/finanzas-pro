@@ -41,14 +41,14 @@ const emptyIngreso = (): Omit<Ingreso, 'id' | 'createdAt'> => ({
   area: 'montada', concepto: '', cliente: '', tipoEvento: 'boda',
   fechaEvento: new Date().toISOString().slice(0, 10),
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
-  metodoPago: 'transferencia', estadoPago: 'pendiente', pagosRecibidos: 0, facturaEmitida: false,
+  empresa: false, metodoPago: 'transferencia', estadoPago: 'pendiente', pagosRecibidos: 0, facturaEmitida: false,
 });
 
 const emptyGasto = (): Omit<Gasto, 'id' | 'createdAt'> => ({
   area: 'montada', fecha: new Date().toISOString().slice(0, 10),
   concepto: '', categoria: 'Otros', tipo: 'variable',
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
-  metodoPago: 'transferencia', facturaRecibida: false, deducible: true,
+  metodoPago: 'transferencia', estadoPago: 'pagado', facturaRecibida: false, deducible: true,
 });
 
 // ── Página principal ──────────────────────────────────────────────────────────

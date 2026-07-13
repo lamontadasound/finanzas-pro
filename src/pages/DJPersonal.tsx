@@ -13,7 +13,7 @@ type Tab = 'resumen' | 'ingresos' | 'gastos' | 'suplidos';
 const TABS: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'ingresos', label: 'Ingresos' }, { id: 'gastos', label: 'Gastos' }, { id: 'suplidos', label: 'Suplidos' }];
 
 const emptyIngreso = (): Omit<Ingreso, 'id' | 'createdAt'> => ({
-  area: 'dj', concepto: '', cliente: '', tipoEvento: 'dj_personal',
+  area: 'dj', concepto: '', cliente: '', empresa: false, tipoEvento: 'dj_personal',
   fechaEvento: new Date().toISOString().slice(0, 10),
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
   metodoPago: 'efectivo', estadoPago: 'pendiente', pagosRecibidos: 0, facturaEmitida: false,
@@ -23,7 +23,7 @@ const emptyGasto = (): Omit<Gasto, 'id' | 'createdAt'> => ({
   area: 'dj', fecha: new Date().toISOString().slice(0, 10),
   concepto: '', categoria: 'Otros', tipo: 'variable',
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
-  metodoPago: 'efectivo', facturaRecibida: false, deducible: true,
+  metodoPago: 'efectivo', estadoPago: 'pagado', facturaRecibida: false, deducible: true,
 });
 
 const emptySuplido = (): Omit<Suplido, 'id' | 'createdAt'> => ({
