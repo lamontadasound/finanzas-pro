@@ -19,6 +19,7 @@ const FacturasAreaPage = lazy(() => import('./pages/shared/FacturasAreaPage').th
 const InversionesPage = lazy(() => import('./pages/shared/InversionesPage').then((m) => ({ default: m.InversionesPage })));
 const InformesPage    = lazy(() => import('./pages/shared/InformesPage').then((m) => ({ default: m.InformesPage })));
 const AdminUsuarios   = lazy(() => import('./pages/admin/Usuarios').then((m) => ({ default: m.AdminUsuarios })));
+const AdminAjustes    = lazy(() => import('./pages/admin/Ajustes').then((m) => ({ default: m.AdminAjustes })));
 
 // ── Pantallas de estado ───────────────────────────────────────────────────────
 const LoadingScreen = () => (
@@ -134,6 +135,7 @@ export default function App() {
 
                     {/* Admin */}
                     <Route path="/admin/usuarios" element={<RequireAdmin><AdminUsuarios /></RequireAdmin>} />
+                    <Route path="/admin/ajustes"  element={<RequireAdmin><AdminAjustes /></RequireAdmin>} />
 
                     {/* Rutas antiguas → redirect */}
                     <Route path="/montada-sound" element={<Navigate to="/montada/resumen" replace />} />
