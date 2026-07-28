@@ -11,7 +11,7 @@ const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', curren
 
 const TIPOS: EventType[] = ['boda', 'real_madrid', 'alquiler', 'evento_privado', 'dj_personal', 'empresa', 'otro'];
 const ESTADOS: EventStatus[] = ['pendiente', 'confirmado', 'realizado', 'cobrado', 'facturado'];
-const CAT_GE: GastoEventoCategoria[] = ['DJ', 'Técnico', 'Fotomatón', 'Personal', 'Gasolina', 'Transporte', 'Hotel', 'Alquiler material', 'Catering', 'Peajes', 'Dietas', 'Proveedores', 'Comisiones', 'Reparaciones', 'Otros'];
+const CAT_GE: GastoEventoCategoria[] = ['Cámara', 'DJ', 'Montador', 'Técnico', 'Decoración', 'Gasolina', 'Transporte', 'Personal', 'Alquiler', 'Proveedor', 'Otro'];
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 
 const estadoColor: Record<EventStatus, string> = {

@@ -12,25 +12,27 @@ import { useStore } from '../../store/useStore';
 // ── Subnav items ──────────────────────────────────────────────────────────────
 
 const SUB_MONTADA = [
-  { to: '/montada/resumen',     label: 'Resumen',              icon: LayoutDashboard },
-  { to: '/montada/ingresos',    label: 'Ingresos',             icon: TrendingUp },
-  { to: '/montada/gastos',      label: 'Gastos generales',     icon: Wallet },
-  { to: '/montada/eventos',     label: 'Eventos',              icon: Calendar },
-  { to: '/montada/pagos',       label: 'Pagos recibidos',      icon: CreditCard },
-  { to: '/montada/facturas',    label: 'Facturas',             icon: Receipt },
-  { to: '/montada/inversiones', label: 'Inversiones y equipos',icon: Package },
-  { to: '/montada/informes',    label: 'Informes',             icon: BarChart3 },
+  { to: '/montada/ingresos',       label: 'Ingresos de eventos',  icon: TrendingUp },
+  { to: '/montada/gastos-eventos', label: 'Gastos de eventos',    icon: Calendar },
+  { to: '/montada/gastos',         label: 'Gastos generales',     icon: Wallet },
+  { to: '/montada/beneficio',      label: 'Beneficio',            icon: BarChart3 },
+  { to: '/montada/informes',       label: 'Informes',             icon: FileText },
+  { to: '/montada/reparto-socios', label: 'Reparto socios',       icon: Users },
 ];
 
 const SUB_DJ = [
-  { to: '/dj/resumen',     label: 'Resumen',              icon: LayoutDashboard },
-  { to: '/dj/ingresos',    label: 'Ingresos',             icon: TrendingUp },
-  { to: '/dj/gastos',      label: 'Gastos generales',     icon: Wallet },
-  { to: '/dj/eventos',     label: 'Actuaciones',          icon: Calendar },
-  { to: '/dj/pagos',       label: 'Pagos recibidos',      icon: CreditCard },
-  { to: '/dj/facturas',    label: 'Facturas',             icon: Receipt },
-  { to: '/dj/inversiones', label: 'Inversiones y equipos',icon: Package },
-  { to: '/dj/informes',    label: 'Informes',             icon: BarChart3 },
+  { to: '/dj/ingresos',         label: 'Ingresos de actuaciones', icon: TrendingUp },
+  { to: '/dj/gastos-actuacion', label: 'Gastos de actuación',     icon: Calendar },
+  { to: '/dj/gastos',           label: 'Gastos',                  icon: Wallet },
+  { to: '/dj/beneficio',        label: 'Beneficio',               icon: BarChart3 },
+  { to: '/dj/informes',         label: 'Informes',                icon: FileText },
+];
+
+const SUB_CONTABILIDAD = [
+  { to: '/contabilidad/pagos',       label: 'Pagos recibidos',    icon: CreditCard,  perm: 'pagos' as const },
+  { to: '/contabilidad/facturas',    label: 'Facturas',           icon: Receipt,     perm: 'facturas' as const },
+  { to: '/contabilidad/inversiones', label: 'Inversiones',        icon: Package,     perm: 'inversiones' as const },
+  { to: '/contabilidad/informes',    label: 'Informes contables', icon: BarChart3,   perm: 'informes' as const },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -99,6 +101,8 @@ const NavContent = ({ onClose }: { onClose?: () => void }) => {
   const showMontada = canView('montada');
   const showDj      = canView('dj');
   const showAdmin   = isAdmin();
+  const contabilidadItems = SUB_CONTABILIDAD.filter((item) => canView(item.perm));
+  const showContabilidad  = contabilidadItems.length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -154,13 +158,27 @@ const NavContent = ({ onClose }: { onClose?: () => void }) => {
 
         {showMontada && showDj && <div className="my-3 border-t border-white/8" />}
 
-        {/* ── DJ Personal ── */}
+        {/* ── DJs ── */}
         {showDj && (
           <div className="mb-1">
-            <SectionHeader icon={Music2} label="DJ Personal" color="bg-purple-400" />
+            <SectionHeader icon={Music2} label="DJs" color="bg-purple-400" />
             <div className="space-y-0.5">
               {SUB_DJ.map((item) => (
                 <SubLink key={item.to} {...item} onClick={close} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(showMontada || showDj) && showContabilidad && <div className="my-3 border-t border-white/8" />}
+
+        {/* ── Contabilidad (conjunta) ── */}
+        {showContabilidad && (
+          <div className="mb-1">
+            <SectionHeader icon={Wallet} label="Contabilidad" color="bg-blue-400" />
+            <div className="space-y-0.5">
+              {contabilidadItems.map((item) => (
+                <SubLink key={item.to} to={item.to} label={item.label} icon={item.icon} onClick={close} />
               ))}
             </div>
           </div>

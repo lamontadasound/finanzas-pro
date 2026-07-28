@@ -18,6 +18,7 @@ const ADMIN_PERMS: Permisos = {
   inversiones: { ver: true, crear: true, editar: true, eliminar: true },
   facturas:    { ver: true, crear: true, editar: true, eliminar: true },
   informes:    { ver: true, crear: true, editar: true, eliminar: true },
+  pagos:       { ver: true, crear: true, editar: true, eliminar: true },
 };
 
 export interface CurrentUser {

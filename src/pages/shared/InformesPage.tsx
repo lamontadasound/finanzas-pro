@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { Area } from '../../types';
+import type { Area, GastoTipo, Ingreso } from '../../types';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
@@ -20,6 +20,96 @@ export const InformesPage = ({ area }: Props) => {
   const equipo       = useMemo(() => allEquipo.filter((e) => e.area === area), [allEquipo, area]);
 
   const [year, setYear] = useState(new Date().getFullYear());
+  const [filterTipo, setFilterTipo] = useState<GastoTipo | ''>('');
+
+  // ── Pagos pendientes ───────────────────────────────────────────────────────
+  const [filtroPagoAnio, setFiltroPagoAnio] = useState<number | ''>('');
+  const [filtroPagoMes, setFiltroPagoMes] = useState<number | ''>('');
+  const [filtroPagoCliente, setFiltroPagoCliente] = useState('');
+  const [filtroPagoDJ, setFiltroPagoDJ] = useState('');
+  const [filtroPagoEstado, setFiltroPagoEstado] = useState<'' | 'pendiente' | 'parcial'>('');
+  const [filtroPagoTipoEvento, setFiltroPagoTipoEvento] = useState('');
+
+  const cantidadCobrada = (i: Ingreso) => (i.pagosRecibidos ?? 0) + (i.tieneReserva ? (i.reserva ?? 0) : 0);
+  const cantidadPendienteDe = (i: Ingreso) => Math.max(0, i.total - cantidadCobrada(i));
+  const diasPendienteDe = (i: Ingreso) => {
+    const desde = new Date(i.fechaFactura || i.fechaEvento);
+    return Math.max(0, Math.floor((Date.now() - desde.getTime()) / (1000 * 60 * 60 * 24)));
+  };
+  const estaVencido = (i: Ingreso) => !!i.fechaCobroPrevista && new Date(i.fechaCobroPrevista).getTime() < Date.now();
+
+  const pagosPendientesBase = useMemo(
+    () => ingresos.filter((i) => i.estadoPago === 'pendiente' || i.estadoPago === 'parcial'),
+    [ingresos],
+  );
+
+  const clientesConPagosPendientes = useMemo(
+    () => Array.from(new Set(pagosPendientesBase.map((i) => i.cliente))).sort(),
+    [pagosPendientesBase],
+  );
+  const tiposEventoConPagosPendientes = useMemo(
+    () => Array.from(new Set(pagosPendientesBase.map((i) => i.tipoEvento))).sort(),
+    [pagosPendientesBase],
+  );
+  const djsConPagosPendientes = useMemo(
+    () => Array.from(new Set(pagosPendientesBase.map((i) => i.djRelacionado).filter((d): d is string => !!d))).sort(),
+    [pagosPendientesBase],
+  );
+
+  const pagosPendientesFiltrados = useMemo(() => pagosPendientesBase.filter((i) => {
+    const d = new Date(i.fechaEvento);
+    if (filtroPagoAnio !== '' && d.getFullYear() !== filtroPagoAnio) return false;
+    if (filtroPagoMes !== '' && d.getMonth() !== filtroPagoMes) return false;
+    if (filtroPagoCliente && i.cliente !== filtroPagoCliente) return false;
+    if (filtroPagoDJ && i.djRelacionado !== filtroPagoDJ) return false;
+    if (filtroPagoEstado && i.estadoPago !== filtroPagoEstado) return false;
+    if (filtroPagoTipoEvento && i.tipoEvento !== filtroPagoTipoEvento) return false;
+    return true;
+  }).sort((a, b) => b.fechaEvento.localeCompare(a.fechaEvento)), [pagosPendientesBase, filtroPagoAnio, filtroPagoMes, filtroPagoCliente, filtroPagoDJ, filtroPagoEstado, filtroPagoTipoEvento]);
+
+  const resumenPagosPendientes = useMemo(() => {
+    const hoy = new Date();
+    const delMes = pagosPendientesBase.filter((i) => {
+      const d = new Date(i.fechaEvento);
+      return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth();
+    });
+    const delAnio = pagosPendientesBase.filter((i) => new Date(i.fechaEvento).getFullYear() === hoy.getFullYear());
+    return {
+      totalPendiente: pagosPendientesFiltrados.reduce((a, i) => a + cantidadPendienteDe(i), 0),
+      numPendientes: pagosPendientesFiltrados.filter((i) => i.estadoPago === 'pendiente').length,
+      numParciales: pagosPendientesFiltrados.filter((i) => i.estadoPago === 'parcial').length,
+      numVencidos: pagosPendientesFiltrados.filter((i) => estaVencido(i)).length,
+      totalPendienteMes: delMes.reduce((a, i) => a + cantidadPendienteDe(i), 0),
+      totalPendienteAnio: delAnio.reduce((a, i) => a + cantidadPendienteDe(i), 0),
+    };
+  }, [pagosPendientesFiltrados, pagosPendientesBase]);
+
+  const gastosAnio = useMemo(
+    () => gastos.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
+    [gastos, year, filterTipo],
+  );
+  const gastosEventoAnio = useMemo(
+    () => gastosEvento.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
+    [gastosEvento, year, filterTipo],
+  );
+
+  const porCategoriaGenerales = useMemo(() => {
+    const map = new Map<string, { count: number; total: number }>();
+    gastosAnio.forEach((g) => {
+      const cur = map.get(g.categoria) ?? { count: 0, total: 0 };
+      map.set(g.categoria, { count: cur.count + 1, total: cur.total + g.total });
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+  }, [gastosAnio]);
+
+  const porCategoriaEvento = useMemo(() => {
+    const map = new Map<string, { count: number; total: number }>();
+    gastosEventoAnio.forEach((g) => {
+      const cur = map.get(g.categoria) ?? { count: 0, total: 0 };
+      map.set(g.categoria, { count: cur.count + 1, total: cur.total + g.importe });
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+  }, [gastosEventoAnio]);
 
   const yearOpts = useMemo(() => {
     const years = new Set<number>();
@@ -34,10 +124,10 @@ export const InformesPage = ({ area }: Props) => {
         const d = new Date(i.fechaEvento); return d.getFullYear() === year && d.getMonth() === m;
       });
       const gasMes = gastos.filter((g) => {
-        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m;
+        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m && (!filterTipo || g.tipo === filterTipo);
       });
       const gesEvMes = gastosEvento.filter((g) => {
-        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m;
+        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m && (!filterTipo || g.tipo === filterTipo);
       });
 
       const totalIng    = ingMes.reduce((a, i) => a + i.total, 0);
@@ -49,7 +139,7 @@ export const InformesPage = ({ area }: Props) => {
 
       return { mes, totalIng, baseImp, totalGas, costesEv, beneficio, cobrado, numEv: ingMes.length };
     });
-  }, [ingresos, gastos, gastosEvento, year]);
+  }, [ingresos, gastos, gastosEvento, year, filterTipo]);
 
   const totals = monthly.reduce((acc, m) => ({
     totalIng:  acc.totalIng  + m.totalIng,
@@ -102,9 +192,99 @@ export const InformesPage = ({ area }: Props) => {
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
             {yearOpts.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
+          <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as GastoTipo | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Todo tipo de gasto</option>
+            <option value="fijo">Fijo</option>
+            <option value="variable">Variable</option>
+          </select>
           <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
             <Download size={14} /> Exportar CSV
           </button>
+        </div>
+      </div>
+
+      {/* Pagos pendientes */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-bold text-gray-900">Pagos pendientes de {area === 'montada' ? 'La Montada Sound' : 'DJs'}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{area === 'montada' ? 'Ingresos' : 'Actuaciones'} pendientes de cobrar total o parcialmente</p>
+        </div>
+        <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 border-b border-gray-100 bg-gray-50/50">
+          <div><p className="text-xs text-gray-500">Total pendiente de cobrar</p><p className="font-bold text-amber-700">{fmt(resumenPagosPendientes.totalPendiente)}</p></div>
+          <div><p className="text-xs text-gray-500">{area === 'montada' ? 'Facturas' : 'Actuaciones'} pendientes</p><p className="font-bold text-gray-900">{resumenPagosPendientes.numPendientes}</p></div>
+          <div><p className="text-xs text-gray-500">Cobradas parcialmente</p><p className="font-bold text-gray-900">{resumenPagosPendientes.numParciales}</p></div>
+          <div><p className="text-xs text-gray-500">Pendientes vencidos</p><p className={`font-bold ${resumenPagosPendientes.numVencidos > 0 ? 'text-red-600' : 'text-gray-900'}`}>{resumenPagosPendientes.numVencidos}</p></div>
+          <div><p className="text-xs text-gray-500">Pendiente este mes</p><p className="font-bold text-gray-900">{fmt(resumenPagosPendientes.totalPendienteMes)}</p></div>
+          <div><p className="text-xs text-gray-500">Pendiente este año</p><p className="font-bold text-gray-900">{fmt(resumenPagosPendientes.totalPendienteAnio)}</p></div>
+        </div>
+        <div className="px-5 py-3 flex flex-wrap gap-3 border-b border-gray-100">
+          <select value={filtroPagoAnio} onChange={(e) => setFiltroPagoAnio(e.target.value ? Number(e.target.value) : '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Todos los años</option>
+            {Array.from(new Set(pagosPendientesBase.map((i) => new Date(i.fechaEvento).getFullYear()))).sort((a, b) => b - a).map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={filtroPagoMes} onChange={(e) => setFiltroPagoMes(e.target.value !== '' ? Number(e.target.value) : '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Todos los meses</option>
+            {MESES_FULL.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select value={filtroPagoCliente} onChange={(e) => setFiltroPagoCliente(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Todos los clientes</option>
+            {clientesConPagosPendientes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {area === 'dj' && (
+            <select value={filtroPagoDJ} onChange={(e) => setFiltroPagoDJ(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+              <option value="">Todos los DJs</option>
+              {djsConPagosPendientes.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          )}
+          <select value={filtroPagoEstado} onChange={(e) => setFiltroPagoEstado(e.target.value as '' | 'pendiente' | 'parcial')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Pendiente y parcial</option>
+            <option value="pendiente">Solo pendiente</option>
+            <option value="parcial">Solo parcial</option>
+          </select>
+          <select value={filtroPagoTipoEvento} onChange={(e) => setFiltroPagoTipoEvento(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">Todos los tipos de evento</option>
+            {tiposEventoConPagosPendientes.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-100 bg-gray-50">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Concepto</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cliente</th>
+                {area === 'dj' && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">DJ</th>}
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Tipo evento</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Nº factura</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total con IVA</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Reserva cobrada</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Días pendiente</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pagosPendientesFiltrados.length === 0 ? (
+                <tr><td colSpan={area === 'dj' ? 11 : 10} className="text-center py-10 text-gray-400 text-sm">Sin pagos pendientes</td></tr>
+              ) : pagosPendientesFiltrados.map((i) => (
+                <tr key={i.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">{i.concepto}</td>
+                  <td className="px-4 py-3 text-gray-600">{i.cliente}</td>
+                  {area === 'dj' && <td className="px-4 py-3 text-gray-600">{i.djRelacionado || <span className="text-gray-300">—</span>}</td>}
+                  <td className="px-4 py-3 text-gray-600">{i.tipoEvento}</td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{i.fechaEvento}</td>
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{i.numeroFactura || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-900">{fmt(i.total)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-600">{i.tieneReserva ? fmt(i.reserva ?? 0) : '—'}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-amber-700">{fmt(cantidadPendienteDe(i))}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${i.estadoPago === 'parcial' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{i.estadoPago}</span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-500">{diasPendienteDe(i)}{estaVencido(i) && <span className="ml-1 text-red-600 font-semibold">(vencido)</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -150,6 +330,61 @@ export const InformesPage = ({ area }: Props) => {
                 <td className="px-4 py-3 text-center text-gray-700">{totals.numEv}</td>
               </tr>
             </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Gasto por categoría */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-800">Gastos generales por categoría — {year}</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Categoría</th>
+                <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500">Nº</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {porCategoriaGenerales.length === 0 ? (
+                <tr><td colSpan={3} className="text-center py-6 text-gray-400 text-sm">Sin gastos en {year}</td></tr>
+              ) : porCategoriaGenerales.map(([cat, data]) => (
+                <tr key={cat} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{cat}</td>
+                  <td className="px-4 py-2.5 text-center text-gray-500">{data.count}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(data.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-800">Gastos de evento por categoría — {year}</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Categoría</th>
+                <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500">Nº</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {porCategoriaEvento.length === 0 ? (
+                <tr><td colSpan={3} className="text-center py-6 text-gray-400 text-sm">Sin gastos en {year}</td></tr>
+              ) : porCategoriaEvento.map(([cat, data]) => (
+                <tr key={cat} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{cat}</td>
+                  <td className="px-4 py-2.5 text-center text-gray-500">{data.count}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(data.total)}</td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>

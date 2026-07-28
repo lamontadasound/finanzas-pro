@@ -129,7 +129,7 @@ export const Dashboard = () => {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300 hover:text-gray-900'
               }`}
             >
-              {a === 'todos' ? 'Conjunto' : a === 'montada' ? 'La Montada' : 'DJ Personal'}
+              {a === 'todos' ? 'Conjunto' : a === 'montada' ? 'La Montada' : 'DJs'}
             </button>
           ))}
         </div>

@@ -10,9 +10,10 @@ import { NO_PERMS, ALL_PERMS } from '../../types';
 
 const AREAS: { key: AreaKey; label: string }[] = [
   { key: 'montada',     label: 'La Montada Sound' },
-  { key: 'dj',          label: 'DJ Personal' },
-  { key: 'inversiones', label: 'Inversiones' },
-  { key: 'facturas',    label: 'Facturas' },
+  { key: 'dj',          label: 'DJs' },
+  { key: 'pagos',       label: 'Contabilidad · Pagos recibidos' },
+  { key: 'facturas',    label: 'Contabilidad · Facturas' },
+  { key: 'inversiones', label: 'Contabilidad · Inversiones' },
   { key: 'informes',    label: 'Informes' },
 ];
 

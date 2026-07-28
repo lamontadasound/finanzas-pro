@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type {
   Evento, Ingreso, Gasto, Suplido, Factura, Equipo,
-  GastoEvento, PagoEvento, Documento, Usuario,
+  GastoEvento, PagoEvento, Documento, Usuario, Socio, MovimientoSocio,
 } from '../types';
 
 // ── Raw DB types ──────────────────────────────────────────────────────────────
@@ -22,6 +22,9 @@ type RawIngreso = {
   total: number; metodo_pago: string; estado_pago: string;
   pagos_recibidos: number; factura_emitida: boolean;
   numero_factura: string | null; notas: string | null; created_at: string;
+  reserva: number | null; sin_factura: boolean | null; linea_negocio: string | null;
+  tiene_reserva: boolean | null; fecha_cobro_reserva: string | null;
+  metodo_pago_reserva: string | null; dj_relacionado: string | null;
 };
 
 type RawGasto = {
@@ -31,12 +34,31 @@ type RawGasto = {
   total: number; metodo_pago: string; estado_pago: string | null;
   factura_recibida: boolean; deducible: boolean;
   evento_id: string | null; observaciones: string | null; created_at: string;
+  linea_negocio: string | null;
+  pagado_por: string | null; fecha_pago: string | null; numero_factura: string | null;
+  es_recurrente: boolean | null; periodicidad: string | null;
+  fecha_inicio_recurrencia: string | null; fecha_fin_recurrencia: string | null;
+  proxima_fecha_pago: string | null; renovacion_automatica: boolean | null;
+  recurrencia_id: string | null;
+};
+
+type RawSocio = {
+  id: string; nombre: string; porcentaje: number; created_at: string;
+  fecha_incorporacion: string | null; activo: boolean | null; observaciones: string | null;
+};
+
+type RawMovimientoSocio = {
+  id: string; socio_id: string; fecha: string; tipo: string; cantidad: number;
+  concepto: string; cuenta: string | null; documento_id: string | null;
+  observaciones: string | null; created_at: string;
 };
 
 type RawSuplido = {
   id: string; area: string; fecha: string; cliente: string; concepto: string;
   importe: number; metodo_pago: string; justificante: boolean;
   evento_id: string | null; observaciones: string | null; created_at: string;
+  ingreso_id: string | null; estado: string | null;
+  cantidad_recuperada: number | null; fecha_cobro: string | null;
 };
 
 type RawFactura = {
@@ -57,12 +79,22 @@ type RawEquipo = {
   financiado: boolean | null; vida_util: number | null;
   garantia: number | null; fecha_fin_garantia: string | null;
   numero_serie: string | null; observaciones: string | null; created_at: string;
+  descripcion: string | null; marca: string | null; modelo: string | null;
+  comprador: string | null; propietario: string | null;
+  evento_relacionado_id: string | null; valor_residual: number | null;
+  documento_id: string | null;
+  cantidad: number | null;
 };
 
 type RawGastoEvento = {
   id: string; ingreso_id: string; area: string; fecha: string;
   concepto: string; categoria: string; importe: number;
   observaciones: string | null; created_at: string;
+  base_imponible: number | null; porcentaje_iva: number | null;
+  importe_iva: number | null; total_con_iva: number | null;
+  factura_recibida: boolean | null; numero_factura: string | null;
+  estado_pago: string | null; proveedor: string | null; tipo: string | null;
+  pagado_por: string | null;
 };
 
 type RawPagoEvento = {
@@ -107,6 +139,13 @@ const mapIngreso = (r: RawIngreso): Ingreso => ({
   pagosRecibidos: Number(r.pagos_recibidos), facturaEmitida: r.factura_emitida,
   numeroFactura: r.numero_factura ?? undefined, notas: r.notas ?? undefined,
   createdAt: r.created_at,
+  reserva: r.reserva == null ? undefined : Number(r.reserva),
+  sinFactura: r.sin_factura ?? undefined,
+  lineaNegocio: (r.linea_negocio ?? undefined) as Ingreso['lineaNegocio'],
+  tieneReserva: r.tiene_reserva ?? undefined,
+  fechaCobroReserva: r.fecha_cobro_reserva ?? undefined,
+  metodoPagoReserva: (r.metodo_pago_reserva ?? undefined) as Ingreso['metodoPagoReserva'],
+  djRelacionado: r.dj_relacionado ?? undefined,
 });
 
 const mapGasto = (r: RawGasto): Gasto => ({
@@ -120,6 +159,30 @@ const mapGasto = (r: RawGasto): Gasto => ({
   facturaRecibida: r.factura_recibida, deducible: r.deducible,
   eventoId: r.evento_id ?? undefined, observaciones: r.observaciones ?? undefined,
   createdAt: r.created_at,
+  lineaNegocio: (r.linea_negocio ?? undefined) as Gasto['lineaNegocio'],
+  pagadoPor: (r.pagado_por ?? undefined) as Gasto['pagadoPor'],
+  fechaPago: r.fecha_pago ?? undefined, numeroFactura: r.numero_factura ?? undefined,
+  esRecurrente: r.es_recurrente ?? undefined,
+  periodicidad: (r.periodicidad ?? undefined) as Gasto['periodicidad'],
+  fechaInicioRecurrencia: r.fecha_inicio_recurrencia ?? undefined,
+  fechaFinRecurrencia: r.fecha_fin_recurrencia ?? undefined,
+  proximaFechaPago: r.proxima_fecha_pago ?? undefined,
+  renovacionAutomatica: r.renovacion_automatica ?? undefined,
+  recurrenciaId: r.recurrencia_id ?? undefined,
+});
+
+const mapSocio = (r: RawSocio): Socio => ({
+  id: r.id, nombre: r.nombre, porcentaje: Number(r.porcentaje), createdAt: r.created_at,
+  fechaIncorporacion: r.fecha_incorporacion ?? undefined,
+  activo: r.activo ?? true,
+  observaciones: r.observaciones ?? undefined,
+});
+
+const mapMovimientoSocio = (r: RawMovimientoSocio): MovimientoSocio => ({
+  id: r.id, socioId: r.socio_id, fecha: r.fecha, tipo: r.tipo as MovimientoSocio['tipo'],
+  cantidad: Number(r.cantidad), concepto: r.concepto, cuenta: r.cuenta ?? undefined,
+  documentoId: r.documento_id ?? undefined, observaciones: r.observaciones ?? undefined,
+  createdAt: r.created_at,
 });
 
 const mapSuplido = (r: RawSuplido): Suplido => ({
@@ -128,6 +191,10 @@ const mapSuplido = (r: RawSuplido): Suplido => ({
   metodoPago: r.metodo_pago as Suplido['metodoPago'], justificante: r.justificante,
   eventoId: r.evento_id ?? undefined, observaciones: r.observaciones ?? undefined,
   createdAt: r.created_at,
+  ingresoId: r.ingreso_id ?? undefined,
+  estado: (r.estado ?? undefined) as Suplido['estado'],
+  cantidadRecuperada: r.cantidad_recuperada == null ? undefined : Number(r.cantidad_recuperada),
+  fechaCobro: r.fecha_cobro ?? undefined,
 });
 
 const mapFactura = (r: RawFactura): Factura => ({
@@ -155,6 +222,13 @@ const mapEquipo = (r: RawEquipo): Equipo => ({
   garantia: r.garantia ?? undefined, fechaFinGarantia: r.fecha_fin_garantia ?? undefined,
   numeroSerie: r.numero_serie ?? undefined,
   observaciones: r.observaciones ?? undefined, createdAt: r.created_at,
+  descripcion: r.descripcion ?? undefined, marca: r.marca ?? undefined,
+  modelo: r.modelo ?? undefined, comprador: r.comprador ?? undefined,
+  propietario: r.propietario ?? undefined,
+  eventoRelacionadoId: r.evento_relacionado_id ?? undefined,
+  valorResidual: r.valor_residual ?? undefined,
+  documentoId: r.documento_id ?? undefined,
+  cantidad: r.cantidad ?? undefined,
 });
 
 const mapGastoEvento = (r: RawGastoEvento): GastoEvento => ({
@@ -163,6 +237,12 @@ const mapGastoEvento = (r: RawGastoEvento): GastoEvento => ({
   categoria: r.categoria as GastoEvento['categoria'],
   importe: Number(r.importe), observaciones: r.observaciones ?? undefined,
   createdAt: r.created_at,
+  baseImponible: r.base_imponible ?? undefined, porcentajeIVA: r.porcentaje_iva ?? undefined,
+  importeIVA: r.importe_iva ?? undefined, totalConIva: r.total_con_iva ?? undefined,
+  facturaRecibida: r.factura_recibida ?? undefined, numeroFactura: r.numero_factura ?? undefined,
+  estadoPago: (r.estado_pago ?? undefined) as GastoEvento['estadoPago'],
+  proveedor: r.proveedor ?? undefined, tipo: (r.tipo ?? undefined) as GastoEvento['tipo'],
+  pagadoPor: (r.pagado_por ?? undefined) as GastoEvento['pagadoPor'],
 });
 
 const mapPagoEvento = (r: RawPagoEvento): PagoEvento => ({
@@ -210,6 +290,12 @@ const toDbIngreso = (i: Ingreso): RawIngreso => ({
   estado_pago: i.estadoPago, pagos_recibidos: i.pagosRecibidos,
   factura_emitida: i.facturaEmitida, numero_factura: i.numeroFactura ?? null,
   notas: i.notas ?? null, created_at: i.createdAt,
+  reserva: i.reserva ?? null, sin_factura: i.sinFactura ?? null,
+  linea_negocio: i.lineaNegocio ?? null,
+  tiene_reserva: i.tieneReserva ?? null,
+  fecha_cobro_reserva: i.fechaCobroReserva ?? null,
+  metodo_pago_reserva: i.metodoPagoReserva ?? null,
+  dj_relacionado: i.djRelacionado ?? null,
 });
 
 const toDbGasto   = (g: Gasto): RawGasto => ({
@@ -220,7 +306,28 @@ const toDbGasto   = (g: Gasto): RawGasto => ({
   estado_pago: g.estadoPago ?? 'pendiente',
   factura_recibida: g.facturaRecibida, deducible: g.deducible,
   evento_id: g.eventoId ?? null, observaciones: g.observaciones ?? null,
-  created_at: g.createdAt,
+  created_at: g.createdAt, linea_negocio: g.lineaNegocio ?? null,
+  pagado_por: g.pagadoPor ?? null, fecha_pago: g.fechaPago ?? null,
+  numero_factura: g.numeroFactura ?? null, es_recurrente: g.esRecurrente ?? false,
+  periodicidad: g.periodicidad ?? null,
+  fecha_inicio_recurrencia: g.fechaInicioRecurrencia ?? null,
+  fecha_fin_recurrencia: g.fechaFinRecurrencia ?? null,
+  proxima_fecha_pago: g.proximaFechaPago ?? null,
+  renovacion_automatica: g.renovacionAutomatica ?? false,
+  recurrencia_id: g.recurrenciaId ?? null,
+});
+
+const toDbSocio = (s: Socio): RawSocio => ({
+  id: s.id, nombre: s.nombre, porcentaje: s.porcentaje, created_at: s.createdAt,
+  fecha_incorporacion: s.fechaIncorporacion ?? null,
+  activo: s.activo ?? true,
+  observaciones: s.observaciones ?? null,
+});
+
+const toDbMovimientoSocio = (m: MovimientoSocio): RawMovimientoSocio => ({
+  id: m.id, socio_id: m.socioId, fecha: m.fecha, tipo: m.tipo, cantidad: m.cantidad,
+  concepto: m.concepto, cuenta: m.cuenta ?? null, documento_id: m.documentoId ?? null,
+  observaciones: m.observaciones ?? null, created_at: m.createdAt,
 });
 
 const toDbSuplido = (s: Suplido): RawSuplido => ({
@@ -228,6 +335,8 @@ const toDbSuplido = (s: Suplido): RawSuplido => ({
   concepto: s.concepto, importe: s.importe, metodo_pago: s.metodoPago,
   justificante: s.justificante, evento_id: s.eventoId ?? null,
   observaciones: s.observaciones ?? null, created_at: s.createdAt,
+  ingreso_id: s.ingresoId ?? null, estado: s.estado ?? null,
+  cantidad_recuperada: s.cantidadRecuperada ?? null, fecha_cobro: s.fechaCobro ?? null,
 });
 
 const toDbFactura = (f: Factura): RawFactura => ({
@@ -252,12 +361,22 @@ const toDbEquipo  = (e: Equipo): RawEquipo => ({
   fecha_fin_garantia: e.fechaFinGarantia ?? null,
   numero_serie: e.numeroSerie ?? null,
   observaciones: e.observaciones ?? null, created_at: e.createdAt,
+  descripcion: e.descripcion ?? null, marca: e.marca ?? null, modelo: e.modelo ?? null,
+  comprador: e.comprador ?? null, propietario: e.propietario ?? null,
+  evento_relacionado_id: e.eventoRelacionadoId ?? null,
+  valor_residual: e.valorResidual ?? null, documento_id: e.documentoId ?? null,
+  cantidad: e.cantidad ?? 1,
 });
 
 const toDbGastoEvento = (g: GastoEvento): RawGastoEvento => ({
   id: g.id, ingreso_id: g.ingresoId, area: g.area, fecha: g.fecha,
   concepto: g.concepto, categoria: g.categoria, importe: g.importe,
   observaciones: g.observaciones ?? null, created_at: g.createdAt,
+  base_imponible: g.baseImponible ?? null, porcentaje_iva: g.porcentajeIVA ?? null,
+  importe_iva: g.importeIVA ?? null, total_con_iva: g.totalConIva ?? null,
+  factura_recibida: g.facturaRecibida ?? false, numero_factura: g.numeroFactura ?? null,
+  estado_pago: g.estadoPago ?? 'pendiente', proveedor: g.proveedor ?? null,
+  tipo: g.tipo ?? null, pagado_por: g.pagadoPor ?? null,
 });
 
 const toDbPagoEvento  = (p: PagoEvento): RawPagoEvento => ({
@@ -328,4 +447,6 @@ export const db = {
   pagosEvento:  makeCrud<PagoEvento,  RawPagoEvento>  ('pagos_evento',  mapPagoEvento,  toDbPagoEvento,  'fecha'),
   documentos:   makeCrud<Documento,   RawDocumento>   ('documentos',   mapDocumento,   toDbDocumento,   'fecha_subida'),
   usuarios:     makeCrud<Usuario,     RawUsuario>     ('usuarios',     mapUsuario,     toDbUsuario,     'created_at'),
+  socios:            makeCrud<Socio,            RawSocio>            ('socios',             mapSocio,            toDbSocio,            'created_at'),
+  movimientosSocios: makeCrud<MovimientoSocio,  RawMovimientoSocio>  ('movimientos_socios', mapMovimientoSocio,  toDbMovimientoSocio, 'fecha'),
 };

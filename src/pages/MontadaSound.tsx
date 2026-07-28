@@ -46,7 +46,7 @@ const emptyIngreso = (): Omit<Ingreso, 'id' | 'createdAt'> => ({
 
 const emptyGasto = (): Omit<Gasto, 'id' | 'createdAt'> => ({
   area: 'montada', fecha: new Date().toISOString().slice(0, 10),
-  concepto: '', categoria: 'Otros', tipo: 'variable',
+  concepto: '', categoria: 'Material', tipo: 'variable',
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
   metodoPago: 'transferencia', estadoPago: 'pagado', facturaRecibida: false, deducible: true,
 });

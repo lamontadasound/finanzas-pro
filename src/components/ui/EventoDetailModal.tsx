@@ -21,8 +21,8 @@ import type { Ingreso, GastoEvento, PagoEvento, GastoEventoCategoria } from '../
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const GASTO_EVENTO_CATEGORIAS: GastoEventoCategoria[] = [
-  'DJ', 'Técnico', 'Fotomatón', 'Gasolina', 'Hotel',
-  'Alquiler material', 'Catering', 'Peajes', 'Dietas', 'Otros',
+  'DJ', 'Técnico', 'Gasolina', 'Alquiler',
+  'Proveedor', 'Transporte', 'Personal', 'Otro',
 ];
 
 type ModalTab = 'detalles' | 'costes' | 'pagos' | 'resumen';
@@ -41,7 +41,7 @@ const IVA_OPTS = [0, 4, 10, 21];
 const emptyGastoEvento = (ingreso: Ingreso): Omit<GastoEvento, 'id' | 'createdAt'> => ({
   ingresoId: ingreso.id, area: ingreso.area,
   fecha: new Date().toISOString().slice(0, 10),
-  concepto: '', categoria: 'Otros', importe: 0,
+  concepto: '', categoria: 'Otro', importe: 0,
 });
 
 const emptyPagoEvento = (ingreso: Ingreso): Omit<PagoEvento, 'id' | 'createdAt'> => ({

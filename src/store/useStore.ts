@@ -6,6 +6,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   eventos: [], ingresos: [], gastos: [], suplidos: [], facturas: [],
   equipo: [], gastosEvento: [], pagosEvento: [], documentos: [], usuarios: [],
+  socios: [], movimientosSocios: [],
   _loaded: false, _error: null,
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
@@ -18,7 +19,13 @@ export const useStore = create<AppState>()((set, get) => ({
           db.gastosEvento.getAll(), db.pagosEvento.getAll(),
           db.documentos.getAll(), db.usuarios.getAll(),
         ]);
-      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento, documentos, usuarios, _loaded: true, _error: null });
+      // "socios"/"movimientos_socios" son tablas nuevas — si todavía no existen
+      // (pendiente de migración), no debe romper la carga del resto de la app.
+      const [socios, movimientosSocios] = await Promise.all([
+        db.socios.getAll().catch(() => []),
+        db.movimientosSocios.getAll().catch(() => []),
+      ]);
+      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento, documentos, usuarios, socios, movimientosSocios, _loaded: true, _error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[Store] Error al cargar datos:', msg);
@@ -110,4 +117,22 @@ export const useStore = create<AppState>()((set, get) => ({
     if (u) db.usuarios.upsert(u).catch(console.error);
   },
   deleteUsuario: (id) => { set((s) => ({ usuarios: s.usuarios.filter((x) => x.id !== id) })); db.usuarios.delete(id).catch(console.error); },
+
+  // ── SOCIOS ────────────────────────────────────────────────────────────────
+  addSocio: (s) => { set((st) => ({ socios: [...st.socios, s] })); db.socios.insert(s).catch(console.error); },
+  updateSocio: (id, p) => {
+    set((st) => ({ socios: st.socios.map((x) => x.id === id ? { ...x, ...p } : x) }));
+    const u = get().socios.find((x) => x.id === id);
+    if (u) db.socios.upsert(u).catch(console.error);
+  },
+  deleteSocio: (id) => { set((st) => ({ socios: st.socios.filter((x) => x.id !== id) })); db.socios.delete(id).catch(console.error); },
+
+  // ── MOVIMIENTOS SOCIOS ────────────────────────────────────────────────────
+  addMovimientoSocio: (m) => { set((st) => ({ movimientosSocios: [...st.movimientosSocios, m] })); db.movimientosSocios.insert(m).catch(console.error); },
+  updateMovimientoSocio: (id, p) => {
+    set((st) => ({ movimientosSocios: st.movimientosSocios.map((x) => x.id === id ? { ...x, ...p } : x) }));
+    const u = get().movimientosSocios.find((x) => x.id === id);
+    if (u) db.movimientosSocios.upsert(u).catch(console.error);
+  },
+  deleteMovimientoSocio: (id) => { set((st) => ({ movimientosSocios: st.movimientosSocios.filter((x) => x.id !== id) })); db.movimientosSocios.delete(id).catch(console.error); },
 }));
