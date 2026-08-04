@@ -1,6 +1,6 @@
 // ── Áreas ─────────────────────────────────────────────────────────────────────
 export type Area = 'montada' | 'dj';
-export type AreaKey = 'montada' | 'dj' | 'inversiones' | 'facturas' | 'informes' | 'pagos';
+export type AreaKey = 'montada' | 'dj' | 'inversiones' | 'facturas' | 'informes' | 'pagos' | 'impuestos';
 
 // Inversiones tiene su propia categorización de 3 áreas (independiente de Area).
 // 'real_madrid' se muestra en el frontend como "DJ Personal (Real Madrid)",
@@ -25,6 +25,7 @@ export const ALL_PERMS: Permisos = {
   facturas:    { ver: true, crear: true, editar: true, eliminar: true },
   informes:    { ver: true, crear: true, editar: true, eliminar: true },
   pagos:       { ver: true, crear: true, editar: true, eliminar: true },
+  impuestos:   { ver: true, crear: true, editar: true, eliminar: true },
 };
 
 export const NO_PERMS: Permisos = {
@@ -34,6 +35,7 @@ export const NO_PERMS: Permisos = {
   facturas:    { ver: false, crear: false, editar: false, eliminar: false },
   informes:    { ver: false, crear: false, editar: false, eliminar: false },
   pagos:       { ver: false, crear: false, editar: false, eliminar: false },
+  impuestos:   { ver: false, crear: false, editar: false, eliminar: false },
 };
 
 export type UserRol = 'admin' | 'usuario';
@@ -337,6 +339,29 @@ export interface MovimientoSocio {
   createdAt: string;
 }
 
+// ── Impuestos (Contabilidad) ────────────────────────────────────
+export type ImpuestoTipo = 'autonomos' | 'nominas_ss' | 'iva' | 'sociedades';
+
+export const IMPUESTO_TIPO_LABEL: Record<ImpuestoTipo, string> = {
+  autonomos:  'Cuota de autónomos',
+  nominas_ss: 'Nóminas y Seguridad Social',
+  iva:        'IVA',
+  sociedades: 'Impuesto de Sociedades',
+};
+
+export interface Impuesto {
+  id: string;
+  tipo: ImpuestoTipo;
+  concepto: string;
+  fecha: string;             // periodo/vencimiento del impuesto
+  importe: number;
+  estado: 'pendiente' | 'pagado';
+  fechaPago?: string;
+  observaciones?: string;
+  lineaNegocio?: 'La Montada Sound' | 'DJs' | 'Real Madrid';
+  createdAt: string;
+}
+
 export interface Documento {
   id: string;
   entityType: DocumentoEntityType;
@@ -367,6 +392,7 @@ export interface AppState {
   usuarios:     Usuario[];
   socios:            Socio[];
   movimientosSocios: MovimientoSocio[];
+  impuestos:         Impuesto[];
 
   _loaded: boolean;
   _error: string | null;
@@ -418,4 +444,8 @@ export interface AppState {
   addMovimientoSocio: (m: MovimientoSocio) => void;
   updateMovimientoSocio: (id: string, m: Partial<MovimientoSocio>) => void;
   deleteMovimientoSocio: (id: string) => void;
+
+  addImpuesto: (i: Impuesto) => void;
+  updateImpuesto: (id: string, i: Partial<Impuesto>) => void;
+  deleteImpuesto: (id: string) => void;
 }

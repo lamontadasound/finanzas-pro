@@ -15,6 +15,7 @@ const AREAS: { key: AreaKey; label: string }[] = [
   { key: 'facturas',    label: 'Contabilidad · Facturas' },
   { key: 'inversiones', label: 'Contabilidad · Inversiones' },
   { key: 'informes',    label: 'Informes' },
+  { key: 'impuestos',   label: 'Contabilidad · Impuestos' },
 ];
 
 const DEFAULT_PERMISOS = (): Permisos => JSON.parse(JSON.stringify(NO_PERMS));

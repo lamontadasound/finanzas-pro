@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import type { Area } from '../../types';
 
@@ -10,6 +11,7 @@ const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Juli
 export const InformesContablesPage = () => {
   const allFacturas = useStore((s) => s.facturas);
   const allEquipo    = useStore((s) => s.equipo);
+  const allImpuestos = useStore((s) => s.impuestos);
 
   const [rango, setRango] = useState<Rango>('año');
   const [year, setYear] = useState(new Date().getFullYear());
@@ -46,6 +48,14 @@ export const InformesContablesPage = () => {
 
   const amortizacionTotal = equipo.reduce((a, e) => a + ((e.vidaUtil && e.vidaUtil > 0) ? e.baseImponible / e.vidaUtil : 0), 0);
   const inversionTotal = equipo.reduce((a, e) => a + e.total, 0);
+
+  const impuestosTotales   = allImpuestos.reduce((a, i) => a + i.importe, 0);
+  const impuestosPagados   = allImpuestos.filter((i) => i.estado === 'pagado').reduce((a, i) => a + i.importe, 0);
+  const impuestosPendientes = impuestosTotales - impuestosPagados;
+  const proximosPagos = allImpuestos
+    .filter((i) => i.estado === 'pendiente')
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .slice(0, 3);
 
   const exportCSV = () => {
     const header = 'Concepto;Importe';
@@ -121,6 +131,30 @@ export const InformesContablesPage = () => {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div><p className="text-xs text-gray-500">Inversión total registrada</p><p className="font-semibold text-gray-800">{fmt(inversionTotal)}</p></div>
           <div><p className="text-xs text-gray-500">Amortización anual estimada</p><p className="font-semibold text-gray-800">{fmt(amortizacionTotal)}</p></div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-800">Impuestos</h2>
+          <Link to="/contabilidad/impuestos" className="text-xs font-medium text-amber-600 hover:text-amber-500">Ver detalle →</Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+          <div><p className="text-xs text-gray-500">Impuestos totales</p><p className="font-semibold text-gray-900 text-lg">{fmt(impuestosTotales)}</p></div>
+          <div><p className="text-xs text-gray-500">Pagados</p><p className="font-semibold text-green-700 text-lg">{fmt(impuestosPagados)}</p></div>
+          <div><p className="text-xs text-gray-500">Pendientes</p><p className="font-semibold text-amber-600 text-lg">{fmt(impuestosPendientes)}</p></div>
+          <div>
+            <p className="text-xs text-gray-500">Próximos pagos</p>
+            {proximosPagos.length === 0 ? (
+              <p className="text-sm text-gray-400 mt-1">Sin pagos pendientes</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5">
+                {proximosPagos.map((p) => (
+                  <li key={p.id} className="text-xs text-gray-600 truncate">{p.fecha} · {p.concepto} · {fmt(p.importe)}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

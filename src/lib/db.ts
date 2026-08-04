@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type {
   Evento, Ingreso, Gasto, Suplido, Factura, Equipo,
-  GastoEvento, PagoEvento, Documento, Usuario, Socio, MovimientoSocio,
+  GastoEvento, PagoEvento, Documento, Usuario, Socio, MovimientoSocio, Impuesto,
 } from '../types';
 
 // ── Raw DB types ──────────────────────────────────────────────────────────────
@@ -51,6 +51,12 @@ type RawMovimientoSocio = {
   id: string; socio_id: string; fecha: string; tipo: string; cantidad: number;
   concepto: string; cuenta: string | null; documento_id: string | null;
   observaciones: string | null; created_at: string;
+};
+
+type RawImpuesto = {
+  id: string; tipo: string; concepto: string; fecha: string; importe: number;
+  estado: string; fecha_pago: string | null; observaciones: string | null;
+  linea_negocio: string | null; created_at: string;
 };
 
 type RawSuplido = {
@@ -182,6 +188,14 @@ const mapMovimientoSocio = (r: RawMovimientoSocio): MovimientoSocio => ({
   id: r.id, socioId: r.socio_id, fecha: r.fecha, tipo: r.tipo as MovimientoSocio['tipo'],
   cantidad: Number(r.cantidad), concepto: r.concepto, cuenta: r.cuenta ?? undefined,
   documentoId: r.documento_id ?? undefined, observaciones: r.observaciones ?? undefined,
+  createdAt: r.created_at,
+});
+
+const mapImpuesto = (r: RawImpuesto): Impuesto => ({
+  id: r.id, tipo: r.tipo as Impuesto['tipo'], concepto: r.concepto, fecha: r.fecha,
+  importe: Number(r.importe), estado: r.estado as Impuesto['estado'],
+  fechaPago: r.fecha_pago ?? undefined, observaciones: r.observaciones ?? undefined,
+  lineaNegocio: (r.linea_negocio ?? undefined) as Impuesto['lineaNegocio'],
   createdAt: r.created_at,
 });
 
@@ -330,6 +344,12 @@ const toDbMovimientoSocio = (m: MovimientoSocio): RawMovimientoSocio => ({
   observaciones: m.observaciones ?? null, created_at: m.createdAt,
 });
 
+const toDbImpuesto = (i: Impuesto): RawImpuesto => ({
+  id: i.id, tipo: i.tipo, concepto: i.concepto, fecha: i.fecha, importe: i.importe,
+  estado: i.estado, fecha_pago: i.fechaPago ?? null, observaciones: i.observaciones ?? null,
+  linea_negocio: i.lineaNegocio ?? null, created_at: i.createdAt,
+});
+
 const toDbSuplido = (s: Suplido): RawSuplido => ({
   id: s.id, area: s.area, fecha: s.fecha, cliente: s.cliente,
   concepto: s.concepto, importe: s.importe, metodo_pago: s.metodoPago,
@@ -449,4 +469,5 @@ export const db = {
   usuarios:     makeCrud<Usuario,     RawUsuario>     ('usuarios',     mapUsuario,     toDbUsuario,     'created_at'),
   socios:            makeCrud<Socio,            RawSocio>            ('socios',             mapSocio,            toDbSocio,            'created_at'),
   movimientosSocios: makeCrud<MovimientoSocio,  RawMovimientoSocio>  ('movimientos_socios', mapMovimientoSocio,  toDbMovimientoSocio, 'fecha'),
+  impuestos:         makeCrud<Impuesto,         RawImpuesto>         ('impuestos',          mapImpuesto,         toDbImpuesto,        'fecha'),
 };

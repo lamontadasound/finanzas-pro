@@ -6,7 +6,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   eventos: [], ingresos: [], gastos: [], suplidos: [], facturas: [],
   equipo: [], gastosEvento: [], pagosEvento: [], documentos: [], usuarios: [],
-  socios: [], movimientosSocios: [],
+  socios: [], movimientosSocios: [], impuestos: [],
   _loaded: false, _error: null,
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
@@ -19,13 +19,14 @@ export const useStore = create<AppState>()((set, get) => ({
           db.gastosEvento.getAll(), db.pagosEvento.getAll(),
           db.documentos.getAll(), db.usuarios.getAll(),
         ]);
-      // "socios"/"movimientos_socios" son tablas nuevas — si todavía no existen
-      // (pendiente de migración), no debe romper la carga del resto de la app.
-      const [socios, movimientosSocios] = await Promise.all([
+      // Tablas nuevas — si todavía no existen (pendiente de migración),
+      // no debe romper la carga del resto de la app.
+      const [socios, movimientosSocios, impuestos] = await Promise.all([
         db.socios.getAll().catch(() => []),
         db.movimientosSocios.getAll().catch(() => []),
+        db.impuestos.getAll().catch(() => []),
       ]);
-      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento, documentos, usuarios, socios, movimientosSocios, _loaded: true, _error: null });
+      set({ eventos, ingresos, gastos, suplidos, facturas, equipo, gastosEvento, pagosEvento, documentos, usuarios, socios, movimientosSocios, impuestos, _loaded: true, _error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[Store] Error al cargar datos:', msg);
@@ -135,4 +136,13 @@ export const useStore = create<AppState>()((set, get) => ({
     if (u) db.movimientosSocios.upsert(u).catch(console.error);
   },
   deleteMovimientoSocio: (id) => { set((st) => ({ movimientosSocios: st.movimientosSocios.filter((x) => x.id !== id) })); db.movimientosSocios.delete(id).catch(console.error); },
+
+  // ── IMPUESTOS ─────────────────────────────────────────────────────────────
+  addImpuesto: (i) => { set((st) => ({ impuestos: [...st.impuestos, i] })); db.impuestos.insert(i).catch(console.error); },
+  updateImpuesto: (id, p) => {
+    set((st) => ({ impuestos: st.impuestos.map((x) => x.id === id ? { ...x, ...p } : x) }));
+    const u = get().impuestos.find((x) => x.id === id);
+    if (u) db.impuestos.upsert(u).catch(console.error);
+  },
+  deleteImpuesto: (id) => { set((st) => ({ impuestos: st.impuestos.filter((x) => x.id !== id) })); db.impuestos.delete(id).catch(console.error); },
 }));

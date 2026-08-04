@@ -22,6 +22,7 @@ const InversionesPage = lazy(() => import('./pages/shared/InversionesPage').then
 const InformesPage    = lazy(() => import('./pages/shared/InformesPage').then((m) => ({ default: m.InformesPage })));
 const RepartoSociosPage = lazy(() => import('./pages/shared/RepartoSociosPage').then((m) => ({ default: m.RepartoSociosPage })));
 const InformesContablesPage = lazy(() => import('./pages/contabilidad/InformesContablesPage').then((m) => ({ default: m.InformesContablesPage })));
+const ImpuestosPage   = lazy(() => import('./pages/contabilidad/ImpuestosPage').then((m) => ({ default: m.ImpuestosPage })));
 const AdminUsuarios   = lazy(() => import('./pages/admin/Usuarios').then((m) => ({ default: m.AdminUsuarios })));
 const AdminAjustes    = lazy(() => import('./pages/admin/Ajustes').then((m) => ({ default: m.AdminAjustes })));
 
@@ -147,6 +148,7 @@ export default function App() {
                       <Route path="contabilidad/facturas"    element={<RequirePerm area="facturas"><FacturasAreaPage area="todos" /></RequirePerm>} />
                       <Route path="contabilidad/inversiones" element={<RequirePerm area="inversiones"><InversionesPage area="todos" /></RequirePerm>} />
                       <Route path="contabilidad/informes"    element={<RequirePerm area="informes"><InformesContablesPage /></RequirePerm>} />
+                      <Route path="contabilidad/impuestos"   element={<RequirePerm area="impuestos"><ImpuestosPage /></RequirePerm>} />
 
                       {/* Admin */}
                       <Route path="admin/usuarios" element={<RequireAdmin><AdminUsuarios /></RequireAdmin>} />

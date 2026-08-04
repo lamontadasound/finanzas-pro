@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, Wallet, Calendar, CreditCard,
   Receipt, Package, BarChart3, Building2, Music2,
-  Users, Settings, LogOut, Menu, X, FileText, HardDrive,
+  Users, Settings, LogOut, Menu, X, FileText, HardDrive, Landmark,
 } from 'lucide-react';
 import { useState } from 'react';
 import { clsx } from 'clsx';
@@ -33,6 +33,7 @@ const SUB_CONTABILIDAD = [
   { to: '/contabilidad/facturas',    label: 'Facturas',           icon: Receipt,     perm: 'facturas' as const },
   { to: '/contabilidad/inversiones', label: 'Inversiones',        icon: Package,     perm: 'inversiones' as const },
   { to: '/contabilidad/informes',    label: 'Informes contables', icon: BarChart3,   perm: 'informes' as const },
+  { to: '/contabilidad/impuestos',   label: 'Impuestos',          icon: Landmark,    perm: 'impuestos' as const },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

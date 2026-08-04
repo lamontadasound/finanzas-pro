@@ -281,8 +281,6 @@ export const GastosPage = ({ area }: Props) => {
           {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
-      <p className="text-[11px] text-gray-400 -mt-2">Los filtros de Tipo, Categoría y Periodicidad se aplican sobre los datos cargados en esta sesión; algunos campos (tipo/periodicidad) están pendientes de migración para persistir de forma permanente.</p>
-
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -364,7 +362,6 @@ export const GastosPage = ({ area }: Props) => {
               <select value={form.pagadoPor ?? 'La Montada'} onChange={(e) => setField('pagadoPor', e.target.value as PagadoPor)} className="input-form">
                 {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-              <p className="text-[11px] text-gray-400 mt-1">Pendiente de migración para persistir.</p>
             </div>
             {area === 'dj' && (
               <div>
