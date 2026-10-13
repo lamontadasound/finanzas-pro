@@ -61,7 +61,7 @@ export const BUSINESS_LINES: Record<LineaId, BusinessLineConfig> = {
   montada_installations: {
     id: 'montada_installations',
     label: 'La Montada Installations',
-    shortLabel: 'Installations',
+    shortLabel: 'Instalaciones',
     routeBase: '/lineas/installations',
     legacyArea: null,
     tieneInversiones: false,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { supabase } from '../../lib/supabase';
-const lines = [{id:'dj',name:'DJ · 100% para ti'}, {id:'montada_sound',name:'La Montada Sound'}, {id:'real_madrid',name:'Real Madrid'}, {id:'montada_installations',name:'Installations'}];
+const lines = [{id:'dj',name:'DJ · 100% para ti'}, {id:'montada_sound',name:'La Montada Sound'}, {id:'real_madrid',name:'Real Madrid'}, {id:'montada_installations',name:'Instalaciones'}];
 type Amounts = Record<string,{assigned:string;received:string}>;
 const empty = ():Amounts => Object.fromEntries(lines.map(l=>[l.id,{assigned:'',received:''}]));
 const euros=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
