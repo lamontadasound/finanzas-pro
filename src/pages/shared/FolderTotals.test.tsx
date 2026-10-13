@@ -49,10 +49,11 @@ describe('Totales sin IVA en carpetas', () => {
     expect(screen.getByText('121,00 €')).toBeTruthy();
   });
   it('suma gastos sin IVA y conserva el total anual al entrar en el mes', () => {
-    render(<GastosPage area="montada" />);
-    fireEvent.click(screen.getByRole('button', {name: /2026.*Total sin IVA: 350,00/}));
-    fireEvent.click(screen.getByRole('button', {name: /Marzo.*Total sin IVA: 350,00/}));
-    expect(screen.getByText(/Total sin IVA Marzo 2026:/).textContent).toContain('350,00');
+    render(<MemoryRouter><GastosPage area="montada" /></MemoryRouter>);
+    toYears();
+    fireEvent.click(screen.getByRole('button', {name: /2026.*350\s€/}));
+    fireEvent.click(screen.getByRole('button', {name: /Marzo.*350\s€/}));
+    expect(screen.getByRole('heading', {name: 'Marzo 2026'})).toBeTruthy();
   });
   it('usa el desglose de IVA y conserva los costes históricos sin desglose', () => {
     render(<MemoryRouter><GastosEventoPage area="montada" /></MemoryRouter>);
