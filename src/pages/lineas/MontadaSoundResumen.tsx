@@ -69,12 +69,12 @@ export const MontadaSoundResumen = () => {
           </p>
           <div className="mt-auto pt-8">
             <SplitBar parts={[
-              { label: 'Cobrado', value: m.cobrado, color: '#ffffff' },
-              { label: 'Pendiente', value: m.pendiente, color: 'rgb(255 255 255 / .35)' },
+              { label: 'Cobrado', value: m.cobrado, color: 'var(--tint-ink)' },
+              { label: 'Pendiente', value: m.pendiente, color: 'color-mix(in srgb, var(--tint-ink) 30%, transparent)' },
             ]} />
             <div className="flex justify-between mt-3 text-[13px]">
-              <span className="flex items-center gap-1.5"><Dot color="#fff" />Cobrado <b className="num ml-1"><Money value={m.cobrado} /></b></span>
-              <span className="flex items-center gap-1.5 opacity-80"><Dot color="rgb(255 255 255 / .45)" />Pendiente <b className="num ml-1"><Money value={m.pendiente} /></b></span>
+              <span className="flex items-center gap-1.5"><Dot color="var(--tint-ink)" />Cobrado <b className="num ml-1"><Money value={m.cobrado} /></b></span>
+              <span className="flex items-center gap-1.5 opacity-80"><Dot color="color-mix(in srgb, var(--tint-ink) 40%, transparent)" />Pendiente <b className="num ml-1"><Money value={m.pendiente} /></b></span>
             </div>
           </div>
         </Widget>
@@ -98,7 +98,7 @@ export const MontadaSoundResumen = () => {
             data={m.meses}
             series={[
               { key: 'cobrado', label: 'Cobrado', color: 'var(--tint-a)' },
-              { key: 'pendiente', label: 'Por cobrar', color: '#c26a00', pattern: true },
+              { key: 'pendiente', label: 'Por cobrar', color: 'color-mix(in srgb, var(--tint-b) 38%, #fff)' },
             ]}
           />
         </Widget>

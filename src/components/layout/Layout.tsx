@@ -32,7 +32,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   return (
     <div
       className="app"
-      style={{ '--tint-a': space.tint.from, '--tint-b': space.tint.to, '--tint-glow': space.tint.glow } as CSSProperties}
+      style={{ '--tint-a': space.tint.from, '--tint-b': space.tint.to, '--tint-glow': space.tint.glow, '--tint-ink': space.tint.ink ?? '#ffffff' } as CSSProperties}
     >
       <div className="ambient" aria-hidden />
       <TopBar space={space} />

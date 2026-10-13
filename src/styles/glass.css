@@ -38,6 +38,7 @@
   --tint-a: #3a3a3c;
   --tint-b: #636366;
   --tint-glow: #8e8e93;
+  --tint-ink: #ffffff;
 }
 
 html { background: var(--bg); }
@@ -334,7 +335,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 .hero-card {
   background: linear-gradient(150deg, var(--tint-b) -20%, var(--tint-a) 70%) !important;
-  color: #fff;
+  color: var(--tint-ink, #fff);
   box-shadow: 0 1px 0 rgb(255 255 255 / .25) inset, 0 24px 50px -26px var(--tint-a) !important;
   position: relative; overflow: hidden;
 }
@@ -363,7 +364,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   display: flex; flex-direction: column; align-items: center;
   background: #fff; box-shadow: 0 0 0 .5px rgb(0 0 0 / .1), 0 2px 6px -3px rgb(0 0 0 / .2);
 }
-.date-glyph > span { width: 100%; text-align: center; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--tint-a); padding: 2px 0 1px; }
+.date-glyph > span { width: 100%; text-align: center; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--tint-ink); background: var(--tint-a); padding: 2px 0 1px; }
 .date-glyph > b { font-size: 19px; font-weight: 600; line-height: 26px; color: var(--ink); }
 
 /* ── Lista de ingresos ───────────────────────────────────────────────────── */
@@ -504,4 +505,11 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   .gx-head .r { text-align: right; }
   .gx-row > .gx-cat, .gx-row > .gx-col, .gx-row > .r, .gx-row > .r:not(.gx-strong), .gx-row > .gx-pay { display: block; }
   .gx-main small { display: none; }
+}
+
+.chart-tip {
+  position: absolute; z-index: 5; min-width: 150px; pointer-events: none;
+  padding: 9px 11px; border-radius: 12px; font-size: 12.5px; line-height: 1.6;
+  background: rgb(255 255 255 / .92); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / .3), 0 0 0 .5px rgb(0 0 0 / .08);
 }

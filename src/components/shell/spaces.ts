@@ -22,7 +22,7 @@ export interface Space {
   label: string;
   icon: SpaceIcon;
   /** Color del icono del dock y del ambiente de fondo. */
-  tint: { from: string; to: string; glow: string };
+  tint: { from: string; to: string; glow: string; /** Texto sobre el color (oscuro en tintes claros) */ ink?: string };
   home: string;
   prefixes: string[];
   items: SpaceItem[];
@@ -39,7 +39,7 @@ const inst = '/lineas/installations';
 export const SPACES: Space[] = [
   {
     id: 'home', label: 'Mi espacio', icon: House,
-    tint: { from: '#0060df', to: '#40a9ff', glow: '#5ac8fa' },
+    tint: { from: '#1c1c1e', to: '#55555c', glow: '#a1a1aa' },
     home: '/', prefixes: ['/contabilidad/informes', '/contabilidad/pagos'],
     items: [
       { to: '/', label: 'Resumen', icon: LayoutGrid, end: true },
@@ -49,7 +49,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'montada', label: 'La Montada', icon: AudioLines, linea: 'montada_sound',
-    tint: { from: '#1c1c1e', to: '#4a4a4f', glow: '#a1a1aa' },
+    tint: { from: '#d99a00', to: '#ffcc33', glow: '#ffd75e', ink: '#1d1d1f' },
     home: `${montada}/resumen`, prefixes: [montada, '/montada/'],
     items: [
       { to: `${montada}/resumen`, label: 'Resumen', icon: LayoutGrid },
@@ -68,7 +68,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'dj', label: 'DJ', icon: Disc3, linea: 'dj',
-    tint: { from: '#c2255c', to: '#f76707', glow: '#ff8a5c' },
+    tint: { from: '#4a0b24', to: '#a3194a', glow: '#d9437a' },
     home: `${dj}/resumen`, prefixes: [dj, '/dj/'],
     items: [
       { to: `${dj}/resumen`, label: 'Resumen', icon: LayoutGrid },
@@ -81,7 +81,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'rm', label: 'Real Madrid', icon: Crown, linea: 'real_madrid',
-    tint: { from: '#14213d', to: '#3a5a9b', glow: '#d4af37' },
+    tint: { from: '#0a47b8', to: '#3d8bff', glow: '#7fb2ff' },
     home: `${rm}/resumen`, prefixes: [rm],
     items: [
       { to: `${rm}/resumen`, label: 'Resumen', icon: LayoutGrid },
@@ -95,7 +95,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'inst', label: 'Instalaciones', icon: Cable, linea: 'montada_installations',
-    tint: { from: '#0b5d5e', to: '#2fb3a3', glow: '#5fd3c3' },
+    tint: { from: '#5b3a29', to: '#a8714f', glow: '#c99a74' },
     home: `${inst}/resumen`, prefixes: [inst],
     items: [
       { to: `${inst}/resumen`, label: 'Resumen', icon: LayoutGrid },
