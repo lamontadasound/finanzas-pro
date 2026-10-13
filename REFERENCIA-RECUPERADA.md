@@ -1,0 +1,1 @@
+Se recuperaron archivos auxiliares del ZIP recibido el 15 de septiembre. Ver ../COMPARACION-REFERENCIA.md y ../referencias/mi-espacio-2026-09-14/. Los scripts y SQL son históricos: su recuperación no implica ejecutarlos. No se ha modificado el frontend ni publicado un nuevo despliegue.

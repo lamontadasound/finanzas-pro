@@ -15,6 +15,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Alias "@/*" — solo para componentes del registro Bklit (shadcn/ui) */
+    "paths": { "@/*": ["./src/*"] },
+
     /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,

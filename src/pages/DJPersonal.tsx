@@ -55,7 +55,7 @@ export const DJPersonal = () => {
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-white">DJ Personal</h1>
-        <p className="text-sm text-zinc-500 mt-0.5">Actividad independiente de DJ — separada de la empresa</p>
+        
       </div>
       <div className="flex gap-1 bg-surface-800 border border-surface-400/20 rounded-xl p-1 w-fit">
         {TABS.map((t) => (
@@ -104,7 +104,10 @@ const ResumenTab = ({
   const totBenefReal = monthlyEnriched.reduce((s, r) => s + r.beneficioReal, 0);
   const totPendiente = monthlyEnriched.reduce((s, r) => s + r.totalPendiente, 0);
   const chartData    = monthlyEnriched.map((r) => ({ mes: r.label.slice(0, 3), ingresos: r.ing, gastos: r.gTotal, 'benef. real': r.beneficioReal }));
-  let acum = 0;
+  const monthlyConAcumulado = useMemo(() => monthlyEnriched.reduce<(typeof monthlyEnriched[number] & { acum: number })[]>((acc, row) => {
+    const acum = (acc[acc.length - 1]?.acum ?? 0) + row.balance;
+    return [...acc, { ...row, acum }];
+  }, []), [monthlyEnriched]);
 
   return (
     <div className="space-y-5">
@@ -125,7 +128,7 @@ const ResumenTab = ({
         </div>
         <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
           <p className="text-xs text-zinc-500 mb-1">Pendiente de cobro</p>
-          <p className={`text-lg font-bold ${totPendiente > 0 ? 'text-yellow-400' : 'text-green-400'}`}>{fmt(totPendiente)}</p>
+          <p className={`text-lg font-bold ${totPendiente > 0 ? 'text-yellow-400' : 'text-accent-400'}`}>{fmt(totPendiente)}</p>
           <p className="text-xs text-zinc-600 mt-0.5">{monthlyEnriched.flatMap((r) => r.pendientes).length} evento(s)</p>
         </div>
       </div>
@@ -141,12 +144,12 @@ const ResumenTab = ({
           <BarChart data={chartData} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
             <XAxis dataKey="mes" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmtShort(Number(v))} />
-            <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }} />
+            <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: unknown) => fmtShort(Number(v))} />
+            <Tooltip formatter={(v: unknown) => fmt(Number(v))} contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="ingresos" name="Ingresos" fill="#a78bfa" radius={[4, 4, 0, 0]} />
             <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="benef. real" name="Benef. real" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="benef. real" name="Benef. real" fill="#8d675a" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -164,7 +167,7 @@ const ResumenTab = ({
             <th className="text-right px-4 py-3 text-zinc-500">Acumulado</th>
           </tr></thead>
           <tbody>
-            {monthlyEnriched.map((row) => { acum += row.balance; const hasData = row.ing > 0 || row.gTotal > 0; return (
+            {monthlyConAcumulado.map((row) => { const hasData = row.ing > 0 || row.gTotal > 0; return (
               <tr key={row.num} className={`border-b border-surface-400/10 hover:bg-surface-700/50 ${!hasData ? 'opacity-40' : ''}`}>
                 <td className="px-4 py-2.5 text-zinc-300 font-medium">{row.label}</td>
                 <td className="px-4 py-2.5 text-right text-purple-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
@@ -173,14 +176,14 @@ const ResumenTab = ({
                   {row.ing > 0 ? fmt(row.beneficioReal) : '—'}
                 </td>
                 <td className="px-4 py-2.5 text-right text-zinc-400">{row.gTotal > 0 ? fmt(row.gTotal) : '—'}</td>
-                <td className="px-4 py-2.5 text-right text-green-400">{row.totalCobrado > 0 ? fmt(row.totalCobrado) : '—'}</td>
+                <td className="px-4 py-2.5 text-right text-accent-400">{row.totalCobrado > 0 ? fmt(row.totalCobrado) : '—'}</td>
                 <td className="px-4 py-2.5 text-right">
                   {row.totalPendiente > 0
                     ? <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span>
                     : <span className="text-zinc-600">—</span>
                   }
                 </td>
-                <td className={`px-4 py-2.5 text-right font-semibold ${acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(acum)}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold ${row.acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(row.acum)}</td>
               </tr>
             ); })}
           </tbody>
@@ -190,9 +193,9 @@ const ResumenTab = ({
             <td className="px-4 py-3 text-right text-red-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.costesEvento, 0))}</td>
             <td className={`px-4 py-3 text-right ${totBenefReal >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totBenefReal)}</td>
             <td className="px-4 py-3 text-right text-zinc-400">{fmt(totGas)}</td>
-            <td className="px-4 py-3 text-right text-green-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.totalCobrado, 0))}</td>
+            <td className="px-4 py-3 text-right text-accent-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.totalCobrado, 0))}</td>
             <td className={`px-4 py-3 text-right ${totPendiente > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>{fmt(totPendiente)}</td>
-            <td className="px-4 py-3 text-right text-blue-400">{fmt(acum)}</td>
+            <td className="px-4 py-3 text-right text-blue-400">{fmt(totIng - totGas)}</td>
           </tr></tfoot>
         </table>
       </div>
@@ -222,11 +225,11 @@ const ResumenTab = ({
                       <span className="px-2 py-0.5 bg-yellow-500/10 text-yellow-400 text-xs rounded-full font-medium">{row.pendientes.length} pendiente(s)</span>
                     )}
                     {row.pendientes.length === 0 && row.cobrados.length > 0 && (
-                      <span className="px-2 py-0.5 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">✓ Todo cobrado</span>
+                      <span className="px-2 py-0.5 bg-accent-500/10 text-accent-400 text-xs rounded-full font-medium">✓ Todo cobrado</span>
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-zinc-500">Cobrado: <span className="text-green-400 font-medium">{fmt(row.totalCobrado)}</span></span>
+                    <span className="text-zinc-500">Cobrado: <span className="text-accent-400 font-medium">{fmt(row.totalCobrado)}</span></span>
                     {row.totalPendiente > 0 && (
                       <span className="text-zinc-500">Pendiente: <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span></span>
                     )}
@@ -238,15 +241,15 @@ const ResumenTab = ({
                     {row.cobrados.map((i) => (
                       <div key={i.id} className="flex items-center justify-between py-1.5 border-b border-surface-400/5 last:border-0">
                         <div className="flex items-center gap-3">
-                          <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                          <span className="w-2 h-2 rounded-full bg-accent-400 flex-shrink-0" />
                           <div>
                             <p className="text-sm text-zinc-200">{i.concepto}</p>
                             <p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-green-400">{fmt(i.total)}</p>
-                          <p className="text-xs text-green-400/70">Cobrado ✓</p>
+                          <p className="text-sm font-semibold text-accent-400">{fmt(i.total)}</p>
+                          <p className="text-xs text-accent-400/70">Cobrado ✓</p>
                         </div>
                       </div>
                     ))}
@@ -345,7 +348,7 @@ const IngresosTab = ({
         </div>
         <div className="ml-auto flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-700 border border-surface-400/30 text-zinc-300 text-sm rounded-lg hover:text-white"><Download size={13} />Excel</button>
-          <button onClick={() => { setForm(emptyIngreso()); setModal(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
+          <button onClick={() => { setForm(emptyIngreso()); setModal(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo ingreso</button>
         </div>
       </div>
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden overflow-x-auto">
@@ -375,7 +378,7 @@ const IngresosTab = ({
                     <td className="px-4 py-3 text-right text-purple-400 font-medium">{fmt(i.baseImponible)}</td>
                     <td className="px-4 py-3 text-right text-zinc-400 text-xs">{i.porcentajeIVA}%<br />{fmt(i.importeIVA)}</td>
                     <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
-                    <td className="px-4 py-3 text-center">{i.facturaEmitida ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/15 text-green-400">{i.numeroFactura ?? 'Sí'}</span> : <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/10 text-zinc-500">No</span>}</td>
+                    <td className="px-4 py-3 text-center">{i.facturaEmitida ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-accent-500/15 text-accent-400">{i.numeroFactura ?? 'Sí'}</span> : <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/10 text-zinc-500">No</span>}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${PAYMENT_STATUS_COLORS[i.estadoPago]}`}>{PAYMENT_STATUS_LABELS[i.estadoPago]}</span></td>
                     <td className="px-4 py-3 text-right">{hasCostes ? <span className="text-red-400 font-medium">{fmt(costes)}</span> : <span className="text-zinc-600 text-xs">—</span>}</td>
                     <td className="px-4 py-3 text-right">{hasCostes ? <span className={`font-semibold ${beneficio >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(beneficio)}</span> : <span className="text-zinc-600 text-xs">—</span>}</td>
@@ -408,7 +411,7 @@ const IngresosTab = ({
           <div className="col-span-2 flex items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.facturaEmitida} onChange={(e) => setField('facturaEmitida', e.target.checked)} className="accent-gold-500 w-4 h-4" />
-              <span className="text-sm font-medium text-white">Factura emitida: <span className={form.facturaEmitida ? 'text-green-400' : 'text-zinc-500'}>{form.facturaEmitida ? 'Sí' : 'No'}</span></span>
+              <span className="text-sm font-medium text-white">Factura emitida: <span className={form.facturaEmitida ? 'text-accent-400' : 'text-zinc-500'}>{form.facturaEmitida ? 'Sí' : 'No'}</span></span>
             </label>
             {form.facturaEmitida && (
               <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value)} className="flex-1 bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none font-mono" placeholder="Nº factura" />
@@ -416,7 +419,7 @@ const IngresosTab = ({
           </div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={saveNew} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">Crear ingreso →</button>
+            <button onClick={saveNew} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">Crear ingreso →</button>
           </div>
         </div>
         <p className="text-xs text-zinc-600 mt-3 text-center">Al guardar podrás añadir costes del evento en el detalle</p>
@@ -452,7 +455,7 @@ const GastosTab = ({ gastos, onAdd, onUpdate, onDelete }: { gastos: Gasto[]; onA
 
   const openNew = () => { setForm(emptyGasto()); setEditId(null); setModal(true); };
   const openEdit = (g: Gasto) => { setForm({ ...g }); setEditId(g.id); setModal(true); };
-  const setField = (k: keyof typeof form, v: any) => setForm((f) => {
+  const setField = (k: keyof typeof form, v: unknown) => setForm((f) => {
     const next = { ...f, [k]: v };
     if (k === 'baseImponible' || k === 'porcentajeIVA') { const r = calcIVA(Number(next.baseImponible), Number(next.porcentajeIVA)); return { ...next, ...r }; }
     return next;
@@ -466,7 +469,7 @@ const GastosTab = ({ gastos, onAdd, onUpdate, onDelete }: { gastos: Gasto[]; onA
         <span className="ml-2 text-sm text-zinc-400">Base: <span className="text-red-400 font-semibold">{fmt(totBase)}</span></span>
         <div className="ml-auto flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-2 px-3 py-1.5 border border-surface-400/30 text-zinc-400 hover:text-zinc-200 text-sm rounded-lg hover:bg-surface-700"><Download size={14} /> Excel</button>
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo gasto</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo gasto</button>
         </div>
       </div>
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
@@ -510,7 +513,7 @@ const GastosTab = ({ gastos, onAdd, onUpdate, onDelete }: { gastos: Gasto[]; onA
           <div className="flex flex-col gap-2 pt-4"><label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer"><input type="checkbox" checked={form.deducible} onChange={(e) => setField('deducible', e.target.checked)} className="accent-gold-500" />IVA deducible</label></div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar' : 'Añadir'}</button>
+            <button onClick={save} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar' : 'Añadir'}</button>
           </div>
         </div>
       </Modal>
@@ -539,7 +542,7 @@ const SuplidosTab = ({ suplidos, onAdd, onUpdate, onDelete }: { suplidos: Suplid
 
   const openNew = () => { setForm(emptySuplido()); setEditId(null); setModal(true); };
   const openEdit = (s: Suplido) => { setForm({ ...s }); setEditId(s.id); setModal(true); };
-  const setField = (k: keyof typeof form, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const setField = (k: keyof typeof form, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const save = () => { if (editId) onUpdate(editId, form); else onAdd(form); setModal(false); };
 
   return (
@@ -555,7 +558,7 @@ const SuplidosTab = ({ suplidos, onAdd, onUpdate, onDelete }: { suplidos: Suplid
         <span className="ml-2 text-sm text-zinc-400">Total: <span className="text-orange-400 font-semibold">{fmt(total)}</span></span>
         <div className="ml-auto flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-2 px-3 py-1.5 border border-surface-400/30 text-zinc-400 hover:text-zinc-200 text-sm rounded-lg hover:bg-surface-700"><Download size={14} /> Excel</button>
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo suplido</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo suplido</button>
         </div>
       </div>
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
@@ -578,7 +581,7 @@ const SuplidosTab = ({ suplidos, onAdd, onUpdate, onDelete }: { suplidos: Suplid
                   <td className="px-4 py-3 text-zinc-400">{s.cliente}</td>
                   <td className="px-4 py-3 text-right text-orange-400 font-medium">{fmt(s.importe)}</td>
                   <td className="px-4 py-3 text-zinc-500">{METODO_PAGO_LABELS[s.metodoPago]}</td>
-                  <td className="px-4 py-3 text-center">{s.justificante ? <Check size={14} className="text-green-400 mx-auto" /> : <X size={14} className="text-zinc-600 mx-auto" />}</td>
+                  <td className="px-4 py-3 text-center">{s.justificante ? <Check size={14} className="text-accent-400 mx-auto" /> : <X size={14} className="text-zinc-600 mx-auto" />}</td>
                   <td className="px-4 py-3"><div className="flex gap-1">
                     <button onClick={() => openEdit(s)} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={13} /></button>
                     <button onClick={() => showConfirm('¿Eliminar este suplido? Esta acción no se puede deshacer.', () => onDelete(s.id))} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
@@ -600,7 +603,7 @@ const SuplidosTab = ({ suplidos, onAdd, onUpdate, onDelete }: { suplidos: Suplid
           <div className="col-span-2"><label className="text-xs text-zinc-400 mb-1 block">Observaciones</label><textarea value={form.observaciones ?? ''} onChange={(e) => setField('observaciones', e.target.value)} rows={2} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none resize-none" /></div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar' : 'Añadir'}</button>
+            <button onClick={save} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar' : 'Añadir'}</button>
           </div>
         </div>
       </Modal>

@@ -1,0 +1,11 @@
+# Nombre local. La referencia remota se verifica explícitamente al desplegar.
+project_id = "mi-espacio"
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.admin-user-actions]
+verify_jwt = true
+
+[functions.drive-sync]
+verify_jwt = true

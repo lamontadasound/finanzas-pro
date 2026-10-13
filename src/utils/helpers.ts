@@ -1,5 +1,5 @@
 import { format, parseISO, getYear, getMonth, getQuarter, isWithinInterval } from 'date-fns';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { es } from 'date-fns/locale';
 import type { Ingreso, Gasto } from '../types';
 
@@ -8,6 +8,15 @@ export const fmt = (n: number) =>
 
 export const fmtShort = (n: number) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+
+// Formateador de CONTEOS enteros para <AnimatedNumber>/<StatCard*> — usar
+// siempre en vez de `format={String}`. Bug encontrado en esta auditoría:
+// `String` aplicado directamente a un contador muestra valores intermedios
+// con decimales mientras el muelle de <AnimatedNumber> interpola (p.ej.
+// "0.2960815…" en vez de "3" a mitad de la animación) — un conteo (número
+// de facturas, eventos, inversiones…) nunca debe mostrar decimales, ni
+// siquiera de forma transitoria.
+export const fmtInt = (n: number) => String(Math.round(n));
 
 export const fmtDate = (d: string) => {
   try { return format(parseISO(d), 'dd/MM/yyyy', { locale: es }); } catch { return d; }
@@ -29,7 +38,7 @@ export const MONTHS = Array.from({ length: 12 }, (_, i) => ({ num: i + 1, label:
 export const getAvailableYears = (items: { fecha?: string; fechaEvento?: string; fechaCompra?: string }[]): number[] => {
   const years = new Set<number>();
   items.forEach((item) => {
-    const d = (item as any).fecha || (item as any).fechaEvento || (item as any).fechaCompra;
+    const d = item.fecha || item.fechaEvento || item.fechaCompra;
     if (d) {
       try { years.add(getYear(parseISO(d))); } catch { /* ignore */ }
     }
@@ -56,7 +65,7 @@ export const filterByPeriod = <T extends { fecha?: string; fechaEvento?: string 
 ): T[] => {
   if (filter.type === 'all') return items;
   return items.filter((item) => {
-    const dateStr = (item as any).fecha || (item as any).fechaEvento || '';
+    const dateStr = item.fecha || item.fechaEvento || '';
     if (!dateStr) return false;
     try {
       const d = parseISO(dateStr);
@@ -108,7 +117,7 @@ export const EVENT_TYPE_COLORS: Record<string, string> = {
   boda: 'bg-pink-500/10 text-pink-400',
   real_madrid: 'bg-gold-500/10 text-gold-400',
   alquiler: 'bg-blue-500/10 text-blue-400',
-  empresa: 'bg-green-500/10 text-green-400',
+  empresa: 'bg-accent-500/10 text-accent-400',
   dj_personal: 'bg-purple-500/10 text-purple-400',
   evento_privado: 'bg-orange-500/10 text-orange-400',
   otro: 'bg-zinc-500/10 text-zinc-400',
@@ -126,7 +135,7 @@ export const STATUS_COLORS: Record<string, string> = {
   pendiente: 'text-yellow-400 bg-yellow-400/10',
   confirmado: 'text-blue-400 bg-blue-400/10',
   realizado: 'text-purple-400 bg-purple-400/10',
-  cobrado: 'text-green-400 bg-green-400/10',
+  cobrado: 'text-accent-400 bg-accent-400/10',
   facturado: 'text-gold-400 bg-gold-400/10',
 };
 
@@ -139,7 +148,7 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export const PAYMENT_STATUS_COLORS: Record<string, string> = {
   pendiente: 'text-red-400 bg-red-400/10',
   parcial: 'text-yellow-400 bg-yellow-400/10',
-  pagado: 'text-green-400 bg-green-400/10',
+  pagado: 'text-accent-400 bg-accent-400/10',
 };
 
 export const GASTO_CATEGORIAS: string[] = [
@@ -172,10 +181,14 @@ export const useYearMonth = (items: { fecha?: string; fechaEvento?: string }[]) 
   const [year, setYear] = useState(() => years[0]);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
 
-  // Sync year when the available years list changes (e.g. first entry added)
-  useEffect(() => {
+  // Sync year when the available years list changes (e.g. first entry added).
+  // Ajuste durante el render (patrón recomendado por React en vez de un
+  // efecto) — evita el doble render que provocaría un useEffect aquí.
+  const [prevYears, setPrevYears] = useState(years);
+  if (years !== prevYears) {
+    setPrevYears(years);
     if (!years.includes(year)) setYear(years[0]);
-  }, [years, year]);
+  }
 
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(y => y - 1); }

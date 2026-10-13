@@ -12,8 +12,9 @@ export class StorageUploadError extends Error {}
 const extensionDe = (nombre: string) => nombre.split('.').pop()?.toLowerCase() ?? '';
 
 export const validarArchivo = (file: File) => {
+  if(file.size > 10*1024*1024) throw new StorageUploadError('El archivo supera 10 MB.');
   const ext = extensionDe(file.name);
-  if (!TIPOS_MIME_PERMITIDOS.includes(file.type) && !EXTENSIONES_PERMITIDAS.includes(ext)) {
+  if (!TIPOS_MIME_PERMITIDOS.includes(file.type) || !EXTENSIONES_PERMITIDAS.includes(ext)) {
     throw new StorageUploadError('Formato no admitido. Solo se aceptan PDF, JPG, JPEG y PNG.');
   }
 };

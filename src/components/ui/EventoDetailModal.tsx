@@ -1,3 +1,7 @@
+import {EventExpenseVatFields} from '../forms/EventExpenseVatFields';
+import {expensePaymentLabel} from '../../lib/eventExpensePayment';
+import { EventExpensePaymentFields } from '../forms/EventExpensePaymentFields';
+import { EventCategoryField } from '../forms/EventCategoryField';
 /**
  * EventoDetailModal — Modal completo de un evento/ingreso
  * ─────────────────────────────────────────────────────────────────────────────
@@ -12,18 +16,13 @@ import { Plus, Trash2, X, Save } from 'lucide-react';
 import { Modal } from './Modal';
 import { useStore } from '../../store/useStore';
 import {
-  fmt, fmtDate, uid, METODO_PAGO_LABELS, EVENT_TYPE_LABELS,
-  PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS, calcIVA,
+  fmt, fmtDate, uid, METODO_PAGO_LABELS, EVENT_TYPE_LABELS, calcIVA,
 } from '../../utils/helpers';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import type { Ingreso, GastoEvento, PagoEvento, GastoEventoCategoria } from '../../types';
+import type { Ingreso, GastoEvento, PagoEvento } from '../../types';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const GASTO_EVENTO_CATEGORIAS: GastoEventoCategoria[] = [
-  'DJ', 'Técnico', 'Gasolina', 'Alquiler',
-  'Proveedor', 'Transporte', 'Personal', 'Otro',
-];
 
 type ModalTab = 'detalles' | 'costes' | 'pagos' | 'resumen';
 
@@ -101,6 +100,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
   };
 
   // ── Formularios de costes y pagos ────────────────────────────────────────────
+  const [savingCost, setSavingCost] = useState(false);
   const [gastoForm, setGastoForm] = useState<Omit<GastoEvento, 'id' | 'createdAt'> | null>(null);
   const [pagoForm, setPagoForm] = useState<Omit<PagoEvento, 'id' | 'createdAt'> | null>(null);
 
@@ -123,10 +123,11 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
   const margen         = form.baseImponible > 0 ? (beneficioBruto / form.baseImponible) * 100 : 0;
 
   // ── Guardar costes/pagos ─────────────────────────────────────────────────────
-  const saveGasto = () => {
-    if (!gastoForm || !gastoForm.concepto.trim() || gastoForm.importe <= 0) return;
-    addGastoEvento({ ...gastoForm, id: uid(), createdAt: new Date().toISOString().slice(0, 10) });
-    setGastoForm(null);
+  const saveGasto = async () => {
+    if (savingCost || !gastoForm || !gastoForm.concepto.trim() || gastoForm.importe <= 0) return;
+    setSavingCost(true);
+    try { if (await addGastoEvento({ ...gastoForm, id: uid(), createdAt: new Date().toISOString().slice(0, 10) })) setGastoForm(null); }
+    finally { setSavingCost(false); }
   };
 
   const savePago = () => {
@@ -296,7 +297,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
             <div className="bg-surface-700/30 border border-surface-400/10 rounded-xl px-4 py-3 flex gap-6 text-sm flex-wrap">
               <span className="text-zinc-500">Costes: <span className="text-red-400 font-semibold">{fmt(totalCostes)}</span></span>
               <span className="text-zinc-500">Beneficio: <span className={`font-semibold ${beneficioBruto >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(beneficioBruto)}</span></span>
-              <span className="text-zinc-500">Margen: <span className={`font-semibold ${margen >= 30 ? 'text-green-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>{margen.toFixed(1)}%</span></span>
+              <span className="text-zinc-500">Margen: <span className={`font-semibold ${margen >= 30 ? 'text-accent-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>{margen.toFixed(1)}%</span></span>
             </div>
           )}
           <div className="flex justify-between items-center pt-1">
@@ -309,7 +310,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
             <button
               onClick={saveDetalles}
               disabled={!dirty}
-              className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Save size={14} /> Guardar cambios
             </button>
@@ -343,7 +344,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                     <tr key={g.id} className="border-b border-surface-400/10 hover:bg-surface-700/30">
                       <td className="px-3 py-2 text-xs text-zinc-400">{fmtDate(g.fecha)}</td>
                       <td className="px-3 py-2 text-white text-sm">{g.concepto}</td>
-                      <td className="px-3 py-2 text-xs text-zinc-400">{g.categoria}</td>
+                      <td className="px-3 py-2 text-xs text-zinc-400">{g.categoria}<div className="text-xs text-gray-500">{expensePaymentLabel(g)}</div></td>
                       <td className="px-3 py-2 text-right text-red-400 font-semibold">{fmt(g.importe)}</td>
                       <td className="px-3 py-2">
                         <button
@@ -380,15 +381,10 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                     className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"
                   />
                 </div>
-                <div>
+                <EventExpensePaymentFields value={gastoForm} onChange={patch => setGastoForm(f => f ? {...f,...patch} : f)} />
+              <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Categoría</label>
-                  <select
-                    value={gastoForm.categoria}
-                    onChange={(e) => setGastoForm({ ...gastoForm, categoria: e.target.value as GastoEventoCategoria })}
-                    className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                  >
-                    {GASTO_EVENTO_CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <EventCategoryField value={gastoForm.categoria} onChange={categoria => setGastoForm({...gastoForm,categoria})} />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-zinc-400 mb-1 block">Concepto *</label>
@@ -399,30 +395,14 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                     placeholder="Ej: Pago DJ externo, Técnico de sonido, Gasolina..."
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Importe (€) *</label>
-                  <input
-                    type="number"
-                    value={gastoForm.importe || ''}
-                    onChange={(e) => setGastoForm({ ...gastoForm, importe: Number(e.target.value) })}
-                    className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Observaciones</label>
-                  <input
-                    value={gastoForm.observaciones ?? ''}
-                    onChange={(e) => setGastoForm({ ...gastoForm, observaciones: e.target.value })}
-                    className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                  />
-                </div>
+                <EventExpenseVatFields value={gastoForm} onChange={patch=>setGastoForm(f=>f?{...f,...patch}:f)}/>
+                
               </div>
               <div className="flex justify-end gap-2">
                 <button onClick={() => setGastoForm(null)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200">
                   <X size={12} /> Cancelar
                 </button>
-                <button onClick={saveGasto} className="px-4 py-1.5 bg-gold-500 text-black text-xs font-semibold rounded-lg hover:bg-gold-400">
+                <button disabled={savingCost} onClick={saveGasto} className="px-4 py-1.5 bg-gold-500 text-white text-xs font-semibold rounded-lg hover:bg-gold-400">
                   Guardar coste
                 </button>
               </div>
@@ -439,10 +419,10 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
           {/* Resumen rápido */}
           {myGastos.length > 0 && (
             <div className="bg-surface-700/30 rounded-xl px-4 py-3 flex gap-6 text-sm flex-wrap">
-              <span className="text-zinc-500">Base: <span className="text-green-400 font-semibold">{fmt(form.baseImponible)}</span></span>
+              <span className="text-zinc-500">Base: <span className="text-accent-400 font-semibold">{fmt(form.baseImponible)}</span></span>
               <span className="text-zinc-500">Costes: <span className="text-red-400 font-semibold">{fmt(totalCostes)}</span></span>
               <span className="text-zinc-500">Beneficio: <span className={`font-semibold ${beneficioBruto >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(beneficioBruto)}</span></span>
-              <span className="text-zinc-500">Margen: <span className={`font-semibold ${margen >= 30 ? 'text-green-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>{margen.toFixed(1)}%</span></span>
+              <span className="text-zinc-500">Margen: <span className={`font-semibold ${margen >= 30 ? 'text-accent-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>{margen.toFixed(1)}%</span></span>
             </div>
           )}
         </div>
@@ -475,7 +455,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                       <td className="px-3 py-2 text-xs text-zinc-400">{fmtDate(p.fecha)}</td>
                       <td className="px-3 py-2 text-white">{p.concepto}</td>
                       <td className="px-3 py-2 text-xs text-zinc-400">{METODO_PAGO_LABELS[p.metodoPago]}</td>
-                      <td className="px-3 py-2 text-right text-green-400 font-semibold">{fmt(p.importe)}</td>
+                      <td className="px-3 py-2 text-right text-accent-400 font-semibold">{fmt(p.importe)}</td>
                       <td className="px-3 py-2">
                         <button
                           onClick={() => showConfirm('¿Eliminar este pago?', () => deletePagoEvento(p.id))}
@@ -491,7 +471,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                   <tr className="bg-surface-700/50 border-t border-surface-400/20">
                     <td colSpan={2} className="px-3 py-2.5 text-xs text-zinc-400 font-semibold">Total cobrado</td>
                     <td className="px-3 py-2.5 text-xs text-zinc-500">{myPagos.length} pago(s)</td>
-                    <td className="px-3 py-2.5 text-right text-green-400 font-bold">{fmt(totalCobrado)}</td>
+                    <td className="px-3 py-2.5 text-right text-accent-400 font-bold">{fmt(totalCobrado)}</td>
                     <td></td>
                   </tr>
                 </tfoot>
@@ -501,8 +481,8 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
 
           {/* Pendiente */}
           {totalCobrado > 0 && (
-            <div className={`rounded-xl px-4 py-2.5 text-sm flex items-center justify-between ${pendienteCobro <= 0.01 ? 'bg-green-500/10 border border-green-500/20' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
-              <span className={pendienteCobro <= 0.01 ? 'text-green-400' : 'text-yellow-400'}>
+            <div className={`rounded-xl px-4 py-2.5 text-sm flex items-center justify-between ${pendienteCobro <= 0.01 ? 'bg-accent-500/10 border border-accent-500/20' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
+              <span className={pendienteCobro <= 0.01 ? 'text-accent-400' : 'text-yellow-400'}>
                 {pendienteCobro <= 0.01 ? '✓ Cobrado al completo' : `Pendiente: ${fmt(pendienteCobro)}`}
               </span>
               <span className="text-zinc-500 text-xs">Total factura: {fmt(form.total)}</span>
@@ -564,7 +544,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
                 <button onClick={() => setPagoForm(null)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200">
                   <X size={12} /> Cancelar
                 </button>
-                <button onClick={savePago} className="px-4 py-1.5 bg-gold-500 text-black text-xs font-semibold rounded-lg hover:bg-gold-400">
+                <button onClick={savePago} className="px-4 py-1.5 bg-gold-500 text-white text-xs font-semibold rounded-lg hover:bg-gold-400">
                   Guardar pago
                 </button>
               </div>
@@ -585,18 +565,18 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <ResKPI label="Facturación total (c/IVA)" value={fmt(form.total)} color="text-white" />
-            <ResKPI label="Base imponible (s/IVA)" value={fmt(form.baseImponible)} color="text-green-400" />
+            <ResKPI label="Base imponible (s/IVA)" value={fmt(form.baseImponible)} color="text-accent-400" />
             <ResKPI label="IVA repercutido" value={fmt(form.importeIVA)} sub={`${form.porcentajeIVA}%`} color="text-zinc-300" />
             <ResKPI
               label="Factura emitida"
               value={form.facturaEmitida ? `Sí${form.numeroFactura ? ` · ${form.numeroFactura}` : ''}` : 'No'}
-              color={form.facturaEmitida ? 'text-green-400' : 'text-zinc-500'}
+              color={form.facturaEmitida ? 'text-accent-400' : 'text-zinc-500'}
             />
             <ResKPI label="Total cobrado" value={fmt(totalCobrado)} sub={`${myPagos.length} pago(s)`} color="text-blue-400" />
             <ResKPI
               label="Pendiente de cobro"
               value={fmt(Math.max(0, pendienteCobro))}
-              color={pendienteCobro <= 0.01 ? 'text-green-400' : 'text-yellow-400'}
+              color={pendienteCobro <= 0.01 ? 'text-accent-400' : 'text-yellow-400'}
               sub={pendienteCobro <= 0.01 ? '✓ Cobrado completo' : ''}
             />
             <ResKPI label="Costes del evento" value={fmt(totalCostes)} sub={`${myGastos.length} partida(s)`} color="text-red-400" />
@@ -613,7 +593,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
             <div className="flex items-end justify-between mb-2">
               <div>
                 <p className="text-xs text-zinc-500 mb-1">Margen de beneficio</p>
-                <p className={`text-4xl font-bold tracking-tight ${margen >= 30 ? 'text-green-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>
+                <p className={`text-4xl font-bold tracking-tight ${margen >= 30 ? 'text-accent-400' : margen >= 10 ? 'text-gold-400' : 'text-red-400'}`}>
                   {margen.toFixed(1)}<span className="text-xl">%</span>
                 </p>
               </div>
@@ -625,7 +605,7 @@ export const EventoDetailModal = ({ ingreso, onClose, onUpdate, initialTab = 'de
             </div>
             <div className="h-2 bg-surface-600 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${margen >= 30 ? 'bg-green-400' : margen >= 10 ? 'bg-gold-500' : 'bg-red-500'}`}
+                className={`h-full rounded-full transition-all ${margen >= 30 ? 'bg-accent-400' : margen >= 10 ? 'bg-gold-500' : 'bg-red-500'}`}
                 style={{ width: `${Math.min(100, Math.max(0, margen))}%` }}
               />
             </div>

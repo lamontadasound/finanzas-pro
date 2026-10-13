@@ -1,27 +1,18 @@
-export const AdminAjustes = () => (
-  <div className="space-y-6">
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Ajustes</h1>
-      <p className="text-sm text-gray-500">Configuración general de la aplicación</p>
-    </div>
-
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-      <h2 className="text-sm font-semibold text-gray-800">Información de la cuenta</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Empresa principal</p>
-          <p className="font-semibold text-gray-900">La Montada Sound</p>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Versión</p>
-          <p className="font-semibold text-gray-900">Finanzas Pro v4</p>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-800">
-      <p className="font-semibold mb-1">Próximamente</p>
-      <p className="text-amber-700">Configuración de IVA por defecto, datos fiscales de empresa, preferencias de exportación y más.</p>
-    </div>
-  </div>
-);
+import {useState} from 'react';
+import {Plus,Palette} from 'lucide-react';
+import {useExpenseCategories,categoryKey,categoryColor,type ExpenseCategory} from '../../lib/expenseCategoryConfig';
+import {useStore} from '../../store/useStore';
+import {Button} from '../../components/ui/Button';
+const empty:ExpenseCategory={nombre:'',color:'#2563eb',general:true,evento:true};
+export const AdminAjustes=()=>{
+ const {categories,loading,error,load,save}=useExpenseCategories();
+ const gastos=useStore(s=>s.gastos),eventos=useStore(s=>s.gastosEvento);
+ const [draft,setDraft]=useState<ExpenseCategory>(empty),[editing,setEditing]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
+ const historical=[...new Set([...gastos,...eventos].map(g=>g.categoria))].filter(n=>!categories.some(c=>categoryKey(c.nombre)===categoryKey(n)));
+ const submit=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);setFailure('');setMessage('');try{const nombre=draft.nombre.trim().replace(/\s+/g,' ');if(!nombre||nombre.length>80)throw new Error('Escribe un nombre de entre 1 y 80 caracteres.');if(!editing&&categories.some(c=>categoryKey(c.nombre)===categoryKey(nombre)))throw new Error('Esta categoría ya existe. Pulsa Editar.');if(!draft.general&&!draft.evento)throw new Error('Selecciona gastos generales, por eventos o ambos.');await save({...draft,nombre});setDraft(empty);setEditing(false);setMessage('Categoría guardada. Ya está disponible en gastos y gráficos.');}catch(e){setFailure(e instanceof Error?e.message:'No se pudo guardar.');}finally{setBusy(false);}};
+ return <div className="space-y-6"><header><h1 className="text-2xl font-semibold">Configuración</h1></header>
+ {(error||failure)&&<p role="alert" className="text-red-700">{failure||error} {error&&<button onClick={()=>void load()}>Reintentar</button>}</p>}{message&&<p role="status" className="text-emerald-700">{message}</p>}
+ <form onSubmit={submit} className="finance-card p-6 space-y-4"><h2 className="font-semibold flex gap-2"><Palette size={19}/>{editing?'Editar color y uso':'Añadir categoría'}</h2><div className="grid sm:grid-cols-2 gap-4"><label>Nombre<input required maxLength={80} disabled={editing||busy} className="input-form" value={draft.nombre} onChange={e=>setDraft({...draft,nombre:e.target.value})}/></label><label>Color de las barras<div className="flex items-center gap-3 mt-2"><input aria-label="Color de la categoría" type="color" value={draft.color} onChange={e=>setDraft({...draft,color:e.target.value})}/><span>{draft.color.toUpperCase()}</span></div></label></div><div className="flex flex-wrap gap-5">{(['general','evento'] as const).map(k=><label key={k} className="flex items-center gap-2"><input type="checkbox" checked={draft[k]} onChange={e=>setDraft({...draft,[k]:e.target.checked})}/>{k==='general'?'Gastos generales':'Gastos por eventos'}</label>)}</div><div className="flex gap-3"><Button type="submit" disabled={busy||loading}>{busy?'Guardando…':'Guardar categoría'}</Button>{editing&&<Button variant="secondary" type="button" onClick={()=>{setDraft(empty);setEditing(false);}}>Cancelar</Button>}</div><p className="text-xs text-gray-500">El mismo nombre conserva el mismo color en todos los gráficos. Los gastos antiguos mantienen su categoría.</p></form>
+ <section className="finance-card p-6"><h2 className="font-semibold mb-4">Categorías de gastos</h2><div className="category-settings-list">{categories.map(c=><div key={c.nombre}><span className="expense-category-dot" style={{backgroundColor:c.color}}/><span className="flex-1">{c.nombre}<small className="block text-gray-500">{[c.general?'Generales':'',c.evento?'Eventos':''].filter(Boolean).join(' · ')}</small></span><button type="button" disabled={busy} onClick={()=>{setDraft({...c});setEditing(true);setMessage('');}}>Editar</button></div>)}</div></section>
+ {!!historical.length&&<section className="finance-card p-6 space-y-3"><h2 className="font-semibold">Otras categorías usadas en tus gastos</h2><p className="text-sm text-gray-500">Añádelas a configuración para elegir su color.</p>{historical.map(nombre=><button key={nombre} className="inline-flex items-center gap-2 mr-3" onClick={()=>{setDraft({nombre,color:categoryColor(nombre),general:true,evento:true});setEditing(false);}}><Plus size={14}/>{nombre}</button>)}</section>}</div>;
+};

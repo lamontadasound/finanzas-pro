@@ -1,0 +1,5 @@
+import {useState} from 'react';import {afterEach,it,expect} from 'vitest';import {render,screen,fireEvent,cleanup} from '@testing-library/react';
+import {EventExpensePaymentFields} from './EventExpensePaymentFields';import {expensePaymentLabel} from '../../lib/eventExpensePayment';import type {GastoEvento} from '../../types';
+afterEach(cleanup);
+function Form(){const [expense,setExpense]=useState<Partial<GastoEvento>>({});return <><EventExpensePaymentFields value={expense} onChange={p=>setExpense(g=>({...g,...p}))}/><output>{expensePaymentLabel(expense)}</output></>;}
+it('no inventa pagos históricos y permite guardar estado y método distintos',()=>{render(<Form/>);expect(screen.getByText('Pago sin indicar')).toBeTruthy();fireEvent.change(screen.getByLabelText('Estado del pago del gasto'),{target:{value:'pagado'}});fireEvent.change(screen.getByLabelText('Forma de pago del gasto'),{target:{value:'transferencia'}});expect(screen.getByText('Pagado · Transferencia')).toBeTruthy();fireEvent.change(screen.getByLabelText('Forma de pago del gasto'),{target:{value:'bizum'}});expect(screen.getByText('Pagado · Bizum')).toBeTruthy();});

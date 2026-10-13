@@ -1,88 +1,63 @@
 import { useState, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { Area, GastoTipo, Ingreso } from '../../types';
+import type { Area, GastoTipo } from '../../types';
+import { Button } from '../../components/ui/Button';
+import { BklitBarCard, BklitGaugeCard } from '../../components/charts-app/BklitCharts';
+import { ActivityHeatmap } from '../../components/charts-app/ActivityHeatmap';
+import { HeatmapErrorBoundary } from '../../components/charts-app/HeatmapErrorBoundary';
+import type { LineaId } from '../../config/businessLines';
+import { resolveLinea } from '../../config/resolveLinea';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-interface Props { area: Area }
+// Escala de 5 niveles (claro→oscuro) coherente con el acento de cada línea.
+const HEATMAP_PALETTE: Record<string, readonly [string, string, string, string, string]> = {
+  montada_sound: ['#f2f1fd', '#c8c4f6', '#7b72e3', '#4f46e5', '#28237a'],
+  dj:            ['#eff6ff', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
+  real_madrid:   ['#f5f3ff', '#ddd6fe', '#a78bfa', '#7c3aed', '#4c1d95'],
+};
 
-export const InformesPage = ({ area }: Props) => {
+interface Props {
+  area: Area;
+  /** Fase D: separa DJ de Real Madrid dentro de `area='dj'`. Cuando vale
+   *  'real_madrid', el inventario de equipo también se filtra por
+   *  `equipo.area==='real_madrid'` (esa tabla ya distingue Real Madrid a
+   *  nivel de columna, sin necesitar `resolveLinea`). */
+  filterLinea?: LineaId;
+  tituloLinea?: string;
+}
+
+export const InformesPage = ({ area, filterLinea }: Props) => {
+  const lineaKey = filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj');
+  const heatmapColors = HEATMAP_PALETTE[lineaKey] ?? HEATMAP_PALETTE.dj;
   const allIngresos     = useStore((s) => s.ingresos);
   const allGastos       = useStore((s) => s.gastos);
   const allGastosEvento = useStore((s) => s.gastosEvento);
   const allEquipo       = useStore((s) => s.equipo);
-  const ingresos     = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
-  const gastos       = useMemo(() => allGastos.filter((g) => g.area === area), [allGastos, area]);
-  const gastosEvento = useMemo(() => allGastosEvento.filter((g) => g.area === area), [allGastosEvento, area]);
-  const equipo       = useMemo(() => allEquipo.filter((e) => e.area === area), [allEquipo, area]);
+  const ingresos     = useMemo(
+    () => allIngresos.filter((i) => i.area === area && (!filterLinea || resolveLinea({ id: i.id, area: i.area, tipoEvento: i.tipoEvento, lineaNegocio: i.lineaNegocio }) === filterLinea)),
+    [allIngresos, area, filterLinea],
+  );
+  const gastos       = useMemo(() => allGastos.filter((g) => {
+    if (g.area !== area) return false;
+    if (filterLinea) return resolveLinea(g) === filterLinea;
+    return true;
+  }), [allGastos, area, filterLinea]);
+  const ingresoIds   = useMemo(() => new Set(ingresos.map((i) => i.id)), [ingresos]);
+  const gastosEvento = useMemo(
+    () => allGastosEvento.filter((g) => g.area === area && (!filterLinea || ingresoIds.has(g.ingresoId))),
+    [allGastosEvento, area, filterLinea, ingresoIds],
+  );
+  const equipo       = useMemo(
+    () => allEquipo.filter((e) => filterLinea === 'real_madrid' ? e.area === 'real_madrid' : e.area === area),
+    [allEquipo, area, filterLinea],
+  );
 
   const [year, setYear] = useState(new Date().getFullYear());
   const [filterTipo, setFilterTipo] = useState<GastoTipo | ''>('');
-
-  // ── Pagos pendientes ───────────────────────────────────────────────────────
-  const [filtroPagoAnio, setFiltroPagoAnio] = useState<number | ''>('');
-  const [filtroPagoMes, setFiltroPagoMes] = useState<number | ''>('');
-  const [filtroPagoCliente, setFiltroPagoCliente] = useState('');
-  const [filtroPagoDJ, setFiltroPagoDJ] = useState('');
-  const [filtroPagoEstado, setFiltroPagoEstado] = useState<'' | 'pendiente' | 'parcial'>('');
-  const [filtroPagoTipoEvento, setFiltroPagoTipoEvento] = useState('');
-
-  const cantidadCobrada = (i: Ingreso) => (i.pagosRecibidos ?? 0) + (i.tieneReserva ? (i.reserva ?? 0) : 0);
-  const cantidadPendienteDe = (i: Ingreso) => Math.max(0, i.total - cantidadCobrada(i));
-  const diasPendienteDe = (i: Ingreso) => {
-    const desde = new Date(i.fechaFactura || i.fechaEvento);
-    return Math.max(0, Math.floor((Date.now() - desde.getTime()) / (1000 * 60 * 60 * 24)));
-  };
-  const estaVencido = (i: Ingreso) => !!i.fechaCobroPrevista && new Date(i.fechaCobroPrevista).getTime() < Date.now();
-
-  const pagosPendientesBase = useMemo(
-    () => ingresos.filter((i) => i.estadoPago === 'pendiente' || i.estadoPago === 'parcial'),
-    [ingresos],
-  );
-
-  const clientesConPagosPendientes = useMemo(
-    () => Array.from(new Set(pagosPendientesBase.map((i) => i.cliente))).sort(),
-    [pagosPendientesBase],
-  );
-  const tiposEventoConPagosPendientes = useMemo(
-    () => Array.from(new Set(pagosPendientesBase.map((i) => i.tipoEvento))).sort(),
-    [pagosPendientesBase],
-  );
-  const djsConPagosPendientes = useMemo(
-    () => Array.from(new Set(pagosPendientesBase.map((i) => i.djRelacionado).filter((d): d is string => !!d))).sort(),
-    [pagosPendientesBase],
-  );
-
-  const pagosPendientesFiltrados = useMemo(() => pagosPendientesBase.filter((i) => {
-    const d = new Date(i.fechaEvento);
-    if (filtroPagoAnio !== '' && d.getFullYear() !== filtroPagoAnio) return false;
-    if (filtroPagoMes !== '' && d.getMonth() !== filtroPagoMes) return false;
-    if (filtroPagoCliente && i.cliente !== filtroPagoCliente) return false;
-    if (filtroPagoDJ && i.djRelacionado !== filtroPagoDJ) return false;
-    if (filtroPagoEstado && i.estadoPago !== filtroPagoEstado) return false;
-    if (filtroPagoTipoEvento && i.tipoEvento !== filtroPagoTipoEvento) return false;
-    return true;
-  }).sort((a, b) => b.fechaEvento.localeCompare(a.fechaEvento)), [pagosPendientesBase, filtroPagoAnio, filtroPagoMes, filtroPagoCliente, filtroPagoDJ, filtroPagoEstado, filtroPagoTipoEvento]);
-
-  const resumenPagosPendientes = useMemo(() => {
-    const hoy = new Date();
-    const delMes = pagosPendientesBase.filter((i) => {
-      const d = new Date(i.fechaEvento);
-      return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth();
-    });
-    const delAnio = pagosPendientesBase.filter((i) => new Date(i.fechaEvento).getFullYear() === hoy.getFullYear());
-    return {
-      totalPendiente: pagosPendientesFiltrados.reduce((a, i) => a + cantidadPendienteDe(i), 0),
-      numPendientes: pagosPendientesFiltrados.filter((i) => i.estadoPago === 'pendiente').length,
-      numParciales: pagosPendientesFiltrados.filter((i) => i.estadoPago === 'parcial').length,
-      numVencidos: pagosPendientesFiltrados.filter((i) => estaVencido(i)).length,
-      totalPendienteMes: delMes.reduce((a, i) => a + cantidadPendienteDe(i), 0),
-      totalPendienteAnio: delAnio.reduce((a, i) => a + cantidadPendienteDe(i), 0),
-    };
-  }, [pagosPendientesFiltrados, pagosPendientesBase]);
 
   const gastosAnio = useMemo(
     () => gastos.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
@@ -92,6 +67,31 @@ export const InformesPage = ({ area }: Props) => {
     () => gastosEvento.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
     [gastosEvento, year, filterTipo],
   );
+  const ingresosAnio = useMemo(
+    () => ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === year),
+    [ingresos, year],
+  );
+
+  // ── Gauge: margen operativo real del año — ingresos y gastos SIN IVA ────────
+  const ingresosOperativosAnio = useMemo(() => ingresosAnio.reduce((s, i) => s + i.baseImponible, 0), [ingresosAnio]);
+  const gastosOperativosAnio = useMemo(
+    () => gastosAnio.reduce((s, g) => s + g.baseImponible, 0) + gastosEventoAnio.reduce((s, g) => s + g.importe, 0),
+    [gastosAnio, gastosEventoAnio],
+  );
+  const beneficioOperativoAnio = ingresosOperativosAnio - gastosOperativosAnio;
+  const margenAnio = ingresosOperativosAnio > 0 ? beneficioOperativoAnio / ingresosOperativosAnio : 0;
+
+  // ── Heatmap: actividad y facturación por día real (fechaEvento) ────────────
+  const heatmapDailyCount = useMemo(() => {
+    const map = new Map<string, number>();
+    ingresosAnio.forEach((i) => map.set(i.fechaEvento, (map.get(i.fechaEvento) ?? 0) + 1));
+    return map;
+  }, [ingresosAnio]);
+  const heatmapDailyRevenue = useMemo(() => {
+    const map = new Map<string, number>();
+    ingresosAnio.forEach((i) => map.set(i.fechaEvento, (map.get(i.fechaEvento) ?? 0) + i.total));
+    return map;
+  }, [ingresosAnio]);
 
   const porCategoriaGenerales = useMemo(() => {
     const map = new Map<string, { count: number; total: number }>();
@@ -110,6 +110,16 @@ export const InformesPage = ({ area }: Props) => {
     });
     return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [gastosEventoAnio]);
+
+  // Dataset combinado (generales + evento) para el Bar Chart de Bklit.
+  const gastosPorCategoriaChart = useMemo(() => {
+    const map = new Map<string, number>();
+    porCategoriaGenerales.forEach(([cat, d]) => map.set(cat, (map.get(cat) ?? 0) + d.total));
+    porCategoriaEvento.forEach(([cat, d]) => map.set(cat, (map.get(cat) ?? 0) + d.total));
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([categoria, total]) => ({ categoria, total }));
+  }, [porCategoriaGenerales, porCategoriaEvento]);
 
   const yearOpts = useMemo(() => {
     const years = new Set<number>();
@@ -152,7 +162,7 @@ export const InformesPage = ({ area }: Props) => {
   }), { totalIng: 0, baseImp: 0, totalGas: 0, costesEv: 0, beneficio: 0, cobrado: 0, numEv: 0 });
 
   const exportCSV = () => {
-    const header = 'Mes;Ingresos;Base Imp.;Gastos;Costes Evento;Beneficio Real;Cobrado;Nº Eventos';
+    const header = 'Mes;Ingresos;Total sin IVA;Gastos;Costes Evento;Beneficio Real;Cobrado;Nº Eventos';
     const rows = monthly.map((m) =>
       [m.mes, m.totalIng.toFixed(2), m.baseImp.toFixed(2), m.totalGas.toFixed(2),
        m.costesEv.toFixed(2), m.beneficio.toFixed(2), m.cobrado.toFixed(2), m.numEv].join(';')
@@ -167,7 +177,7 @@ export const InformesPage = ({ area }: Props) => {
   };
 
   const exportEquipoCSV = () => {
-    const header = 'Nombre;Categoría;Fecha Compra;Proveedor;Base Imp.;IVA;Total';
+    const header = 'Nombre;Categoría;Fecha Compra;Proveedor;Total sin IVA;IVA;Total';
     const rows = equipo.map((e) =>
       [e.nombre, e.categoria, e.fechaCompra, e.proveedor ?? '',
        e.baseImponible.toFixed(2), e.importeIVA.toFixed(2), e.total.toFixed(2)].join(';')
@@ -186,7 +196,7 @@ export const InformesPage = ({ area }: Props) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Informes</h1>
-          <p className="text-sm text-gray-500">Resumen anual y exportaciones</p>
+          
         </div>
         <div className="flex items-center gap-3">
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
@@ -197,106 +207,19 @@ export const InformesPage = ({ area }: Props) => {
             <option value="fijo">Fijo</option>
             <option value="variable">Variable</option>
           </select>
-          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
-            <Download size={14} /> Exportar CSV
-          </button>
-        </div>
-      </div>
-
-      {/* Pagos pendientes */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-900">Pagos pendientes de {area === 'montada' ? 'La Montada Sound' : 'DJs'}</h2>
-          <p className="text-xs text-gray-500 mt-0.5">{area === 'montada' ? 'Ingresos' : 'Actuaciones'} pendientes de cobrar total o parcialmente</p>
-        </div>
-        <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 border-b border-gray-100 bg-gray-50/50">
-          <div><p className="text-xs text-gray-500">Total pendiente de cobrar</p><p className="font-bold text-amber-700">{fmt(resumenPagosPendientes.totalPendiente)}</p></div>
-          <div><p className="text-xs text-gray-500">{area === 'montada' ? 'Facturas' : 'Actuaciones'} pendientes</p><p className="font-bold text-gray-900">{resumenPagosPendientes.numPendientes}</p></div>
-          <div><p className="text-xs text-gray-500">Cobradas parcialmente</p><p className="font-bold text-gray-900">{resumenPagosPendientes.numParciales}</p></div>
-          <div><p className="text-xs text-gray-500">Pendientes vencidos</p><p className={`font-bold ${resumenPagosPendientes.numVencidos > 0 ? 'text-red-600' : 'text-gray-900'}`}>{resumenPagosPendientes.numVencidos}</p></div>
-          <div><p className="text-xs text-gray-500">Pendiente este mes</p><p className="font-bold text-gray-900">{fmt(resumenPagosPendientes.totalPendienteMes)}</p></div>
-          <div><p className="text-xs text-gray-500">Pendiente este año</p><p className="font-bold text-gray-900">{fmt(resumenPagosPendientes.totalPendienteAnio)}</p></div>
-        </div>
-        <div className="px-5 py-3 flex flex-wrap gap-3 border-b border-gray-100">
-          <select value={filtroPagoAnio} onChange={(e) => setFiltroPagoAnio(e.target.value ? Number(e.target.value) : '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Todos los años</option>
-            {Array.from(new Set(pagosPendientesBase.map((i) => new Date(i.fechaEvento).getFullYear()))).sort((a, b) => b - a).map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select value={filtroPagoMes} onChange={(e) => setFiltroPagoMes(e.target.value !== '' ? Number(e.target.value) : '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Todos los meses</option>
-            {MESES_FULL.map((m, i) => <option key={m} value={i}>{m}</option>)}
-          </select>
-          <select value={filtroPagoCliente} onChange={(e) => setFiltroPagoCliente(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Todos los clientes</option>
-            {clientesConPagosPendientes.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          {area === 'dj' && (
-            <select value={filtroPagoDJ} onChange={(e) => setFiltroPagoDJ(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-              <option value="">Todos los DJs</option>
-              {djsConPagosPendientes.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          )}
-          <select value={filtroPagoEstado} onChange={(e) => setFiltroPagoEstado(e.target.value as '' | 'pendiente' | 'parcial')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Pendiente y parcial</option>
-            <option value="pendiente">Solo pendiente</option>
-            <option value="parcial">Solo parcial</option>
-          </select>
-          <select value={filtroPagoTipoEvento} onChange={(e) => setFiltroPagoTipoEvento(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Todos los tipos de evento</option>
-            {tiposEventoConPagosPendientes.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Concepto</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cliente</th>
-                {area === 'dj' && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">DJ</th>}
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Tipo evento</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Nº factura</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total con IVA</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Reserva cobrada</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Días pendiente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {pagosPendientesFiltrados.length === 0 ? (
-                <tr><td colSpan={area === 'dj' ? 11 : 10} className="text-center py-10 text-gray-400 text-sm">Sin pagos pendientes</td></tr>
-              ) : pagosPendientesFiltrados.map((i) => (
-                <tr key={i.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{i.concepto}</td>
-                  <td className="px-4 py-3 text-gray-600">{i.cliente}</td>
-                  {area === 'dj' && <td className="px-4 py-3 text-gray-600">{i.djRelacionado || <span className="text-gray-300">—</span>}</td>}
-                  <td className="px-4 py-3 text-gray-600">{i.tipoEvento}</td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{i.fechaEvento}</td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{i.numeroFactura || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-900">{fmt(i.total)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{i.tieneReserva ? fmt(i.reserva ?? 0) : '—'}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-amber-700">{fmt(cantidadPendienteDe(i))}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${i.estadoPago === 'parcial' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{i.estadoPago}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-500">{diasPendienteDe(i)}{estaVencido(i) && <span className="ml-1 text-red-600 font-semibold">(vencido)</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Button variant="dark" icon={<Download size={14} />} onClick={exportCSV}>Exportar CSV</Button>
         </div>
       </div>
 
       {/* Tabla mensual */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Mes</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Ingresos</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Base imp.</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total sin IVA</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Gastos gen.</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Costes evento</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Beneficio real</th>
@@ -312,7 +235,7 @@ export const InformesPage = ({ area }: Props) => {
                   <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.baseImp)}</td>
                   <td className="px-4 py-3 text-right font-mono text-red-600">{fmt(m.totalGas)}</td>
                   <td className="px-4 py-3 text-right font-mono text-orange-600">{fmt(m.costesEv)}</td>
-                  <td className={`px-4 py-3 text-right font-mono font-semibold ${m.beneficio >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(m.beneficio)}</td>
+                  <td className={`px-4 py-3 text-right font-mono font-semibold ${m.beneficio >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(m.beneficio)}</td>
                   <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.cobrado)}</td>
                   <td className="px-4 py-3 text-center text-gray-500">{m.numEv || '—'}</td>
                 </tr>
@@ -325,7 +248,7 @@ export const InformesPage = ({ area }: Props) => {
                 <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(totals.baseImp)}</td>
                 <td className="px-4 py-3 text-right font-mono text-red-700">{fmt(totals.totalGas)}</td>
                 <td className="px-4 py-3 text-right font-mono text-orange-700">{fmt(totals.costesEv)}</td>
-                <td className={`px-4 py-3 text-right font-mono ${totals.beneficio >= 0 ? 'text-green-800' : 'text-red-700'}`}>{fmt(totals.beneficio)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${totals.beneficio >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>{fmt(totals.beneficio)}</td>
                 <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(totals.cobrado)}</td>
                 <td className="px-4 py-3 text-center text-gray-700">{totals.numEv}</td>
               </tr>
@@ -334,9 +257,39 @@ export const InformesPage = ({ area }: Props) => {
         </div>
       </div>
 
+      {/* Margen operativo (Gauge real de Bklit) + actividad diaria (Heatmap propio) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <BklitGaugeCard
+          ingresosOperativos={ingresosOperativosAnio}
+          margen={margenAnio}
+        />
+        <div className="lg:col-span-2">
+          <HeatmapErrorBoundary>
+            <ActivityHeatmap
+              title={`Actividad diaria — ${year}`}
+              year={year}
+              dailyCount={heatmapDailyCount}
+              dailyRevenue={heatmapDailyRevenue}
+              levelColors={heatmapColors}
+            />
+          </HeatmapErrorBoundary>
+        </div>
+      </div>
+
+      {/* Gasto por categoría — Bar Chart real de Bklit */}
+      {gastosPorCategoriaChart.length > 0 && (
+        <BklitBarCard
+          title={`Gastos por categoría — ${year}`}
+          description="Gastos generales y de eventos por categoría"
+          data={gastosPorCategoriaChart}
+          xDataKey="categoria"
+          dataKey="total"
+        />
+      )}
+
       {/* Gasto por categoría */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-800">Gastos generales por categoría — {year}</h2>
           </div>
@@ -362,7 +315,7 @@ export const InformesPage = ({ area }: Props) => {
           </table>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-800">Gastos de evento por categoría — {year}</h2>
           </div>
@@ -391,12 +344,10 @@ export const InformesPage = ({ area }: Props) => {
 
       {/* Inventario equipo */}
       {equipo.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-800">Inventario de equipo</h2>
-            <button onClick={exportEquipoCSV} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-              <Download size={12} /> Exportar
-            </button>
+            <Button size="sm" variant="secondary" icon={<Download size={12} />} onClick={exportEquipoCSV}>Exportar</Button>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">

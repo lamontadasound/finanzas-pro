@@ -1,20 +1,26 @@
-import { useState, useMemo, useRef } from 'react';
+import { resolveLinea } from '../../config/resolveLinea';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import {
   Plus, Edit2, Trash2, Search, Upload, Folder, ChevronLeft,
   FileText, Download, RefreshCw, BarChart3, List, CheckCircle2,
 } from 'lucide-react';
-import { uid } from '../../utils/helpers';
+import { uid, fmtInt } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
+import { Switch } from '../../components/ui/Switch';
+import { Badge } from '../../components/ui/Badge';
+import { StatCard } from '../../components/ui/StatCard';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { subirDocumento, obtenerUrlFirmada, eliminarArchivoStorage, StorageUploadError } from '../../lib/storage';
+import { subirDocumento, obtenerUrlFirmada, eliminarArchivoStorage } from '../../lib/storage';
 import type { InversionArea, Equipo, PaymentMethod, Ingreso, Gasto, GastoEvento } from '../../types';
+import type { LineaId } from '../../config/businessLines';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 const pctFmt = (n: number) => `${n.toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`;
 
-const CATEGORIAS_EQUIPO = ['Sonido', 'Iluminación', 'Pantallas', 'Decoración', 'Mesas de Mezclas', 'Mesas Sonido', 'Dispositivos', 'Cabinas', 'Micrófonos', 'Flightcase'];
+const CATEGORIAS_EQUIPO = ['Sonido', 'Iluminación', 'Estructuras', 'Pantallas', 'Decoración', 'Mesas de Mezclas', 'Mesas Sonido', 'Dispositivos', 'Cabinas', 'Micrófonos', 'Flightcase'];
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 const PCTS_IVA = [0, 10, 21];
 
@@ -42,15 +48,15 @@ const calcularFinGarantia = (fechaCompra?: string, garantiaMeses?: number): stri
   return fin.toISOString().slice(0, 10);
 };
 
-const garantiaEstado = (e: Equipo): { label: string; color: string; detalle: string } => {
+const garantiaEstado = (e: Equipo): { label: string; tone: 'neutral' | 'danger' | 'gold' | 'success'; detalle: string } => {
   const fechaFin = calcularFinGarantia(e.fechaCompra, e.garantia) ?? e.fechaFinGarantia;
-  if (!fechaFin) return { label: 'Sin garantía', color: 'bg-gray-100 text-gray-500', detalle: '' };
+  if (!fechaFin) return { label: 'Sin garantía', tone: 'neutral', detalle: '' };
   const fin = new Date(fechaFin);
   const hoy = new Date();
   const diasRestantes = Math.ceil((fin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  if (diasRestantes < 0) return { label: 'Vencida', color: 'bg-red-100 text-red-600', detalle: `hace ${Math.abs(diasRestantes)} días` };
-  if (diasRestantes < 60) return { label: 'Próxima a vencer', color: 'bg-amber-100 text-amber-700', detalle: `quedan ${diasRestantes} días` };
-  return { label: 'Activa', color: 'bg-green-100 text-green-700', detalle: `quedan ${diasRestantes} días` };
+  if (diasRestantes < 0) return { label: 'Vencida', tone: 'danger', detalle: `hace ${Math.abs(diasRestantes)} días` };
+  if (diasRestantes < 60) return { label: 'Próxima a vencer', tone: 'gold', detalle: `quedan ${diasRestantes} días` };
+  return { label: 'Activa', tone: 'success', detalle: `quedan ${diasRestantes} días` };
 };
 
 const cantidadDe = (e: Equipo) => e.cantidad ?? 1;
@@ -82,9 +88,16 @@ export const InversionesPage = ({ area }: Props) => {
   const documentos     = useStore((s) => s.documentos);
   const addDocumento    = useStore((s) => s.addDocumento);
   const deleteDocumento = useStore((s) => s.deleteDocumento);
-  const canCreate = useAuthStore((s) => s.canCreate);
-  const canEdit   = useAuthStore((s) => s.canEdit);
-  const canDelete = useAuthStore((s) => s.canDelete);
+  // Fase F: permiso real por línea — 'todos' (ruta vieja, ya redirigida) usa
+  // el conjunto de líneas visibles del usuario en su lugar.
+  const canCreateLinea = useAuthStore((s) => s.canCreateLinea);
+  const canEditLinea   = useAuthStore((s) => s.canEditLinea);
+  const canDeleteLinea = useAuthStore((s) => s.canDeleteLinea);
+  const lineasVisibles = useAuthStore((s) => s.lineasVisibles());
+  const permLinea: LineaId | null = area === 'todos' ? null : area === 'montada' ? 'montada_sound' : area;
+  const canCreate = () => permLinea ? canCreateLinea(permLinea) : lineasVisibles.length > 0;
+  const canEdit   = () => permLinea ? canEditLinea(permLinea) : lineasVisibles.length > 0;
+  const canDelete = () => permLinea ? canDeleteLinea(permLinea) : lineasVisibles.length > 0;
   const currentUser = useAuthStore((s) => s.user);
   const showConfirm = useConfirmStore((s) => s.show);
 
@@ -109,7 +122,7 @@ export const InversionesPage = ({ area }: Props) => {
     const map = new Map<string, { count: number; total: number }>();
     filtered.forEach((e) => {
       const cur = map.get(e.categoria) ?? { count: 0, total: 0 };
-      map.set(e.categoria, { count: cur.count + cantidadDe(e), total: cur.total + costeTotalConIva(e) });
+      map.set(e.categoria, { count: cur.count + cantidadDe(e), total: cur.total + baseTotalSinIva(e) });
     });
     return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [filtered]);
@@ -139,16 +152,25 @@ export const InversionesPage = ({ area }: Props) => {
     });
   };
 
-  const openNew = () => { setEditing(null); setForm(EMPTY(area)); setSubidaOk(false); setShowModal(true); };
-  const openEdit = (e: Equipo) => { setEditing(e); setForm({ ...e }); setSubidaOk(false); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setEditing(null); };
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
-  const save = () => {
+  const openNew = () => { setEditing(null); setForm(EMPTY(area)); setSubidaOk(false); setSaveError(''); setShowModal(true); };
+  const openEdit = (e: Equipo) => { setEditing(e); setForm({ ...e }); setSubidaOk(false); setSaveError(''); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setEditing(null); setSaveError(''); };
+
+  const save = async () => {
     if (!form.nombre) return;
-    if (editing) {
-      updateEquipo(editing.id, form);
-    } else {
-      addEquipo({ ...EMPTY(area), ...form, id: uid(), createdAt: new Date().toISOString() } as Equipo);
+    setSaving(true);
+    setSaveError('');
+    const result = editing
+      ? await updateEquipo(editing.id, form)
+      : await addEquipo({ ...EMPTY(area), ...form, id: uid(), createdAt: new Date().toISOString() } as Equipo);
+    setSaving(false);
+
+    if (!result.success) {
+      setSaveError(result.message);
+      return; // no cerramos ni limpiamos el formulario si el guardado falla
     }
     closeModal();
   };
@@ -173,14 +195,14 @@ export const InversionesPage = ({ area }: Props) => {
         file, entityType: 'equipo', entityId: editing.id, area: editing.area === 'real_madrid' ? 'montada' : editing.area,
         tipo: 'factura', subidoPor: currentUser?.id ?? '', subidoPorNombre: currentUser?.nombre ?? '',
       });
+      if (!await addDocumento(doc)) throw new Error('No se pudo registrar el nuevo documento. El anterior se conserva.');
       if (facturaDelEquipo) {
-        await eliminarArchivoStorage(facturaDelEquipo.storageKey).catch(() => {});
-        deleteDocumento(facturaDelEquipo.id);
+        if (!await deleteDocumento(facturaDelEquipo.id)) throw new Error('Nuevo documento guardado. No se pudo retirar el anterior.');
+        await eliminarArchivoStorage(facturaDelEquipo.storageKey);
       }
-      addDocumento(doc);
       setSubidaOk(true);
     } catch (err) {
-      const msg = err instanceof StorageUploadError ? err.message : 'Error inesperado al subir el archivo.';
+      const msg = err instanceof Error ? err.message : 'Error inesperado al subir el archivo.';
       setErrorSubida(msg);
     } finally {
       setSubiendo(false);
@@ -199,9 +221,9 @@ export const InversionesPage = ({ area }: Props) => {
 
   const eliminarFactura = async () => {
     if (!facturaDelEquipo) return;
-    await eliminarArchivoStorage(facturaDelEquipo.storageKey).catch(() => {});
-    deleteDocumento(facturaDelEquipo.id);
-    setSubidaOk(false);
+    if (!await deleteDocumento(facturaDelEquipo.id)) return;
+    try { await eliminarArchivoStorage(facturaDelEquipo.storageKey); setSubidaOk(false); }
+    catch { setErrorSubida('Registro retirado. El archivo sigue protegido en la nube; no se pudo eliminar.'); }
   };
 
   return (
@@ -211,19 +233,17 @@ export const InversionesPage = ({ area }: Props) => {
           <h1 className="text-2xl font-bold text-gray-900">Inversiones y equipos</h1>
           <p className="text-sm text-gray-500">{enCategoria.length} items · Invertido: {fmt(totalInvertido)} · Amortizado: {fmt(totalAmortizado)}</p>
         </div>
-        {canCreate('inversiones') && (
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors">
-            <Plus size={16} /> Añadir equipo
-          </button>
+        {canCreate() && (
+          <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Añadir equipo</Button>
         )}
       </div>
 
       {area === 'todos' && (
         <div className="flex gap-2 border-b border-gray-200">
-          <button onClick={() => setVista('equipo')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'equipo' ? 'border-amber-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+          <button onClick={() => setVista('equipo')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'equipo' ? 'border-gold-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
             <List size={14} /> Equipo
           </button>
-          <button onClick={() => setVista('rentabilidad')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'rentabilidad' ? 'border-amber-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+          <button onClick={() => setVista('rentabilidad')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'rentabilidad' ? 'border-gold-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
             <BarChart3 size={14} /> Rentabilidad global de las inversiones
           </button>
         </div>
@@ -236,7 +256,7 @@ export const InversionesPage = ({ area }: Props) => {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar equipo, categoría o marca…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-amber-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar equipo, categoría o marca…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-gold-400" />
         </div>
         {area === 'todos' && (
           <select value={filterArea} onChange={(e) => setFilterArea(e.target.value as InversionArea | 'todos')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
@@ -256,7 +276,7 @@ export const InversionesPage = ({ area }: Props) => {
 
       {/* Breadcrumb navegación por categoría */}
       <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => setSelectedCategoria(null)} className={`font-medium ${selectedCategoria == null ? 'text-gray-900' : 'text-amber-600 hover:text-amber-500'}`}>Categorías</button>
+        <button onClick={() => setSelectedCategoria(null)} className={`font-medium ${selectedCategoria == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Categorías</button>
         {selectedCategoria != null && (
           <>
             <span className="text-gray-300">/</span>
@@ -272,13 +292,13 @@ export const InversionesPage = ({ area }: Props) => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {carpetasCategoria.map(([cat, data]) => (
-              <button key={cat} onClick={() => setSelectedCategoria(cat)} className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-amber-400 hover:shadow-sm transition-all">
+              <button key={cat} onClick={() => setSelectedCategoria(cat)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
                 <div className="flex items-center gap-2 mb-2">
-                  <Folder size={16} className="text-amber-500" />
+                  <Folder size={16} className="text-gold-500" />
                   <span className="font-bold text-gray-900">{cat}</span>
                 </div>
                 <p className="text-xs text-gray-500">{data.count} unidades</p>
-                <p className="text-sm font-semibold text-gray-700 mt-1">{fmt(data.total)}</p>
+                <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
               </button>
             ))}
           </div>
@@ -286,7 +306,7 @@ export const InversionesPage = ({ area }: Props) => {
       ) : (
       <>
       <button onClick={() => setSelectedCategoria(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a categorías</button>
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
@@ -320,13 +340,16 @@ export const InversionesPage = ({ area }: Props) => {
                   <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(valorAmortizadoContable(e))}</td>
                   <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(valorContablePendiente(e))}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${gar.color}`}>{gar.label}</span>
+                    <Badge tone={gar.tone}>{gar.label}</Badge>
                     {gar.detalle && <p className="text-[10px] text-gray-400 mt-0.5">{gar.detalle}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
-                      {canEdit('inversiones') && <button onClick={() => openEdit(e)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={13} /></button>}
-                      {canDelete('inversiones') && <button onClick={() => showConfirm('¿Eliminar este equipo?', () => deleteEquipo(e.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
+                      {canEdit() && <button onClick={() => openEdit(e)} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Edit2 size={13} /></button>}
+                      {canDelete() && <button onClick={() => showConfirm('¿Eliminar este equipo?', async () => {
+                        const result = await deleteEquipo(e.id);
+                        if (!result.success) alert(`No se pudo eliminar: ${result.message}`);
+                      })} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -428,15 +451,9 @@ export const InversionesPage = ({ area }: Props) => {
               </div>
               <p className="text-[11px] text-gray-400 mt-1">Se calcula solo: fecha de compra + meses de garantía.</p>
             </div>
-            <div className="col-span-2 flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.facturaRecibida} onChange={(e) => setField('facturaRecibida', e.target.checked)} className="rounded" />
-                Factura recibida
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.financiado} onChange={(e) => setField('financiado', e.target.checked)} className="rounded" />
-                Financiado
-              </label>
+            <div className="col-span-2 flex items-center gap-8">
+              <Switch checked={!!form.facturaRecibida} onChange={(v) => setField('facturaRecibida', v)} label="Factura recibida" />
+              <Switch checked={!!form.financiado} onChange={(v) => setField('financiado', v)} label="Financiado" />
             </div>
 
             <div className="col-span-2 border-t border-gray-100 pt-4">
@@ -453,7 +470,7 @@ export const InversionesPage = ({ area }: Props) => {
                       <p className="text-sm text-gray-400">Sin factura subida</p>
                     )}
                     {errorSubida && <p className="text-xs text-red-600 mt-0.5">{errorSubida}</p>}
-                    {subidaOk && !errorSubida && <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1"><CheckCircle2 size={12} /> Factura subida correctamente</p>}
+                    {subidaOk && !errorSubida && <p className="text-xs text-accent-600 mt-0.5 flex items-center gap-1"><CheckCircle2 size={12} /> Factura subida correctamente</p>}
                   </div>
                   <input
                     ref={fileInput}
@@ -466,8 +483,8 @@ export const InversionesPage = ({ area }: Props) => {
                   />
                   {facturaDelEquipo ? (
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <button type="button" onClick={verFactura} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg" title="Ver/descargar"><Download size={14} /></button>
-                      <button type="button" disabled={subiendo} onClick={() => fileInput.current?.click()} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg disabled:opacity-40" title="Sustituir"><RefreshCw size={14} className={subiendo ? 'animate-spin' : ''} /></button>
+                      <button type="button" onClick={verFactura} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg" title="Ver/descargar"><Download size={14} /></button>
+                      <button type="button" disabled={subiendo} onClick={() => fileInput.current?.click()} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg disabled:opacity-40" title="Sustituir"><RefreshCw size={14} className={subiendo ? 'animate-spin' : ''} /></button>
                       <button type="button" onClick={eliminarFactura} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Eliminar"><Trash2 size={14} /></button>
                     </div>
                   ) : (
@@ -510,9 +527,15 @@ export const InversionesPage = ({ area }: Props) => {
             )}
           </div>
 
+          {saveError && (
+            <div className="text-sm rounded-lg px-3 py-2 bg-red-50 text-red-600 border border-red-200">
+              No se pudo guardar: {saveError}
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <button onClick={closeModal} className="flex-1 py-2 border border-gray-200 text-sm font-medium rounded-xl hover:bg-gray-50">Cancelar</button>
-            <button onClick={save} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">{editing ? 'Guardar' : 'Añadir'}</button>
+            <Button variant="secondary" onClick={closeModal} disabled={saving} className="flex-1">Cancelar</Button>
+            <Button variant="primary" onClick={save} loading={saving} className="flex-1">{editing ? 'Guardar' : 'Añadir'}</Button>
           </div>
         </div>
       </Modal>
@@ -546,7 +569,7 @@ const calcularStatsArea = (
 
   const ingresosArea = areaVista === 'montada'
     ? ingresos.filter((i) => i.area === 'montada' && enPeriodo(i.fechaEvento))
-    : ingresos.filter((i) => i.lineaNegocio === 'Real Madrid' && enPeriodo(i.fechaEvento));
+    : ingresos.filter((i) => resolveLinea(i) === 'real_madrid' && enPeriodo(i.fechaEvento));
 
   const ingresoIdsArea = new Set(ingresosArea.map((i) => i.id));
   const gastosDirectosArea = areaVista === 'montada'
@@ -555,7 +578,7 @@ const calcularStatsArea = (
 
   const gastosGeneralesArea = areaVista === 'montada'
     ? gastos.filter((g) => g.area === 'montada' && enPeriodo(g.fecha))
-    : gastos.filter((g) => g.lineaNegocio === 'Real Madrid' && enPeriodo(g.fecha));
+    : gastos.filter((g) => resolveLinea(g) === 'real_madrid' && enPeriodo(g.fecha));
 
   const totalInvertidoSinIVA = equipoArea.reduce((a, e) => a + baseTotalSinIva(e), 0);
   const ivaSoportado = equipoArea.reduce((a, e) => a + ivaTotal(e), 0);
@@ -623,15 +646,15 @@ const RentabilidadGlobal = ({ equipo, ingresos, gastos, gastosEvento }: Rentabil
     return Array.from(set).sort((a, b) => b - a);
   }, [equipo, ingresos]);
 
-  const enPeriodo = (fecha: string) => {
+  const enPeriodo = useCallback((fecha: string) => {
     if (desde && fecha < desde) return false;
     if (hasta && fecha > hasta) return false;
     if (!desde && !hasta && filtroAnio !== 'todos') return new Date(fecha).getFullYear() === filtroAnio;
     return true;
-  };
+  }, [desde, hasta, filtroAnio]);
 
-  const statsMontada    = useMemo(() => calcularStatsArea('montada', equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo), [equipo, ingresos, gastos, gastosEvento, filtroCategoria, filtroAnio, desde, hasta]);
-  const statsRealMadrid = useMemo(() => calcularStatsArea('real_madrid', equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo), [equipo, ingresos, gastos, gastosEvento, filtroCategoria, filtroAnio, desde, hasta]);
+  const statsMontada    = useMemo(() => calcularStatsArea('montada', equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo), [equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo]);
+  const statsRealMadrid = useMemo(() => calcularStatsArea('real_madrid', equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo), [equipo, ingresos, gastos, gastosEvento, filtroCategoria, enPeriodo]);
 
   const statsConjunta = useMemo(() => {
     const totalInvertidoSinIVA = statsMontada.totalInvertidoSinIVA + statsRealMadrid.totalInvertidoSinIVA;
@@ -685,24 +708,29 @@ const RentabilidadGlobal = ({ equipo, ingresos, gastos, gastosEvento }: Rentabil
       </div>
 
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{AREA_VISTA_LABEL[filtroVista]}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Total invertido sin IVA</p><p className="text-lg font-bold text-gray-900">{fmt(stats.totalInvertidoSinIVA)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Total invertido con IVA</p><p className="text-lg font-bold text-gray-900">{fmt(stats.totalPagadoConIVA)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Nº de inversiones</p><p className="text-lg font-bold text-gray-900">{stats.numInversiones}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Amortización contable acumulada</p><p className="text-lg font-bold text-gray-900">{fmt(stats.totalAmortizado)}</p></div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Valor contable pendiente</p><p className="text-lg font-bold text-gray-900">{fmt(stats.valorPendienteContable)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Beneficio operativo (ingresos relacionados)</p><p className={`text-lg font-bold ${stats.beneficioOperativo >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(stats.beneficioOperativo)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Inversión recuperada</p><p className="text-lg font-bold text-gray-900">{fmt(stats.inversionRecuperada)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">Pendiente de recuperar</p><p className="text-lg font-bold text-gray-900">{fmt(stats.pendienteRecuperar)}</p></div>
+      {/* ── Cifra protagonista — mismo lenguaje que Dashboard/Contabilidad ── */}
+      <div className="bg-white border border-gray-100 rounded-card shadow-card px-6 py-7 sm:px-8 sm:py-8">
+        <p className="text-sm text-gray-400 mb-1.5">Pendiente de recuperar</p>
+        <p className="text-[2.75rem] sm:text-5xl font-bold tracking-tight leading-none text-gray-900">{fmt(stats.pendienteRecuperar)}</p>
+        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <span className={`font-medium ${stats.pctRecuperado >= 0 ? 'text-accent-600' : 'text-red-500'}`}>{pctFmt(stats.pctRecuperado)} recuperado</span>
+          <span className={`font-medium ${stats.roiGlobal >= 0 ? 'text-accent-600' : 'text-red-500'}`}>ROI estimado: {pctFmt(stats.roiGlobal)}</span>
+          <span className="text-gray-500">Fecha estimada: {stats.fechaEstimadaRecuperacion}</span>
+        </div>
+      </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">% recuperado</p><p className={`text-lg font-bold ${stats.pctRecuperado >= 0 ? 'text-green-700' : 'text-red-600'}`}>{pctFmt(stats.pctRecuperado)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4"><p className="text-xs text-gray-500">ROI estimado</p><p className={`text-lg font-bold ${stats.roiGlobal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{pctFmt(stats.roiGlobal)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 col-span-2"><p className="text-xs text-gray-500">Fecha estimada de recuperación</p><p className="text-sm font-semibold text-gray-800">{stats.fechaEstimadaRecuperacion}</p></div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <StatCard label="Total invertido sin IVA" value={stats.totalInvertidoSinIVA} format={fmt} padding="sm" />
+        <StatCard label="Nº de inversiones" value={stats.numInversiones} format={fmtInt} padding="sm" />
+        <StatCard label="Amortización acumulada" value={stats.totalAmortizado} format={fmt} padding="sm" />
+        <StatCard label="Valor contable pendiente" value={stats.valorPendienteContable} format={fmt} padding="sm" />
+        <StatCard label="Beneficio operativo" value={stats.beneficioOperativo} format={fmt} tone={stats.beneficioOperativo >= 0 ? 'success' : 'danger'} padding="sm" />
+        <StatCard label="Inversión recuperada" value={stats.inversionRecuperada} format={fmt} padding="sm" />
       </div>
 
       {filtroVista === 'conjunta' && (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100"><h3 className="text-sm font-semibold text-gray-800">Desglose individual por área</h3></div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -721,7 +749,7 @@ const RentabilidadGlobal = ({ equipo, ingresos, gastos, gastosEvento }: Rentabil
                   <td className="px-4 py-2.5 font-medium text-gray-800">La Montada Sound</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.totalInvertidoSinIVA)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.totalAmortizado)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${statsMontada.beneficioOperativo >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(statsMontada.beneficioOperativo)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono ${statsMontada.beneficioOperativo >= 0 ? 'text-accent-700' : 'text-red-600'}`}>{fmt(statsMontada.beneficioOperativo)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.pendienteRecuperar)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{pctFmt(statsMontada.pctRecuperado)}</td>
                 </tr>
@@ -729,7 +757,7 @@ const RentabilidadGlobal = ({ equipo, ingresos, gastos, gastosEvento }: Rentabil
                   <td className="px-4 py-2.5 font-medium text-gray-800">DJ Personal (Real Madrid)</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.totalInvertidoSinIVA)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.totalAmortizado)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${statsRealMadrid.beneficioOperativo >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(statsRealMadrid.beneficioOperativo)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono ${statsRealMadrid.beneficioOperativo >= 0 ? 'text-accent-700' : 'text-red-600'}`}>{fmt(statsRealMadrid.beneficioOperativo)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.pendienteRecuperar)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{pctFmt(statsRealMadrid.pctRecuperado)}</td>
                 </tr>

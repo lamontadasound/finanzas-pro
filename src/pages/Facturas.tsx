@@ -20,9 +20,9 @@ import { Plus, Trash2, Edit2, Download, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 import { useConfirmStore } from '../store/useConfirmStore';
-import { fmt, fmtDate, uid, getAvailableYears, calcIVA, METODO_PAGO_LABELS } from '../utils/helpers';
+import { fmt, fmtDate, uid, calcIVA } from '../utils/helpers';
 import { Modal } from '../components/ui/Modal';
-import type { Factura } from '../types';
+import type { Factura, Ingreso } from '../types';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type FacturaTab = 'emitidas' | 'gastos' | 'iva';
@@ -116,7 +116,7 @@ export const Facturas = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Facturas e IVA</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Facturas emitidas desde ingresos · Facturas de gastos · Liquidación IVA e IS</p>
+          
         </div>
         {/* Filtros */}
         <div className="flex flex-wrap gap-2 items-center">
@@ -141,12 +141,12 @@ export const Facturas = () => {
 
       {/* KPIs rápidos */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <QuickKPI label="IVA repercutido" value={fmt(ivaRepercutido)} color="text-green-400" />
+        <QuickKPI label="IVA repercutido" value={fmt(ivaRepercutido)} color="text-accent-400" />
         <QuickKPI label="IVA deducible" value={fmt(ivaDeducible)} color="text-orange-400" />
         <QuickKPI
           label={ivaAPagar >= 0 ? 'IVA a pagar' : 'IVA a compensar'}
           value={fmt(Math.abs(ivaAPagar))}
-          color={ivaAPagar >= 0 ? 'text-red-400' : 'text-green-400'}
+          color={ivaAPagar >= 0 ? 'text-red-400' : 'text-accent-400'}
         />
         <QuickKPI
           label={`IS estimado (${isRate}%)`}
@@ -220,16 +220,16 @@ const EmitidasTab = ({
   year,
   areaFilter,
 }: {
-  facturasEmitidas: ReturnType<typeof Array.prototype.filter>;
+  facturasEmitidas: Ingreso[];
   year: number;
   areaFilter: string;
 }) => {
-  const totBase  = facturasEmitidas.reduce((s: number, i: any) => s + i.baseImponible, 0);
-  const totIVA   = facturasEmitidas.reduce((s: number, i: any) => s + i.importeIVA, 0);
-  const totTotal = facturasEmitidas.reduce((s: number, i: any) => s + i.total, 0);
+  const totBase  = facturasEmitidas.reduce((s, i) => s + i.baseImponible, 0);
+  const totIVA   = facturasEmitidas.reduce((s, i) => s + i.importeIVA, 0);
+  const totTotal = facturasEmitidas.reduce((s, i) => s + i.total, 0);
 
   const exportXlsx = () => {
-    const rows = facturasEmitidas.map((i: any) => ({
+    const rows = facturasEmitidas.map((i) => ({
       Área: i.area === 'montada' ? 'La Montada Sound' : 'DJ Personal',
       'Nº Factura': i.numeroFactura ?? '',
       Cliente: i.cliente,
@@ -286,7 +286,7 @@ const EmitidasTab = ({
             </tr>
           </thead>
           <tbody>
-            {facturasEmitidas.map((i: any) => (
+            {facturasEmitidas.map((i) => (
               <tr key={i.id} className="border-b border-surface-400/10 hover:bg-surface-700/50">
                 <td className="px-4 py-3 font-mono text-zinc-300 text-xs">{i.numeroFactura || <span className="text-zinc-600">Sin nº</span>}</td>
                 <td className="px-4 py-3">
@@ -299,14 +299,14 @@ const EmitidasTab = ({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-zinc-400 text-sm">{fmtDate(i.fechaEvento)}</td>
-                <td className="px-4 py-3 text-right text-green-400 font-medium">{fmt(i.baseImponible)}</td>
+                <td className="px-4 py-3 text-right text-accent-400 font-medium">{fmt(i.baseImponible)}</td>
                 <td className="px-4 py-3 text-right text-zinc-500 text-xs">{i.porcentajeIVA}%<br />{fmt(i.importeIVA)}</td>
                 <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    i.estadoPago === 'pagado' ? 'bg-green-500/10 text-green-400' :
+                    i.estadoPago === 'pagado' ? 'bg-emerald-500/10 text-emerald-400' :
                     i.estadoPago === 'parcial' ? 'bg-yellow-500/10 text-yellow-400' :
-                    'bg-zinc-500/10 text-zinc-400'
+                    'bg-red-500/10 text-red-400'
                   }`}>
                     {i.estadoPago === 'pagado' ? 'Cobrado' : i.estadoPago === 'parcial' ? 'Parcial' : 'Pendiente'}
                   </span>
@@ -317,7 +317,7 @@ const EmitidasTab = ({
           <tfoot>
             <tr className="bg-surface-700/50 font-semibold border-t border-surface-400/20">
               <td colSpan={4} className="px-4 py-3 text-zinc-400">TOTAL ({facturasEmitidas.length} facturas)</td>
-              <td className="px-4 py-3 text-right text-green-400">{fmt(totBase)}</td>
+              <td className="px-4 py-3 text-right text-accent-400">{fmt(totBase)}</td>
               <td className="px-4 py-3 text-right text-zinc-400">{fmt(totIVA)}</td>
               <td className="px-4 py-3 text-right text-white">{fmt(totTotal)}</td>
               <td></td>
@@ -409,7 +409,7 @@ const GastosFacturasTab = ({
               <Download size={13} /> Excel
             </button>
           )}
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">
             <Plus size={14} /> Nueva factura de gasto
           </button>
         </div>
@@ -455,7 +455,7 @@ const GastosFacturasTab = ({
                   <td className="px-4 py-3 text-right text-red-400 font-medium">{fmt(f.total)}</td>
                   <td className="px-4 py-3 text-center">
                     {f.ivaDeducible
-                      ? <span className="px-1.5 py-0.5 rounded text-xs bg-green-500/10 text-green-400">Sí</span>
+                      ? <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400">Sí</span>
                       : <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-500/10 text-zinc-500">No</span>
                     }
                   </td>
@@ -531,7 +531,7 @@ const GastosFacturasTab = ({
           <div className="flex items-center pt-5">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.ivaDeducible} onChange={(e) => setField('ivaDeducible', e.target.checked)} className="accent-gold-500 w-4 h-4" />
-              <span className="text-sm text-white font-medium">IVA deducible: <span className={form.ivaDeducible ? 'text-green-400' : 'text-zinc-500'}>{form.ivaDeducible ? 'Sí' : 'No'}</span></span>
+              <span className="text-sm text-white font-medium">IVA deducible: <span className={form.ivaDeducible ? 'text-accent-400' : 'text-zinc-500'}>{form.ivaDeducible ? 'Sí' : 'No'}</span></span>
             </label>
           </div>
           {form.notas !== undefined && (
@@ -542,7 +542,7 @@ const GastosFacturasTab = ({
           )}
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir factura'}</button>
+            <button onClick={save} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir factura'}</button>
           </div>
         </div>
       </Modal>
@@ -565,7 +565,7 @@ const IvaTab = ({
   onChangeIsRate,
   year,
 }: {
-  facturasEmitidas: any[];
+  facturasEmitidas: Ingreso[];
   facturasGastos: Factura[];
   ivaRepercutido: number;
   ivaDeducible: number;
@@ -596,17 +596,17 @@ const IvaTab = ({
           <p className="text-xs text-zinc-500 mt-0.5">IVA repercutido de facturas emitidas − IVA soportado deducible de facturas de gastos</p>
         </div>
         <div className="grid grid-cols-3 divide-x divide-surface-400/20">
-          <IVABlock label="IVA repercutido" value={ivaRepercutido} sub={`${facturasEmitidas.length} facturas emitidas`} color="text-green-400" sign="+" />
+          <IVABlock label="IVA repercutido" value={ivaRepercutido} sub={`${facturasEmitidas.length} facturas emitidas`} color="text-accent-400" sign="+" />
           <IVABlock label="IVA soportado deducible" value={ivaDeducible} sub={`${facturasGastos.filter((f) => f.ivaDeducible).length} facturas deducibles`} color="text-orange-400" sign="−" />
           <IVABlock
             label={ivaAPagar >= 0 ? 'IVA a ingresar en Hacienda' : 'IVA a compensar'}
             value={Math.abs(ivaAPagar)}
             sub={ivaAPagar >= 0 ? 'Resultado positivo → pagar' : 'Resultado negativo → compensar'}
-            color={ivaAPagar >= 0 ? 'text-red-400' : 'text-green-400'}
+            color={ivaAPagar >= 0 ? 'text-red-400' : 'text-accent-400'}
           />
         </div>
         <div className="px-5 py-3 bg-surface-700/30 text-xs text-zinc-500">
-          <strong className="text-zinc-400">Cálculo:</strong> {fmt(ivaRepercutido)} (repercutido) − {fmt(ivaDeducible)} (deducible) = <span className={ivaAPagar >= 0 ? 'text-red-400 font-semibold' : 'text-green-400 font-semibold'}>{fmt(ivaAPagar)}</span>
+          <strong className="text-zinc-400">Cálculo:</strong> {fmt(ivaRepercutido)} (repercutido) − {fmt(ivaDeducible)} (deducible) = <span className={ivaAPagar >= 0 ? 'text-red-400 font-semibold' : 'text-accent-400 font-semibold'}>{fmt(ivaAPagar)}</span>
         </div>
       </div>
 
@@ -630,7 +630,7 @@ const IvaTab = ({
                   autoFocus
                 />
                 <span className="text-zinc-400 text-sm">%</span>
-                <button onClick={saveRate} className="px-2 py-1 bg-gold-500 text-black text-xs rounded hover:bg-gold-400 font-semibold">OK</button>
+                <button onClick={saveRate} className="px-2 py-1 bg-gold-500 text-white text-xs rounded hover:bg-gold-400 font-semibold">OK</button>
                 <button onClick={() => setEditingRate(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">✕</button>
               </div>
             ) : (
@@ -647,7 +647,7 @@ const IvaTab = ({
         {/* Cálculo paso a paso */}
         <div className="p-5 space-y-3">
           <div className="space-y-2">
-            <ISLine label="Ingresos con factura emitida (base imponible)" value={baseIngFact} color="text-green-400" />
+            <ISLine label="Ingresos con factura emitida (base imponible)" value={baseIngFact} color="text-accent-400" />
             <ISLine label="Gastos deducibles (facturas de gastos)" value={baseGastoDed} color="text-red-400" negative />
             <div className="border-t border-surface-400/20 pt-2">
               <ISLine
@@ -667,14 +667,14 @@ const IvaTab = ({
               <ISLine
                 label="Impuesto de Sociedades estimado"
                 value={isEstimado}
-                color={isEstimado > 0 ? 'text-red-400' : 'text-green-400'}
+                color={isEstimado > 0 ? 'text-red-400' : 'text-accent-400'}
                 bold
               />
             </div>
           </div>
 
           {beneficioFiscal <= 0 && (
-            <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-sm text-green-400">
+            <div className="bg-accent-500/10 border border-accent-500/20 rounded-xl px-4 py-3 text-sm text-accent-400">
               Beneficio fiscal negativo o cero → IS = 0 €
             </div>
           )}
@@ -690,13 +690,13 @@ const IvaTab = ({
       <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-white mb-4">Resumen fiscal {year}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <ResFiscalKPI label="Ingresos facturados" value={fmt(baseIngFact)} color="text-green-400" />
+          <ResFiscalKPI label="Ingresos facturados" value={fmt(baseIngFact)} color="text-accent-400" />
           <ResFiscalKPI label="Gastos deducibles" value={fmt(baseGastoDed)} color="text-red-400" />
           <ResFiscalKPI label="Beneficio fiscal" value={fmt(beneficioFiscal)} color={beneficioFiscal >= 0 ? 'text-gold-400' : 'text-zinc-500'} />
           <ResFiscalKPI label={`IS estimado (${isRate}%)`} value={fmt(isEstimado)} color="text-purple-400" />
-          <ResFiscalKPI label="IVA repercutido" value={fmt(ivaRepercutido)} color="text-green-400" />
+          <ResFiscalKPI label="IVA repercutido" value={fmt(ivaRepercutido)} color="text-accent-400" />
           <ResFiscalKPI label="IVA deducible" value={fmt(ivaDeducible)} color="text-orange-400" />
-          <ResFiscalKPI label={ivaAPagar >= 0 ? 'IVA a pagar' : 'IVA a compensar'} value={fmt(Math.abs(ivaAPagar))} color={ivaAPagar >= 0 ? 'text-red-400' : 'text-green-400'} />
+          <ResFiscalKPI label={ivaAPagar >= 0 ? 'IVA a pagar' : 'IVA a compensar'} value={fmt(Math.abs(ivaAPagar))} color={ivaAPagar >= 0 ? 'text-red-400' : 'text-accent-400'} />
           <ResFiscalKPI label="Total obligaciones" value={fmt(isEstimado + Math.max(0, ivaAPagar))} color="text-red-400" />
         </div>
       </div>

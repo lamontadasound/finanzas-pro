@@ -42,7 +42,7 @@ const BarChart = ({ data }: { data: { label: string; ing: number; gas: number }[
         <div key={d.label} className="flex-1 flex flex-col items-center gap-0.5">
           <div className="w-full flex flex-col items-center gap-0.5 justify-end" style={{ height: 112 }}>
             <div
-              className="w-full bg-amber-400 rounded-t-sm min-h-[2px]"
+              className="w-full bg-blue-500 rounded-t-sm min-h-[2px]"
               style={{ height: `${(d.ing / max) * 100}%` }}
               title={`Ingresos: ${fmt(d.ing)}`}
             />
@@ -98,11 +98,11 @@ const CobrosMes = ({ ingresos }: { ingresos: Ingreso[] }) => {
             >
               <span className="text-sm font-semibold text-gray-800">{MESES_FULL[mIdx]} {year}</span>
               <div className="flex items-center gap-4">
-                <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full font-medium">
+                <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">
                   Cobrado: {fmt(val.cobrado)}
                 </span>
                 {val.pendiente > 0 && (
-                  <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded-full font-medium">
                     Pendiente: {fmt(val.pendiente)}
                   </span>
                 )}
@@ -128,9 +128,9 @@ const CobrosMes = ({ ingresos }: { ingresos: Ingreso[] }) => {
                         <td className="px-4 py-2 text-right font-mono text-gray-800">{fmtFull(i.total)}</td>
                         <td className="px-4 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            i.estadoPago === 'pagado' ? 'bg-green-100 text-green-700' :
-                            i.estadoPago === 'parcial' ? 'bg-blue-100 text-blue-700' :
-                            i.estadoPago === 'pendiente' ? 'bg-amber-100 text-amber-700' :
+                            i.estadoPago === 'pagado' ? 'bg-emerald-100 text-emerald-700' :
+                            i.estadoPago === 'parcial' ? 'bg-amber-100 text-amber-800' :
+                            i.estadoPago === 'pendiente' ? 'bg-red-100 text-red-700' :
                             'bg-gray-100 text-gray-500'
                           }`}>
                             {i.estadoPago}
@@ -217,7 +217,7 @@ export const ResumenPage = ({ area }: Props) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{label} — Resumen</h1>
-          <p className="text-sm text-gray-500">Vista financiera consolidada</p>
+          
         </div>
 
         {/* Filtros de rango */}
@@ -227,7 +227,7 @@ export const ResumenPage = ({ area }: Props) => {
               key={r}
               onClick={() => setRango(r)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                rango === r ? 'bg-amber-500 text-black' : 'bg-white border border-gray-200 text-gray-600 hover:border-amber-400'
+                rango === r ? 'bg-gold-500 text-black' : 'bg-white border border-gray-200 text-gray-600 hover:border-gold-400'
               }`}
             >
               {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -269,9 +269,9 @@ export const ResumenPage = ({ area }: Props) => {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Ingresos totales" value={fmt(totalIngresos)} sub={`${ingFiltrados.length} eventos`} color="bg-green-500" icon={TrendingUp} />
+        <KpiCard label="Ingresos totales" value={fmt(totalIngresos)} sub={`${ingFiltrados.length} eventos`} color="bg-blue-600" icon={TrendingUp} />
         <KpiCard label="Gastos totales" value={fmt(totalGastos)} sub="Generales + evento" color="bg-red-500" icon={TrendingDown} />
-        <KpiCard label="Beneficio real" value={fmt(beneficioReal)} sub="Base imp. − costes evento" color={beneficioReal >= 0 ? 'bg-amber-500' : 'bg-red-600'} icon={DollarSign} />
+        <KpiCard label="Beneficio real" value={fmt(beneficioReal)} sub="Base imp. − costes evento" color={beneficioReal >= 0 ? 'bg-emerald-600' : 'bg-red-600'} icon={DollarSign} />
         <KpiCard label="Cobrado / Pendiente" value={fmt(cobrado)} sub={`Pendiente: ${fmt(pendiente)}`} color="bg-blue-500" icon={CheckCircle2} />
       </div>
 
@@ -287,7 +287,7 @@ export const ResumenPage = ({ area }: Props) => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-800">Ingresos vs Gastos por mes ({rangoYear})</h2>
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-amber-400 rounded-sm inline-block" /> Ingresos</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-sm inline-block" /> Ingresos</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-400 rounded-sm inline-block" /> Gastos</span>
           </div>
         </div>

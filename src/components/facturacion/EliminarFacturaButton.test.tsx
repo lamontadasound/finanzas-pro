@@ -1,0 +1,12 @@
+import {it,expect,vi,afterEach} from 'vitest';
+import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
+import {EliminarFacturaButton} from './EliminarFacturaButton';
+import {useStore} from '../../store/useStore';
+import type {Factura} from '../../types';
+const mock=vi.hoisted(()=>({rpc:vi.fn(),confirm:vi.fn()}));
+vi.mock('../../lib/supabase',()=>({supabase:{rpc:mock.rpc}}));
+vi.mock('../../store/useConfirmStore',()=>({useConfirmStore:(selector:(s:{show:typeof mock.confirm})=>unknown)=>selector({show:mock.confirm})}));
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+const factura={id:'test',numero:'123',numeroSecuencial:123,total:121} as Factura;
+it('confirma antes de eliminar del listado y mantiene los importes',async()=>{mock.rpc.mockResolvedValue({error:null});useStore.setState({facturas:[factura]});const done=vi.fn();render(<EliminarFacturaButton factura={factura} onDeleted={done}/>);fireEvent.click(screen.getByRole('button',{name:'Eliminar factura'}));expect(mock.rpc).not.toHaveBeenCalled();await mock.confirm.mock.calls[0][1]();await waitFor(()=>expect(done).toHaveBeenCalled());expect(mock.rpc).toHaveBeenCalledWith('ocultar_factura_generada',{p_id:'test'});expect(useStore.getState().facturas[0]).toMatchObject({numeroSecuencial:123,total:121,ocultaEn:expect.any(String)});});
+it('mantiene visible la factura si el servidor rechaza el borrado',async()=>{mock.rpc.mockResolvedValue({error:{message:'Sin permiso'}});useStore.setState({facturas:[factura]});render(<EliminarFacturaButton factura={factura}/>);fireEvent.click(screen.getByRole('button',{name:'Eliminar factura'}));await mock.confirm.mock.calls[0][1]();expect(await screen.findByRole('alert')).toHaveProperty('textContent','Sin permiso');expect(useStore.getState().facturas[0].ocultaEn).toBeUndefined();});

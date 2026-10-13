@@ -37,7 +37,10 @@ const calcArea = (ing: { baseImponible: number; importeIVA: number }[], gas: { b
 };
 
 const MonthlyTable = ({ monthly }: { monthly: ReturnType<typeof buildMonthlyTable> }) => {
-  let acum = 0;
+  const monthlyConAcumulado = monthly.reduce<(typeof monthly[number] & { acum: number })[]>((acc, row) => {
+    const acum = (acc[acc.length - 1]?.acum ?? 0) + row.balance;
+    return [...acc, { ...row, acum }];
+  }, []);
   const totIng = monthly.reduce((s, r) => s + r.ing, 0);
   const totGas = monthly.reduce((s, r) => s + r.gTotal, 0);
   return (
@@ -54,14 +57,15 @@ const MonthlyTable = ({ monthly }: { monthly: ReturnType<typeof buildMonthlyTabl
           <th className="text-right px-4 py-3 text-zinc-500">IVA sop.</th>
         </tr></thead>
         <tbody>
-          {monthly.map((row) => { acum += row.balance; return (
+          {monthlyConAcumulado.map((row) => {
+            return (
             <tr key={row.num} className={`border-b border-surface-400/10 hover:bg-surface-700/50 ${row.ing === 0 && row.gTotal === 0 ? 'opacity-40' : ''}`}>
               <td className="px-4 py-2.5 text-zinc-300 font-medium">{row.label}</td>
-              <td className="px-4 py-2.5 text-right text-green-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
+              <td className="px-4 py-2.5 text-right text-accent-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
               <td className="px-4 py-2.5 text-right text-zinc-400">{row.gFijo > 0 ? fmt(row.gFijo) : '—'}</td>
               <td className="px-4 py-2.5 text-right text-zinc-400">{row.gVar > 0 ? fmt(row.gVar) : '—'}</td>
               <td className={`px-4 py-2.5 text-right font-semibold ${row.balance >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{row.ing > 0 || row.gTotal > 0 ? fmt(row.balance) : '—'}</td>
-              <td className={`px-4 py-2.5 text-right font-semibold ${acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(acum)}</td>
+              <td className={`px-4 py-2.5 text-right font-semibold ${row.acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(row.acum)}</td>
               <td className="px-4 py-2.5 text-right text-zinc-500">{row.ivaRep > 0 ? fmt(row.ivaRep) : '—'}</td>
               <td className="px-4 py-2.5 text-right text-zinc-500">{row.ivaSop > 0 ? fmt(row.ivaSop) : '—'}</td>
             </tr>
@@ -69,11 +73,11 @@ const MonthlyTable = ({ monthly }: { monthly: ReturnType<typeof buildMonthlyTabl
         </tbody>
         <tfoot><tr className="bg-surface-700/50 font-semibold">
           <td className="px-4 py-3 text-zinc-300">TOTAL</td>
-          <td className="px-4 py-3 text-right text-green-400">{fmt(totIng)}</td>
+          <td className="px-4 py-3 text-right text-accent-400">{fmt(totIng)}</td>
           <td className="px-4 py-3 text-right text-zinc-400">{fmt(monthly.reduce((s, r) => s + r.gFijo, 0))}</td>
           <td className="px-4 py-3 text-right text-zinc-400">{fmt(monthly.reduce((s, r) => s + r.gVar, 0))}</td>
           <td className={`px-4 py-3 text-right ${totIng - totGas >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totIng - totGas)}</td>
-          <td className="px-4 py-3 text-right text-blue-400">{fmt(acum)}</td>
+          <td className="px-4 py-3 text-right text-blue-400">{fmt(totIng - totGas)}</td>
           <td className="px-4 py-3 text-right text-zinc-500">{fmt(monthly.reduce((s, r) => s + r.ivaRep, 0))}</td>
           <td className="px-4 py-3 text-right text-zinc-500">{fmt(monthly.reduce((s, r) => s + r.ivaSop, 0))}</td>
         </tr></tfoot>
@@ -135,15 +139,15 @@ export const Informes = () => {
         <h3 className="text-sm font-semibold text-white">{label} — {year}</h3>
       </div>
       <Divider label="Cuenta de resultados (base imponible)" />
-      <Row label="Ingresos brutos (s/IVA)" value={fmt(c.totalIng)} color="text-green-400" />
+      <Row label="Ingresos brutos (s/IVA)" value={fmt(c.totalIng)} color="text-accent-400" />
       <Row label="Total gastos (s/IVA)" value={fmt(c.totalGas)} color="text-red-400" />
       <Row label="Beneficio bruto" value={fmt(c.beneficioBruto)} bold color={c.beneficioBruto >= 0 ? 'text-gold-400' : 'text-red-400'} />
       <Row label="Impuesto de Sociedades 25%" value={fmt(c.is)} sub="estimado" color="text-orange-400" />
       <Row label="Beneficio neto (después IS)" value={fmt(c.beneficioNeto)} bold color={c.beneficioNeto >= 0 ? 'text-blue-400' : 'text-red-400'} />
       <Divider label="IVA" />
-      <Row label="IVA repercutido" value={fmt(c.ivaRep)} color="text-emerald-400" />
+      <Row label="IVA repercutido" value={fmt(c.ivaRep)} color="text-accent-400" />
       <Row label="IVA soportado deducible" value={fmt(c.ivaSop)} color="text-orange-400" />
-      <Row label={c.ivaLiq >= 0 ? 'IVA a pagar' : 'IVA a compensar'} value={fmt(Math.abs(c.ivaLiq))} bold color={c.ivaLiq >= 0 ? 'text-red-400' : 'text-green-400'} />
+      <Row label={c.ivaLiq >= 0 ? 'IVA a pagar' : 'IVA a compensar'} value={fmt(Math.abs(c.ivaLiq))} bold color={c.ivaLiq >= 0 ? 'text-red-400' : 'text-accent-400'} />
     </div>
     <div className="pt-1">
       <p className="text-xs text-zinc-500 mb-2 font-medium uppercase tracking-wider">Desglose mensual — base imponible</p>
@@ -157,7 +161,7 @@ export const Informes = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Informes</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Análisis financiero y fiscal</p>
+          
         </div>
         <div className="flex gap-2 items-center">
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="bg-surface-700 border border-surface-400/30 text-white text-sm rounded-lg px-3 py-1.5 outline-none">
@@ -181,7 +185,7 @@ export const Informes = () => {
         <div className="space-y-5">
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-4"><p className="text-xs text-zinc-500 mb-1">Ingresos totales</p><p className="text-xl font-bold text-green-400">{fmtShort(totalIng)}</p><p className="text-xs text-zinc-600 mt-1">M: {fmtShort(mC.totalIng)} + DJ: {fmtShort(djC.totalIng)}</p></div>
+            <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-4"><p className="text-xs text-zinc-500 mb-1">Ingresos totales</p><p className="text-xl font-bold text-accent-400">{fmtShort(totalIng)}</p><p className="text-xs text-zinc-600 mt-1">M: {fmtShort(mC.totalIng)} + DJ: {fmtShort(djC.totalIng)}</p></div>
             <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-4"><p className="text-xs text-zinc-500 mb-1">Gastos totales</p><p className="text-xl font-bold text-red-400">{fmtShort(totalGas)}</p><p className="text-xs text-zinc-600 mt-1">M: {fmtShort(mC.totalGas)} + DJ: {fmtShort(djC.totalGas)}</p></div>
             <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-4"><p className="text-xs text-zinc-500 mb-1">Beneficio bruto</p><p className={`text-xl font-bold ${beneficioBruto >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmtShort(beneficioBruto)}</p><p className="text-xs text-zinc-600 mt-1">Antes de IS</p></div>
             <div className="bg-surface-800 border border-surface-400/20 rounded-xl p-4"><p className="text-xs text-zinc-500 mb-1">Beneficio neto</p><p className={`text-xl font-bold ${beneficioNeto >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmtShort(beneficioNeto)}</p><p className="text-xs text-zinc-600 mt-1">IS est.: {fmtShort(is)}</p></div>
@@ -192,9 +196,9 @@ export const Informes = () => {
             <div className="bg-surface-800 border border-surface-400/20 rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-surface-400/20"><h3 className="text-sm font-semibold text-white">Cuenta de Pérdidas y Ganancias — {year}</h3></div>
               <Divider label="Ingresos" />
-              <Row label="La Montada Sound (s/IVA)" value={fmt(mC.totalIng)} color="text-green-400" />
-              <Row label="DJ Personal (s/IVA)" value={fmt(djC.totalIng)} color="text-green-400" />
-              <Row label="TOTAL INGRESOS" value={fmt(totalIng)} bold color="text-green-400" />
+              <Row label="La Montada Sound (s/IVA)" value={fmt(mC.totalIng)} color="text-accent-400" />
+              <Row label="DJ Personal (s/IVA)" value={fmt(djC.totalIng)} color="text-accent-400" />
+              <Row label="TOTAL INGRESOS" value={fmt(totalIng)} bold color="text-accent-400" />
               <Divider label="Gastos" />
               <Row label="La Montada Sound (s/IVA)" value={fmt(mC.totalGas)} color="text-red-400" />
               <Row label="DJ Personal (s/IVA)" value={fmt(djC.totalGas)} color="text-red-400" />
@@ -209,13 +213,13 @@ export const Informes = () => {
               <Divider label="IVA repercutido (ventas)" />
               <Row label="La Montada Sound" value={fmt(mC.ivaRep)} />
               <Row label="DJ Personal" value={fmt(djC.ivaRep)} />
-              <Row label="Total IVA repercutido" value={fmt(ivaRep)} bold color="text-emerald-400" />
+              <Row label="Total IVA repercutido" value={fmt(ivaRep)} bold color="text-accent-400" />
               <Divider label="IVA soportado deducible (compras)" />
               <Row label="La Montada Sound" value={fmt(mC.ivaSop)} />
               <Row label="DJ Personal" value={fmt(djC.ivaSop)} />
               <Row label="Total IVA soportado" value={fmt(ivaSop)} bold color="text-orange-400" />
               <Divider label="Resultado IVA" />
-              <Row label={ivaLiq >= 0 ? 'IVA a pagar a Hacienda' : 'IVA a compensar'} value={fmt(Math.abs(ivaLiq))} bold color={ivaLiq >= 0 ? 'text-red-400' : 'text-green-400'} />
+              <Row label={ivaLiq >= 0 ? 'IVA a pagar a Hacienda' : 'IVA a compensar'} value={fmt(Math.abs(ivaLiq))} bold color={ivaLiq >= 0 ? 'text-red-400' : 'text-accent-400'} />
             </div>
           </div>
 
@@ -226,8 +230,8 @@ export const Informes = () => {
               <BarChart data={conjChartData} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                 <XAxis dataKey="mes" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmtShort(Number(v))} />
-                <Tooltip formatter={(v: any) => fmt(Number(v))} contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }} />
+                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: unknown) => fmtShort(Number(v))} />
+                <Tooltip formatter={(v: unknown) => fmt(Number(v))} contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="montada" name="La Montada" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="dj" name="DJ Personal" fill="#a78bfa" radius={[4, 4, 0, 0]} />

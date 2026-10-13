@@ -1,16 +1,25 @@
+import {ExpenseStatus} from '../../components/ui/ExpenseStatus';
+import {useExpenseCategories,categoryOptions} from '../../lib/expenseCategoryConfig';
+import { resolveLinea } from '../../config/resolveLinea';
 import { useState, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, Folder, ChevronLeft } from 'lucide-react';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
+import { Switch } from '../../components/ui/Switch';
+import { Badge } from '../../components/ui/Badge';
 import { useConfirmStore } from '../../store/useConfirmStore';
+import { AdjuntarFacturaModal } from '../../components/facturacion/AdjuntarFacturaModal';
+import { Paperclip } from 'lucide-react';
 import type { Area, Gasto, GastoCategoria, GastoTipo, PagadoPor, PaymentMethod } from '../../types';
+import type { LineaId } from '../../config/businessLines';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-const CATEGORIAS_GASTO: GastoCategoria[] = ['Impuestos', 'Gestoría', 'Marketing', 'RRSS', 'Software', 'Personal', 'Material', 'Equipo'];
+
 const TIPOS_GASTO: GastoTipo[] = ['fijo', 'variable'];
 const PAGADORES: PagadoPor[] = ['La Montada', 'Julia', 'Rodrigo', 'Julia y Rodrigo', 'Marco'];
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
@@ -18,14 +27,22 @@ const PCTS_IVA = [0, 10, 21];
 const PERIODICIDADES = ['Ocasional', 'Mensual', 'Trimestral', 'Anual'] as const;
 type Periodicidad = typeof PERIODICIDADES[number];
 
-interface Props { area: Area }
+interface Props {
+  area: Area;
+  /** Fase D: separa DJ de Real Madrid dentro de `area='dj'` usando el campo
+   *  libre `lineaNegocio` que ya existe en `Gasto` (sin migración): los
+   *  gastos generales de Real Madrid se guardan con `lineaNegocio:'Real
+   *  Madrid'`; el resto de `area='dj'` se consideran DJ. */
+  filterLinea?: LineaId;
+}
 
-const EMPTY = (area: Area): Partial<Gasto> => ({
+const EMPTY = (area: Area, filterLinea?: LineaId): Partial<Gasto> => ({
   area, fecha: new Date().toISOString().slice(0, 10),
   concepto: '', categoria: 'Personal', tipo: 'variable', pagadoPor: 'La Montada',
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
   metodoPago: 'transferencia', estadoPago: 'pagado',
   facturaRecibida: false, deducible: true,
+  lineaNegocio: filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj'),
 });
 
 // ── Generación de repeticiones futuras, evitando duplicados ──────────────────
@@ -45,15 +62,26 @@ const numeroRepeticiones = (periodicidad: Periodicidad): number => {
   return 0;
 };
 
-export const GastosPage = ({ area }: Props) => {
+export const GastosPage = ({ area, filterLinea }: Props) => {
   const allGastos  = useStore((s) => s.gastos);
-  const gastos     = useMemo(() => allGastos.filter((g) => g.area === area), [allGastos, area]);
+  const {categories}=useExpenseCategories();
+  const CATEGORIAS_GASTO=categoryOptions(categories,'general',allGastos.map(g=>g.categoria));
+  const gastos     = useMemo(() => allGastos.filter((g) => {
+    if (g.area !== area) return false;
+    if (filterLinea) return resolveLinea(g) === filterLinea;
+    return true;
+  }), [allGastos, area, filterLinea]);
   const addGasto   = useStore((s) => s.addGasto);
   const updateGasto = useStore((s) => s.updateGasto);
   const deleteGasto = useStore((s) => s.deleteGasto);
-  const canCreate  = useAuthStore((s) => s.canCreate);
-  const canEdit    = useAuthStore((s) => s.canEdit);
-  const canDelete  = useAuthStore((s) => s.canDelete);
+  // Fase F: permiso real por línea (ver IngresosPage para el porqué).
+  const permLinea = filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj');
+  const canCreateLinea = useAuthStore((s) => s.canCreateLinea);
+  const canEditLinea   = useAuthStore((s) => s.canEditLinea);
+  const canDeleteLinea = useAuthStore((s) => s.canDeleteLinea);
+  const canCreate  = () => canCreateLinea(permLinea);
+  const canEdit    = () => canEditLinea(permLinea);
+  const canDelete  = () => canDeleteLinea(permLinea);
   const showConfirm = useConfirmStore((s) => s.show);
 
   const [search, setSearch]       = useState('');
@@ -63,7 +91,8 @@ export const GastosPage = ({ area }: Props) => {
   const [filterPagadoPor, setFilterPagadoPor] = useState<PagadoPor | ''>('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]     = useState<Gasto | null>(null);
-  const [form, setForm]           = useState<Partial<Gasto>>(EMPTY(area));
+  const [facturaGasto, setFacturaGasto] = useState<Gasto | null>(null);
+  const [form, setForm]           = useState<Partial<Gasto>>(EMPTY(area, filterLinea));
   const [periodicidad, setPeriodicidad] = useState<Periodicidad>('Ocasional');
 
   // ── Navegación por Año → Mes (carpetas) ──────────────────────────────────
@@ -75,7 +104,7 @@ export const GastosPage = ({ area }: Props) => {
     gastos.forEach((g) => {
       const y = new Date(g.fecha).getFullYear();
       const cur = map.get(y) ?? { count: 0, total: 0 };
-      map.set(y, { count: cur.count + 1, total: cur.total + g.total });
+      map.set(y, { count: cur.count + 1, total: cur.total + g.baseImponible });
     });
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
   }, [gastos]);
@@ -86,14 +115,14 @@ export const GastosPage = ({ area }: Props) => {
     gastos.filter((g) => new Date(g.fecha).getFullYear() === selectedYear).forEach((g) => {
       const m = new Date(g.fecha).getMonth();
       const cur = map.get(m) ?? { count: 0, total: 0 };
-      map.set(m, { count: cur.count + 1, total: cur.total + g.total });
+      map.set(m, { count: cur.count + 1, total: cur.total + g.baseImponible });
     });
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [gastos, selectedYear]);
 
   const totalAnio = useMemo(() => {
     if (selectedYear == null) return 0;
-    return gastos.filter((g) => new Date(g.fecha).getFullYear() === selectedYear).reduce((a, g) => a + g.total, 0);
+    return gastos.filter((g) => new Date(g.fecha).getFullYear() === selectedYear).reduce((a, g) => a + g.baseImponible, 0);
   }, [gastos, selectedYear]);
 
   const totalMes = useMemo(() => {
@@ -101,7 +130,7 @@ export const GastosPage = ({ area }: Props) => {
     return gastos.filter((g) => {
       const d = new Date(g.fecha);
       return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
-    }).reduce((a, g) => a + g.total, 0);
+    }).reduce((a, g) => a + g.baseImponible, 0);
   }, [gastos, selectedYear, selectedMonth]);
 
   const enElMes = useMemo(() => {
@@ -125,7 +154,7 @@ export const GastosPage = ({ area }: Props) => {
     return list.sort((a, b) => b.fecha.localeCompare(a.fecha));
   }, [enElMes, search, filterCat, filterTipo, filterPeriodicidad, filterPagadoPor]);
 
-  const totalFiltrado = filtered.reduce((a, g) => a + g.total, 0);
+
 
   const setField = (k: keyof Gasto, v: unknown) => {
     setForm((f) => {
@@ -141,23 +170,23 @@ export const GastosPage = ({ area }: Props) => {
     });
   };
 
-  const openNew = () => { setEditing(null); setForm(EMPTY(area)); setPeriodicidad('Ocasional'); setShowModal(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY(area, filterLinea)); setPeriodicidad('Ocasional'); setShowModal(true); };
   const openEdit = (g: Gasto) => { setEditing(g); setForm({ ...g }); setPeriodicidad('Ocasional'); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditing(null); };
 
   const yaExiste = (candidato: Gasto) =>
     allGastos.some((g) => g.area === candidato.area && g.concepto === candidato.concepto && g.categoria === candidato.categoria && g.fecha === candidato.fecha);
 
-  const save = () => {
+  const save = async () => {
     if (!form.concepto) return;
     if (editing) {
-      updateGasto(editing.id, form);
+      if (!await updateGasto(editing.id, form)) return;
       closeModal();
       return;
     }
     const recurrenciaId = uid();
-    const base: Gasto = { ...EMPTY(area), ...form, id: uid(), createdAt: new Date().toISOString(), recurrenciaId, periodicidad: periodicidad === 'Ocasional' ? undefined : (periodicidad.toLowerCase() as Gasto['periodicidad']), esRecurrente: periodicidad !== 'Ocasional' } as Gasto;
-    addGasto(base);
+    const base: Gasto = { ...EMPTY(area, filterLinea), ...form, id: uid(), createdAt: new Date().toISOString(), recurrenciaId, periodicidad: periodicidad === 'Ocasional' ? undefined : (periodicidad.toLowerCase() as Gasto['periodicidad']), esRecurrente: periodicidad !== 'Ocasional' } as Gasto;
+    if (!await addGasto(base)) return;
 
     if (periodicidad !== 'Ocasional') {
       const n = numeroRepeticiones(periodicidad);
@@ -165,7 +194,7 @@ export const GastosPage = ({ area }: Props) => {
       for (let i = 1; i <= n; i++) {
         const fecha = sumarPeriodo(fechaBase, periodicidad, i).toISOString().slice(0, 10);
         const candidato: Gasto = { ...base, id: uid(), fecha, createdAt: new Date().toISOString() };
-        if (!yaExiste(candidato)) addGasto(candidato);
+        if (!yaExiste(candidato)) if (!await addGasto(candidato)) return;
       }
     }
     closeModal();
@@ -176,22 +205,19 @@ export const GastosPage = ({ area }: Props) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gastos generales</h1>
-          <p className="text-sm text-gray-500">{filtered.length} registros · Total: {fmt(totalFiltrado)}</p>
         </div>
-        {canCreate(area) && (
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors">
-            <Plus size={16} /> Nuevo gasto
-          </button>
+        {canCreate() && (
+          <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo gasto</Button>
         )}
       </div>
 
       {/* Breadcrumb navegación Año → Mes */}
       <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-amber-600 hover:text-amber-500'}`}>Años</button>
+        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Años</button>
         {selectedYear != null && (
           <>
             <span className="text-gray-300">/</span>
-            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-amber-600 hover:text-amber-500'}`}>{selectedYear}</button>
+            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>{selectedYear}</button>
           </>
         )}
         {selectedYear != null && selectedMonth != null && (
@@ -209,13 +235,13 @@ export const GastosPage = ({ area }: Props) => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {anios.map(([y, data]) => (
-              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-amber-400 hover:shadow-sm transition-all">
+              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
                 <div className="flex items-center gap-2 mb-2">
-                  <Folder size={16} className="text-amber-500" />
+                  <Folder size={16} className="text-gold-500" />
                   <span className="text-lg font-bold text-gray-900">{y}</span>
                 </div>
                 <p className="text-xs text-gray-500">{data.count} gastos</p>
-                <p className="text-sm font-semibold text-gray-700 mt-1">{fmt(data.total)}</p>
+                <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
               </button>
             ))}
           </div>
@@ -227,20 +253,20 @@ export const GastosPage = ({ area }: Props) => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <button onClick={() => setSelectedYear(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a años</button>
-            <p className="text-sm text-gray-600">Total {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
+            <p className="text-sm text-gray-600">Total sin IVA {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
           </div>
           {mesesDelAnio.length === 0 ? (
             <p className="text-center py-16 text-gray-400 text-sm">Sin gastos en {selectedYear}</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {mesesDelAnio.map(([m, data]) => (
-                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-amber-400 hover:shadow-sm transition-all">
+                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
                   <div className="flex items-center gap-2 mb-2">
-                    <Folder size={16} className="text-amber-500" />
+                    <Folder size={16} className="text-gold-500" />
                     <span className="font-bold text-gray-900">{MESES_FULL[m]}</span>
                   </div>
                   <p className="text-xs text-gray-500">{data.count} gastos</p>
-                  <p className="text-sm font-semibold text-gray-700 mt-1">{fmt(data.total)}</p>
+                  <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
                 </button>
               ))}
             </div>
@@ -253,22 +279,22 @@ export const GastosPage = ({ area }: Props) => {
       <>
       <div className="flex items-center justify-between">
         <button onClick={() => setSelectedMonth(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a meses</button>
-        <p className="text-sm text-gray-600">Total {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
+        <p className="text-sm text-gray-600">Total sin IVA {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar concepto o proveedor…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-amber-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar concepto o proveedor…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-gold-400" />
         </div>
         <select value={filterCat} onChange={(e) => setFilterCat(e.target.value as GastoCategoria | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
           <option value="">Todas las categorías</option>
           {CATEGORIAS_GASTO.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as GastoTipo | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
+{area !== 'montada' && (        <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as GastoTipo | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
           <option value="">Todos los tipos</option>
           {TIPOS_GASTO.map((t) => <option key={t} value={t}>{t === 'fijo' ? 'Fijo' : 'Variable'}</option>)}
-        </select>
+        </select>)}
         <select value={filterPeriodicidad} onChange={(e) => setFilterPeriodicidad(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
           <option value="">Toda periodicidad</option>
           <option value="ocasional">Ocasional</option>
@@ -281,7 +307,7 @@ export const GastosPage = ({ area }: Props) => {
           {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
@@ -289,16 +315,16 @@ export const GastosPage = ({ area }: Props) => {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
+                {area !== 'montada' && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>}
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado por</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total sin IVA</th><th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total con IVA</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">Sin gastos registrados</td></tr>
+                <tr><td colSpan={area==='montada'?8:9} className="text-center py-12 text-gray-400 text-sm">Sin gastos registrados</td></tr>
               ) : filtered.map((g) => (
                 <tr key={g.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{g.fecha}</td>
@@ -307,18 +333,19 @@ export const GastosPage = ({ area }: Props) => {
                     {g.proveedor && <p className="text-xs text-gray-400">{g.proveedor}</p>}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{g.categoria}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${g.tipo === 'fijo' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{g.tipo}</span>
-                  </td>
+{area !== 'montada' && (                  <td className="px-4 py-3">
+                    <Badge tone={g.tipo === 'fijo' ? 'info' : 'neutral'}>{g.tipo}</Badge>
+                  </td>)}
                   <td className="px-4 py-3 text-gray-600">{g.pagadoPor ?? '—'}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(g.total)}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(g.baseImponible)}</td><td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(g.total)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${g.estadoPago === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{g.estadoPago}</span>
+                    <ExpenseStatus status={g.estadoPago}/>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
-                      {canEdit(area) && <button onClick={() => openEdit(g)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={13} /></button>}
-                      {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar este gasto?', () => deleteGasto(g.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
+                      {canCreate() && <button onClick={() => setFacturaGasto(g)} title="Adjuntar factura" className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Paperclip size={13} /></button>}
+                      {canEdit() && <button onClick={() => openEdit(g)} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Edit2 size={13} /></button>}
+                      {canDelete() && <button onClick={() => showConfirm('¿Eliminar este gasto?', () => deleteGasto(g.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -351,12 +378,12 @@ export const GastosPage = ({ area }: Props) => {
                 {CATEGORIAS_GASTO.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div>
+{area !== 'montada' && (            <div>
               <label className="label-form">Tipo de gasto</label>
               <select value={form.tipo ?? 'variable'} onChange={(e) => setField('tipo', e.target.value as GastoTipo)} className="input-form">
                 {TIPOS_GASTO.map((t) => <option key={t} value={t}>{t === 'fijo' ? 'Fijo' : 'Variable'}</option>)}
               </select>
-            </div>
+            </div>)}
             <div>
               <label className="label-form">Pagado por</label>
               <select value={form.pagadoPor ?? 'La Montada'} onChange={(e) => setField('pagadoPor', e.target.value as PagadoPor)} className="input-form">
@@ -374,7 +401,7 @@ export const GastosPage = ({ area }: Props) => {
               </div>
             )}
             <div>
-              <label className="label-form">Base imponible (€)</label>
+              <label className="label-form">Total sin IVA (€)</label>
               <input type="number" step="0.01" value={form.baseImponible ?? 0} onChange={(e) => setField('baseImponible', parseFloat(e.target.value) || 0)} className="input-form" />
             </div>
             <div>
@@ -384,7 +411,7 @@ export const GastosPage = ({ area }: Props) => {
               </select>
             </div>
             <div>
-              <label className="label-form">Total</label>
+              <label className="label-form">Total con IVA</label>
               <div className="input-form bg-gray-50 text-gray-700 font-semibold">{fmt(form.total ?? 0)}</div>
             </div>
             <div>
@@ -407,32 +434,26 @@ export const GastosPage = ({ area }: Props) => {
               </select>
               {editing && <p className="text-[11px] text-gray-400 mt-1">La periodicidad solo se define al crear el gasto.</p>}
             </div>
-            <div className="col-span-2 flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.facturaRecibida} onChange={(e) => setField('facturaRecibida', e.target.checked)} className="rounded" />
-                Factura recibida
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.deducible} onChange={(e) => setField('deducible', e.target.checked)} className="rounded" />
-                Gasto deducible
-              </label>
-            </div>
-            <div className="col-span-2">
-              <label className="label-form">Observaciones</label>
-              <textarea value={form.observaciones ?? ''} onChange={(e) => setField('observaciones', e.target.value)} rows={2} className="input-form" />
+            <div className="col-span-2 flex items-center gap-8">
+              <Switch checked={!!form.facturaRecibida} onChange={(v) => setField('facturaRecibida', v)} label="Factura recibida" />
+              <Switch checked={!!form.deducible} onChange={(v) => setField('deducible', v)} label="Gasto deducible" />
             </div>
           </div>
           {!editing && periodicidad !== 'Ocasional' && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-gold-700 bg-gold-50 border border-gold-200 rounded-lg px-3 py-2">
               Al guardar se crearán automáticamente las siguientes repeticiones ({periodicidad.toLowerCase()}) durante 1 año, comprobando que no existan ya para evitar duplicados.
             </p>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={closeModal} className="flex-1 py-2 border border-gray-200 text-sm font-medium rounded-xl hover:bg-gray-50">Cancelar</button>
-            <button onClick={save} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">{editing ? 'Guardar' : 'Añadir gasto'}</button>
+            <Button variant="secondary" onClick={closeModal} className="flex-1">Cancelar</Button>
+            <Button variant="primary" onClick={save} className="flex-1">{editing ? 'Guardar' : 'Añadir gasto'}</Button>
           </div>
         </div>
       </Modal>
+
+      {facturaGasto && (
+        <AdjuntarFacturaModal gasto={facturaGasto} onClose={() => setFacturaGasto(null)} />
+      )}
     </div>
   );
 };

@@ -1,0 +1,3 @@
+import {it,expect} from 'vitest';
+import {leadFollowup,responseDays,type Lead} from './soundLeads';
+it('clasifica seguimiento y calcula días sin inventar respuestas',()=>{const r={estado:'pendiente',fecha:'2026-09-01',primer_contacto:'2026-09-03',siguiente_contacto:'2026-10-01'} as Lead;expect(leadFollowup(r,'2026-10-02')).toBe('Retrasado');expect(leadFollowup(r,'2026-10-01')).toBe('Hoy');expect(leadFollowup({...r,estado:'convertido'},'2026-10-02')).toBe('Cerrado');expect(leadFollowup({...r,siguiente_contacto:null})).toBe('Sin programar');expect(responseDays(r)).toBe(2);expect(responseDays({...r,primer_contacto:null})).toBeNull();});

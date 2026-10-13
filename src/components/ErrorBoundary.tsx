@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
             <button
               onClick={() => this.setState({ error: null })}
-              className="mt-2 px-5 py-2 bg-amber-500 text-black text-sm font-semibold rounded-lg hover:bg-amber-400 transition-colors"
+              className="mt-2 px-5 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400 transition-colors"
             >
               Reintentar
             </button>

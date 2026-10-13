@@ -1,15 +1,31 @@
+import {EventExpenseVatFields} from '../../components/forms/EventExpenseVatFields';
+import {IngresoRentabilidad} from '../../components/lineas/IngresoRentabilidad';
+import {ingresoRentabilidad} from '../../lib/ingresoRentabilidad';
+import { EventExpensePaymentFields } from '../../components/forms/EventExpensePaymentFields';
+import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, ChevronDown, Folder, ChevronLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, Folder, ChevronLeft } from 'lucide-react';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
+import { Switch } from '../../components/ui/Switch';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import type { Area, Ingreso, PaymentMethod, PaymentStatus, GastoEvento, GastoEventoCategoria, GastoTipo, PagadoPor, Suplido } from '../../types';
+import { ContentCard2 } from '../../components/ui2/ContentCard';
+import { Button2 } from '../../components/ui2/Button';
+import { Badge2 } from '../../components/ui2/Badge';
+import { SearchInput2 } from '../../components/ui2/SearchInput';
+import { RowMenu2 } from '../../components/ui2/RowMenu';
+import { GenerarFacturaModal } from '../../components/facturacion/GenerarFacturaModal';
+import type { Area, Ingreso, PaymentMethod, PaymentStatus, GastoEvento, GastoEventoCategoria, PagadoPor, Suplido } from '../../types';
+import type { LineaId } from '../../config/businessLines';
+import { resolveLinea } from '../../config/resolveLinea';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
-const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 const ESTADOS: PaymentStatus[] = ['presupuesto', 'pendiente', 'parcial', 'pagado', 'cancelado'];
 const PCTS_IVA = [0, 10, 21];
 
@@ -18,32 +34,41 @@ const TIPOS_EVENTO_FORM = ['Boda', 'Alquiler', 'Evento corporativo', 'Real Madri
 const LINEAS_NEGOCIO = ['La Montada Sound', 'DJs', 'Real Madrid'] as const;
 const ESTADOS_FORM: PaymentStatus[] = ['pendiente', 'parcial', 'pagado'];
 const METODOS_FORM: PaymentMethod[] = ['transferencia', 'tarjeta', 'efectivo'];
-const CAT_GASTO_EVENTO: GastoEventoCategoria[] = ['Cámara', 'DJ', 'Montador', 'Técnico', 'Decoración', 'Gasolina', 'Transporte', 'Personal', 'Alquiler', 'Proveedor', 'Otro'];
-const TIPOS_GASTO_EVENTO: GastoTipo[] = ['fijo', 'variable'];
 const PAGADORES: PagadoPor[] = ['La Montada', 'Julia', 'Rodrigo', 'Julia y Rodrigo', 'Marco'];
 
-const estadoColor: Record<PaymentStatus, string> = {
-  presupuesto: 'bg-gray-100 text-gray-600',
-  pendiente:   'bg-amber-100 text-amber-700',
-  parcial:     'bg-blue-100 text-blue-700',
-  pagado:      'bg-green-100 text-green-700',
-  cancelado:   'bg-red-100 text-red-600',
+const estadoTone: Record<PaymentStatus, 'neutral' | 'gold' | 'info' | 'success' | 'danger' | 'warning'> = {
+  presupuesto: 'neutral',
+  pendiente:   'danger',
+  parcial:     'warning',
+  pagado:      'success',
+  cancelado:   'danger',
 };
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const suplidoPendiente = (s: Suplido) => Math.max(0, s.importe - (s.cantidadRecuperada ?? 0));
 
-interface Props { area: Area }
+interface Props {
+  area: Area;
+  /** Fase D: separa DJ de Real Madrid dentro de `area='dj'` (comparten
+   *  tabla hoy). Usa `resolveLinea` — compatibilidad temporal mientras la
+   *  migración de `linea_negocio` no esté ejecutada. */
+  filterLinea?: LineaId;
+  tituloOverride?: string;
+}
 
-const EMPTY = (area: Area): Partial<Ingreso> => ({
+const TIPOS_EVENTO_REAL_MADRID = ['real_madrid', 'Evento', 'Servicio', 'Otro'] as const;
+const TIPO_EVENTO_RM_LABEL: Record<string, string> = { real_madrid: 'Partido', Evento: 'Evento', Servicio: 'Servicio', Otro: 'Otro' };
+
+const EMPTY = (area: Area, filterLinea?: LineaId): Partial<Ingreso> => ({
   area,
   concepto: '', cliente: '', empresa: false,
-  tipoEvento: TIPOS_EVENTO_FORM[0], fechaEvento: new Date().toISOString().slice(0, 10),
+  tipoEvento: filterLinea === 'real_madrid' ? 'real_madrid' : TIPOS_EVENTO_FORM[0],
+  fechaEvento: new Date().toISOString().slice(0, 10),
   baseImponible: 0, porcentajeIVA: 21, importeIVA: 0, total: 0,
   metodoPago: 'transferencia', estadoPago: 'pendiente', pagosRecibidos: 0,
   facturaEmitida: false, notas: '', sinFactura: false,
-  lineaNegocio: area === 'montada' ? 'La Montada Sound' : 'DJs',
+  lineaNegocio: filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj'),
   tieneReserva: false, reserva: 0,
 });
 
@@ -54,9 +79,13 @@ const calcularEstado = (total: number, cobrado: number): PaymentStatus => {
   return 'pagado';
 };
 
-export const IngresosPage = ({ area }: Props) => {
+export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   const allIngresos  = useStore((s) => s.ingresos);
-  const ingresos     = useMemo(() => allIngresos.filter((i) => i.area === area), [allIngresos, area]);
+  const isRealMadrid = filterLinea === 'real_madrid';
+  const ingresos     = useMemo(
+    () => allIngresos.filter((i) => i.area === area && (!filterLinea || resolveLinea({ id: i.id, area: i.area, tipoEvento: i.tipoEvento, lineaNegocio: i.lineaNegocio }) === filterLinea)),
+    [allIngresos, area, filterLinea],
+  );
   const allGastosEvento = useStore((s) => s.gastosEvento);
   const addGastoEvento = useStore((s) => s.addGastoEvento);
   const allSuplidos = useStore((s) => s.suplidos);
@@ -66,22 +95,32 @@ export const IngresosPage = ({ area }: Props) => {
   const addIngreso   = useStore((s) => s.addIngreso);
   const updateIngreso = useStore((s) => s.updateIngreso);
   const deleteIngreso = useStore((s) => s.deleteIngreso);
-  const canCreate    = useAuthStore((s) => s.canCreate);
-  const canEdit      = useAuthStore((s) => s.canEdit);
-  const canDelete    = useAuthStore((s) => s.canDelete);
+  // Fase F: permiso real por línea, no por AreaKey legado — imprescindible
+  // para Real Madrid, que comparte area='dj' con DJ pero es una línea
+  // distinta con su propio permiso.
+  const permLinea = filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj');
+  const canCreateLinea = useAuthStore((s) => s.canCreateLinea);
+  const canEditLinea    = useAuthStore((s) => s.canEditLinea);
+  const canDeleteLinea  = useAuthStore((s) => s.canDeleteLinea);
+  const canCreate    = () => canCreateLinea(permLinea);
+  const canEdit      = () => canEditLinea(permLinea);
+  const canDelete    = () => canDeleteLinea(permLinea);
 
+  const [detailId,setDetailId]=useState<string|null>(null);
+  const detailIngreso=ingresos.find(i=>i.id===detailId);
   const [search, setSearch]       = useState('');
   const [filterEstado, setFilter] = useState<PaymentStatus | ''>('');
   const [filterCliente, setFilterCliente] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [facturaIngreso, setFacturaIngreso] = useState<Ingreso | null>(null);
   const [editing, setEditing]     = useState<Ingreso | null>(null);
-  const [form, setForm]           = useState<Partial<Ingreso>>(EMPTY(area));
+  const [form, setForm]           = useState<Partial<Ingreso>>(EMPTY(area, filterLinea));
   const [gastoTarget, setGastoTarget] = useState<Ingreso | null>(null);
   const [mostrarSuplidosForm, setMostrarSuplidosForm] = useState(false);
   const [showSuplidoFormModal, setShowSuplidoFormModal] = useState(false);
   const [editingSuplidoForm, setEditingSuplidoForm] = useState<Suplido | null>(null);
   const [suplidoFormData, setSuplidoFormData] = useState<Partial<Suplido>>({});
-  const [gastoForm, setGastoForm] = useState<{ concepto: string; categoria: GastoEventoCategoria; tipo: GastoTipo; pagadoPor: PagadoPor; importe: number; fecha: string }>({ concepto: '', categoria: 'Otro', tipo: 'variable', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
+  const [gastoForm, setGastoForm] = useState<{ concepto: string; categoria: GastoEventoCategoria; estadoPago?: GastoEvento['estadoPago']; metodoPago?: GastoEvento['metodoPago']; pagadoPor: PagadoPor; importe: number; fecha: string }>({ concepto: '', categoria: 'DJ', estadoPago: 'pendiente', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
   const showConfirm = useConfirmStore((s) => s.show);
   const [sortField, setSortField] = useState<'fechaEvento' | 'total' | 'cliente'>('fechaEvento');
   const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('desc');
@@ -128,7 +167,7 @@ export const IngresosPage = ({ area }: Props) => {
     ingresos.forEach((i) => {
       const y = new Date(i.fechaEvento).getFullYear();
       const cur = map.get(y) ?? { count: 0, total: 0 };
-      map.set(y, { count: cur.count + 1, total: cur.total + i.total });
+      map.set(y, { count: cur.count + 1, total: cur.total + i.baseImponible });
     });
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
   }, [ingresos]);
@@ -139,14 +178,14 @@ export const IngresosPage = ({ area }: Props) => {
     ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === selectedYear).forEach((i) => {
       const m = new Date(i.fechaEvento).getMonth();
       const cur = map.get(m) ?? { count: 0, total: 0 };
-      map.set(m, { count: cur.count + 1, total: cur.total + i.total });
+      map.set(m, { count: cur.count + 1, total: cur.total + i.baseImponible });
     });
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [ingresos, selectedYear]);
 
   const totalAnio = useMemo(() => {
     if (selectedYear == null) return 0;
-    return ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === selectedYear).reduce((a, i) => a + i.total, 0);
+    return ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === selectedYear).reduce((a, i) => a + i.baseImponible, 0);
   }, [ingresos, selectedYear]);
 
   const totalMes = useMemo(() => {
@@ -154,7 +193,7 @@ export const IngresosPage = ({ area }: Props) => {
     return ingresos.filter((i) => {
       const d = new Date(i.fechaEvento);
       return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
-    }).reduce((a, i) => a + i.total, 0);
+    }).reduce((a, i) => a + i.baseImponible, 0);
   }, [ingresos, selectedYear, selectedMonth]);
 
   const clientesDisponibles = useMemo(() => Array.from(new Set(ingresos.map((i) => i.cliente).filter(Boolean))).sort(), [ingresos]);
@@ -188,7 +227,7 @@ export const IngresosPage = ({ area }: Props) => {
 
   const openNew = () => {
     setEditing(null);
-    setForm(EMPTY(area));
+    setForm(EMPTY(area, filterLinea));
     setMostrarSuplidosForm(false);
     setShowModal(true);
   };
@@ -230,19 +269,19 @@ export const IngresosPage = ({ area }: Props) => {
   };
   const openEditSuplidoForm = (s: Suplido) => { setEditingSuplidoForm(s); setSuplidoFormData({ ...s }); setShowSuplidoFormModal(true); };
   const closeSuplidoFormModal = () => { setShowSuplidoFormModal(false); setEditingSuplidoForm(null); };
-  const saveSuplidoForm = () => {
+  const saveSuplidoForm = async () => {
     if (!editing || !suplidoFormData.concepto || (suplidoFormData.importe ?? 0) <= 0) return;
     if (editingSuplidoForm) {
-      updateSuplido(editingSuplidoForm.id, suplidoFormData);
+      if (!await updateSuplido(editingSuplidoForm.id, suplidoFormData)) return;
     } else {
-      addSuplido({
+      if (!await addSuplido({
         id: uid(), area, ingresoId: editing.id, cliente: editing.cliente,
         concepto: suplidoFormData.concepto ?? '', importe: suplidoFormData.importe ?? 0,
         fecha: suplidoFormData.fecha ?? new Date().toISOString().slice(0, 10),
         estado: suplidoFormData.estado ?? 'pendiente', cantidadRecuperada: suplidoFormData.cantidadRecuperada ?? 0,
         fechaCobro: suplidoFormData.fechaCobro, observaciones: suplidoFormData.observaciones,
         metodoPago: 'transferencia', justificante: false, createdAt: new Date().toISOString(),
-      } as Suplido);
+      } as Suplido)) return;
     }
     closeSuplidoFormModal();
   };
@@ -265,12 +304,12 @@ export const IngresosPage = ({ area }: Props) => {
     });
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.concepto || !form.cliente) return;
     if (editing) {
-      updateIngreso(editing.id, form);
+      if (!await updateIngreso(editing.id, form)) return;
     } else {
-      addIngreso({ ...EMPTY(area), ...form, id: uid(), createdAt: new Date().toISOString() } as Ingreso);
+      if (!await addIngreso({ ...EMPTY(area, filterLinea), ...form, id: uid(), createdAt: new Date().toISOString() } as Ingreso)) return;
     }
     closeModal();
   };
@@ -278,67 +317,63 @@ export const IngresosPage = ({ area }: Props) => {
   // ── Gasto asociado directamente a un ingreso (Añadir gasto) ──
   const openGasto = (i: Ingreso) => {
     setGastoTarget(i);
-    setGastoForm({ concepto: '', categoria: 'Otro', tipo: 'variable', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
+    setGastoForm({ concepto: '', categoria: 'DJ', estadoPago: 'pendiente', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
   };
   const closeGasto = () => setGastoTarget(null);
-  const saveGasto = () => {
+  const saveGasto = async () => {
     if (!gastoTarget || !gastoForm.concepto || gastoForm.importe <= 0) return;
-    addGastoEvento({
+    if (!await addGastoEvento({
       id: uid(),
       ingresoId: gastoTarget.id,
       area,
       fecha: gastoForm.fecha,
       concepto: gastoForm.concepto,
       categoria: gastoForm.categoria,
-      tipo: gastoForm.tipo,
+      estadoPago: gastoForm.estadoPago,
+      metodoPago: gastoForm.metodoPago,
       pagadoPor: gastoForm.pagadoPor,
       importe: gastoForm.importe,
       createdAt: new Date().toISOString(),
-    } as GastoEvento);
+    } as GastoEvento)) return;
     closeGasto();
   };
-  const gastosDe = (ingresoId: string) => allGastosEvento.filter((g) => g.ingresoId === ingresoId);
+
 
   const sort = (f: typeof sortField) => {
     if (sortField === f) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortField(f); setSortDir('asc'); }
   };
 
-  const SortIcon = ({ f }: { f: typeof sortField }) =>
+  const sortIcon = (f: typeof sortField) =>
     sortField === f ? <ChevronDown size={12} className={sortDir === 'desc' ? '' : 'rotate-180'} /> : null;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ingresos</h1>
-          <p className="text-sm text-gray-500">{filtered.length} registros · Total: {fmt(totalFiltrado)}</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{tituloOverride ?? 'Ingresos'}</h1>
+          <p className="text-sm text-gray-400">{filtered.length} registros · Total: {fmt(totalFiltrado)}</p>
         </div>
         <div className="flex items-center gap-3">
-          {area === 'dj' && (
-            <button onClick={() => setShowSuplidosListado(true)} className="text-left bg-white border border-gray-200 rounded-xl px-4 py-2 hover:border-amber-400 hover:shadow-sm transition-all">
-              <p className="text-xs text-gray-500">Suplidos por cobrar</p>
-              <p className={`text-sm font-bold ${totalSuplidosPendientes > 0 ? 'text-amber-700' : 'text-gray-800'}`}>{fmt(totalSuplidosPendientes)}</p>
+          {area === 'dj' && !isRealMadrid && (
+            <button onClick={() => setShowSuplidosListado(true)} className="text-left bg-white border border-gray-100 rounded-2xl px-4 py-2 hover:shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all">
+              <p className="text-xs text-gray-400">Suplidos por cobrar</p>
+              <p className={`text-sm font-bold ${totalSuplidosPendientes > 0 ? 'text-gold-700' : 'text-gray-800'}`}>{fmt(totalSuplidosPendientes)}</p>
             </button>
           )}
-          {canCreate(area) && (
-            <button
-              onClick={openNew}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors"
-            >
-              <Plus size={16} /> Nuevo ingreso
-            </button>
+          {canCreate() && (
+            <Button2 variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo ingreso</Button2>
           )}
         </div>
       </div>
 
       {/* Breadcrumb navegación Año → Mes */}
       <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-amber-600 hover:text-amber-500'}`}>Años</button>
+        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Años</button>
         {selectedYear != null && (
           <>
             <span className="text-gray-300">/</span>
-            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-amber-600 hover:text-amber-500'}`}>{selectedYear}</button>
+            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>{selectedYear}</button>
           </>
         )}
         {selectedYear != null && selectedMonth != null && (
@@ -352,17 +387,19 @@ export const IngresosPage = ({ area }: Props) => {
       {/* Nivel 1: carpetas de años */}
       {selectedYear == null && (
         anios.length === 0 ? (
-          <p className="text-center py-16 text-gray-400 text-sm">Sin ingresos registrados todavía</p>
+          <EmptyState icon={<Folder size={22} />} title="Sin ingresos registrados todavía" />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {anios.map(([y, data]) => (
-              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-amber-400 hover:shadow-sm transition-all">
+              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-100 rounded-[24px] p-5 text-left hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] transition-all duration-220 ease-smooth">
                 <div className="flex items-center gap-2 mb-2">
-                  <Folder size={16} className="text-amber-500" />
+                  <div className="w-8 h-8 rounded-full bg-gold-50 flex items-center justify-center">
+                    <Folder size={14} className="text-gold-600" />
+                  </div>
                   <span className="text-lg font-bold text-gray-900">{y}</span>
                 </div>
-                <p className="text-xs text-gray-500">{data.count} ingresos</p>
-                <p className="text-sm font-semibold text-gray-700 mt-1">{fmt(data.total)}</p>
+                <p className="text-xs text-gray-400">{data.count} ingresos</p>
+                <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
               </button>
             ))}
           </div>
@@ -374,20 +411,22 @@ export const IngresosPage = ({ area }: Props) => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <button onClick={() => setSelectedYear(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a años</button>
-            <p className="text-sm text-gray-600">Total {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
+            <p className="text-sm text-gray-600">Total sin IVA {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
           </div>
           {mesesDelAnio.length === 0 ? (
             <p className="text-center py-16 text-gray-400 text-sm">Sin ingresos en {selectedYear}</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {mesesDelAnio.map(([m, data]) => (
-                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-amber-400 hover:shadow-sm transition-all">
+                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-100 rounded-[24px] p-5 text-left hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] transition-all duration-220 ease-smooth">
                   <div className="flex items-center gap-2 mb-2">
-                    <Folder size={16} className="text-amber-500" />
+                    <div className="w-8 h-8 rounded-full bg-gold-50 flex items-center justify-center">
+                      <Folder size={14} className="text-gold-600" />
+                    </div>
                     <span className="font-bold text-gray-900">{MESES_FULL[m]}</span>
                   </div>
-                  <p className="text-xs text-gray-500">{data.count} ingresos</p>
-                  <p className="text-sm font-semibold text-gray-700 mt-1">{fmt(data.total)}</p>
+                  <p className="text-xs text-gray-400">{data.count} ingresos</p>
+                  <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
                 </button>
               ))}
             </div>
@@ -400,106 +439,92 @@ export const IngresosPage = ({ area }: Props) => {
       <>
       <div className="flex items-center justify-between">
         <button onClick={() => setSelectedMonth(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a meses</button>
-        <p className="text-sm text-gray-600">Total {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
+        <p className="text-sm text-gray-600">Total sin IVA {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
+      {/* Tabla estilo Motoko: cabecera + filtros dentro de una sola tarjeta */}
+      <ContentCard2 padding="none">
+        <div className="flex flex-wrap items-center gap-3 p-5 border-b border-gray-100">
+          <SearchInput2
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar concepto o cliente…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-amber-400"
+            className="flex-1 min-w-[220px]"
           />
+          <select
+            value={filterEstado}
+            onChange={(e) => setFilter(e.target.value as PaymentStatus | '')}
+            className="text-sm border border-gray-200 rounded-full px-4 py-2.5 bg-white text-gray-600"
+          >
+            <option value="">Todos los estados</option>
+            {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select
+            value={filterCliente}
+            onChange={(e) => setFilterCliente(e.target.value)}
+            className="text-sm border border-gray-200 rounded-full px-4 py-2.5 bg-white text-gray-600"
+          >
+            <option value="">Todos los clientes</option>
+            {clientesDisponibles.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
-        <select
-          value={filterEstado}
-          onChange={(e) => setFilter(e.target.value as PaymentStatus | '')}
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white"
-        >
-          <option value="">Todos los estados</option>
-          {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select
-          value={filterCliente}
-          onChange={(e) => setFilterCliente(e.target.value)}
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white"
-        >
-          <option value="">Todos los clientes</option>
-          {clientesDisponibles.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
 
-      {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Vista tabla — desktop */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead>
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('fechaEvento')}>
-                  <span className="flex items-center gap-1">Fecha <SortIcon f="fechaEvento" /></span>
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('fechaEvento')}>
+                  <span className="flex items-center gap-1">Fecha {sortIcon('fechaEvento')}</span>
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('cliente')}>
-                  <span className="flex items-center gap-1">Cliente <SortIcon f="cliente" /></span>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Concepto</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('cliente')}>
+                  <span className="flex items-center gap-1">Cliente {sortIcon('cliente')}</span>
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Base sin IVA</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('total')}>
-                  <span className="flex items-center gap-1 justify-end">Total con IVA <SortIcon f="total" /></span>
+                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total sin IVA</th>
+                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('total')}>
+                  <span className="flex items-center gap-1 justify-end">Total con IVA {sortIcon('total')}</span>
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nº Factura</th>
-                <th className="px-4 py-3" />
+                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Gastos sin IVA</th><th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Beneficio</th><th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Margen</th><th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Nº Factura</th>
+                <th className="px-6 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">Sin resultados</td></tr>
+                <tr><td colSpan={11} className="text-center py-12 text-gray-400 text-sm">Sin resultados</td></tr>
               ) : filtered.map((i) => {
-                const gastosIngreso = gastosDe(i.id);
-                const totalGastosIngreso = gastosIngreso.reduce((a, g) => a + g.importe, 0);
-                const beneficioIngreso = i.baseImponible - totalGastosIngreso;
+                const rentabilidad=ingresoRentabilidad(i,allGastosEvento);
                 return (
-                <tr key={i.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{i.fechaEvento}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {i.concepto}
-                    {gastosIngreso.length > 0 && (
-                      <p className="text-xs text-gray-400">
-                        Gastos: {fmt(totalGastosIngreso)} · Beneficio: <span className={beneficioIngreso >= 0 ? 'text-green-600' : 'text-red-600'}>{fmt(beneficioIngreso)}</span>
-                      </p>
-                    )}
+                <tr key={i.id} onClick={()=>setDetailId(i.id)} className="hover:bg-gray-50/70 transition-colors cursor-pointer">
+                  <td className="px-6 py-3.5 text-gray-500 whitespace-nowrap">{i.fechaEvento}</td>
+                  <td className="px-4 py-3.5 font-medium text-gray-900">
+                    <button className="text-left hover:underline" onClick={e=>{e.stopPropagation();setDetailId(i.id);}} aria-label={`Ver rentabilidad de ${i.concepto}`}>{i.concepto}</button><p className="text-xs text-gray-400 font-normal mt-1">Ver rentabilidad</p>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{i.cliente}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(i.baseImponible)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(i.total)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoColor[i.estadoPago]}`}>
-                      {i.estadoPago}
-                    </span>
+                  <td className="px-4 py-3.5 text-gray-600">{i.cliente}</td>
+                  <td className="px-4 py-3.5 text-right font-mono text-gray-600">{fmt(i.baseImponible)}</td>
+                  <td className="px-4 py-3.5 text-right font-mono font-semibold text-gray-900">{fmt(i.total)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-red-600 whitespace-nowrap">{fmt(rentabilidad.coste)}</td><td className={`px-4 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap ${rentabilidad.beneficio>=0?'text-emerald-700':'text-red-600'}`}>{fmt(rentabilidad.beneficio)}</td><td className="px-4 py-3.5 text-right tabular-nums">{rentabilidad.margen==null?'—':rentabilidad.margen.toLocaleString('es-ES',{maximumFractionDigits:1})+' %'}</td>
+                  <td className="px-4 py-3.5 text-center">
+                    <Badge2 tone={estadoTone[i.estadoPago]}>{i.estadoPago}</Badge2>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">
+                  <td className="px-4 py-3.5 text-gray-600 font-mono text-xs">
                     {i.numeroFactura || <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-3.5" onClick={e=>e.stopPropagation()}>
                     <div className="flex items-center gap-1 justify-end">
-                      {canCreate(area) && (
-                        <button onClick={() => openGasto(i)} className="text-xs text-amber-600 hover:text-amber-500 font-medium whitespace-nowrap mr-1">
+                      {canCreate() && (
+                        <button onClick={() => openGasto(i)} className="text-xs text-gold-600 hover:text-gold-700 font-medium whitespace-nowrap mr-1">
                           + Añadir gasto
                         </button>
                       )}
-                      {canEdit(area) && (
-                        <button onClick={() => openEdit(i)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors">
-                          <Edit2 size={13} />
-                        </button>
-                      )}
-                      {canDelete(area) && (
-                        <button onClick={() => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                      <RowMenu2
+                        actions={[
+                          ...(canCreate() ? [{ label: 'Generar factura', onClick: () => setFacturaIngreso(i) }] : []),
+                          ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
+                          ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -507,10 +532,43 @@ export const IngresosPage = ({ area }: Props) => {
             </tbody>
           </table>
         </div>
-      </div>
+
+        {/* Vista tarjetas — móvil (misma información y acciones, sin comprimir) */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {filtered.length === 0 ? (
+            <p className="text-center py-12 text-gray-400 text-sm">Sin resultados</p>
+          ) : filtered.map((i) => {
+            const rentabilidad=ingresoRentabilidad(i,allGastosEvento);
+            return (
+              <div key={i.id} className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <button className="font-medium text-gray-900 text-left hover:underline" onClick={()=>setDetailId(i.id)} aria-label={`Ver rentabilidad de ${i.concepto}`}>{i.concepto}</button>
+                    <p className="text-xs text-gray-400">{i.cliente} · {i.fechaEvento}</p>
+                  </div>
+                  <RowMenu2
+                    actions={[
+                      ...(canCreate() ? [{ label: 'Añadir gasto', onClick: () => openGasto(i) }] : []),
+                      ...(canCreate() ? [{ label: 'Generar factura', onClick: () => setFacturaIngreso(i) }] : []),
+                      ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
+                      ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
+                    ]}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge2 tone={estadoTone[i.estadoPago]}>{i.estadoPago}</Badge2>
+                  <p className="font-mono font-semibold text-gray-900">{fmt(i.total)}</p>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 text-xs"><div><dt className="text-gray-500">Total sin IVA</dt><dd className="font-semibold mt-1">{fmt(i.baseImponible)}</dd></div><div><dt className="text-gray-500">Total con IVA</dt><dd className="font-semibold mt-1">{fmt(i.total)}</dd></div><div><dt className="text-gray-500">Gastos sin IVA</dt><dd className="font-semibold text-red-600 mt-1">{fmt(rentabilidad.coste)}</dd></div><div><dt className="text-gray-500">Beneficio</dt><dd className={`font-semibold mt-1 ${rentabilidad.beneficio>=0?'text-emerald-700':'text-red-600'}`}>{fmt(rentabilidad.beneficio)}</dd></div></dl><button className="text-xs font-semibold underline" onClick={()=>setDetailId(i.id)}>Ver detalle de rentabilidad</button>
+              </div>
+            );
+          })}
+        </div>
+      </ContentCard2>
       </>
       )}
 
+      {detailIngreso&&<IngresoRentabilidad ingreso={detailIngreso} gastos={allGastosEvento} onClose={()=>setDetailId(null)} onAddExpense={canCreate()?()=>{setDetailId(null);openGasto(detailIngreso);}:undefined}/>}
       {/* Modal edición */}
       <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar ingreso' : 'Nuevo ingreso'} size="lg">
         <div className="space-y-4">
@@ -529,17 +587,25 @@ export const IngresosPage = ({ area }: Props) => {
             <div>
               <label className="label-form">Tipo de evento</label>
               <select value={form.tipoEvento ?? TIPOS_EVENTO_FORM[0]} onChange={(e) => setField('tipoEvento', e.target.value)} className="input-form">
-                {TIPOS_EVENTO_FORM.map((t) => <option key={t} value={t}>{t}</option>)}
+                {isRealMadrid
+                  ? TIPOS_EVENTO_REAL_MADRID.map((t) => <option key={t} value={t}>{TIPO_EVENTO_RM_LABEL[t]}</option>)
+                  : TIPOS_EVENTO_FORM.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            {/* Línea de negocio — campo distinto de "Tipo de evento" */}
+            {/* Línea de negocio — campo distinto de "Tipo de evento". Bloqueado
+                cuando se accede desde una línea concreta (filterLinea) para
+                evitar que un ingreso quede mal clasificado entre DJ/Real Madrid. */}
             <div>
               <label className="label-form">Línea de negocio</label>
-              <select value={form.lineaNegocio ?? (area === 'montada' ? 'La Montada Sound' : 'DJs')} onChange={(e) => setField('lineaNegocio', e.target.value as Ingreso['lineaNegocio'])} className="input-form">
-                {LINEAS_NEGOCIO.map((l) => <option key={l} value={l}>{l}</option>)}
-              </select>
+              {filterLinea ? (
+                <div className="input-form bg-gray-50 text-gray-700 font-medium">{form.lineaNegocio}</div>
+              ) : (
+                <select value={form.lineaNegocio ?? (area === 'montada' ? 'La Montada Sound' : 'DJs')} onChange={(e) => setField('lineaNegocio', e.target.value as Ingreso['lineaNegocio'])} className="input-form">
+                  {LINEAS_NEGOCIO.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+              )}
             </div>
-            {area === 'dj' && (
+            {area === 'dj' && !isRealMadrid && (
               <div>
                 <label className="label-form">DJ relacionado</label>
                 <input value={form.djRelacionado ?? ''} onChange={(e) => setField('djRelacionado', e.target.value)} className="input-form" placeholder="Nombre del DJ" />
@@ -584,25 +650,18 @@ export const IngresosPage = ({ area }: Props) => {
             {/* Reserva opcional — oculta hasta que se marque "Sí" */}
             <div className="col-span-2 border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
               <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Reserva</p>
-              <div>
-                <label className="label-form">¿Tiene reserva?</label>
-                <select
-                  value={form.tieneReserva ? 'si' : 'no'}
-                  onChange={(e) => {
-                    const tiene = e.target.value === 'si';
-                    setField('tieneReserva', tiene);
-                    if (!tiene) {
-                      setField('reserva', 0);
-                      setField('fechaCobroReserva', undefined);
-                      setField('metodoPagoReserva', undefined);
-                    }
-                  }}
-                  className="input-form"
-                >
-                  <option value="no">No</option>
-                  <option value="si">Sí</option>
-                </select>
-              </div>
+              <Switch
+                label="¿Tiene reserva?"
+                checked={!!form.tieneReserva}
+                onChange={(tiene) => {
+                  setField('tieneReserva', tiene);
+                  if (!tiene) {
+                    setField('reserva', 0);
+                    setField('fechaCobroReserva', undefined);
+                    setField('metodoPagoReserva', undefined);
+                  }
+                }}
+              />
               {form.tieneReserva && (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
@@ -625,15 +684,11 @@ export const IngresosPage = ({ area }: Props) => {
             </div>
 
             {/* Suplidos opcionales — solo DJs, no afectan a ingresos/gastos/IVA/beneficio/reserva */}
-            {area === 'dj' && (
+            {area === 'dj' && !isRealMadrid && (
               <div className="col-span-2 border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
                 <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Suplidos</p>
                 <div>
-                  <label className="label-form">¿Hay suplidos?</label>
-                  <select value={mostrarSuplidosForm ? 'si' : 'no'} onChange={(e) => toggleSuplidos(e.target.value === 'si')} className="input-form">
-                    <option value="no">No</option>
-                    <option value="si">Sí</option>
-                  </select>
+                  <Switch label="¿Hay suplidos?" checked={mostrarSuplidosForm} onChange={toggleSuplidos} />
                 </div>
                 {mostrarSuplidosForm && (
                   !editing ? (
@@ -642,13 +697,11 @@ export const IngresosPage = ({ area }: Props) => {
                     <>
                       <div className="grid grid-cols-3 gap-4">
                         <div><p className="text-xs text-gray-500">Total adelantado</p><p className="font-semibold text-gray-900">{fmt(totalesSuplidosIngreso.adelantado)}</p></div>
-                        <div><p className="text-xs text-gray-500">Total recuperado</p><p className="font-semibold text-green-700">{fmt(totalesSuplidosIngreso.recuperado)}</p></div>
-                        <div><p className="text-xs text-gray-500">Pendiente de cobrar</p><p className={`font-semibold ${totalesSuplidosIngreso.pendiente > 0 ? 'text-amber-700' : 'text-gray-800'}`}>{fmt(totalesSuplidosIngreso.pendiente)}</p></div>
+                        <div><p className="text-xs text-gray-500">Total recuperado</p><p className="font-semibold text-accent-700">{fmt(totalesSuplidosIngreso.recuperado)}</p></div>
+                        <div><p className="text-xs text-gray-500">Pendiente de cobrar</p><p className={`font-semibold ${totalesSuplidosIngreso.pendiente > 0 ? 'text-gold-700' : 'text-gray-800'}`}>{fmt(totalesSuplidosIngreso.pendiente)}</p></div>
                       </div>
                       <div className="flex justify-end">
-                        <button type="button" onClick={openNewSuplidoForm} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-black text-xs font-semibold rounded-lg hover:bg-amber-400">
-                          <Plus size={12} /> Añadir suplido
-                        </button>
+                        <Button type="button" size="sm" variant="primary" icon={<Plus size={12} />} onClick={openNewSuplidoForm}>Añadir suplido</Button>
                       </div>
                       {suplidosDelIngreso.length > 0 && (
                         <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
@@ -656,9 +709,9 @@ export const IngresosPage = ({ area }: Props) => {
                             <div key={s.id} className="flex items-center gap-3 px-4 py-2 text-sm">
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-800 truncate">{s.concepto} <span className="text-gray-400 font-normal">· {s.fecha}</span></p>
-                                <p className="text-xs text-gray-400">{fmt(s.importe)} adelantado · {fmt(s.cantidadRecuperada ?? 0)} recuperado · <span className={s.estado === 'cobrado' ? 'text-green-600' : 'text-amber-600'}>{s.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}</span></p>
+                                <p className="text-xs text-gray-400">{fmt(s.importe)} adelantado · {fmt(s.cantidadRecuperada ?? 0)} recuperado · <span className={s.estado === 'cobrado' ? 'text-emerald-700' : 'text-red-700'}>{s.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}</span></p>
                               </div>
-                              <button type="button" onClick={() => openEditSuplidoForm(s)} className="p-1 text-gray-400 hover:text-amber-500"><Edit2 size={13} /></button>
+                              <button type="button" onClick={() => openEditSuplidoForm(s)} className="p-1 text-gray-400 hover:text-gold-500"><Edit2 size={13} /></button>
                               <button type="button" onClick={() => showConfirm('¿Eliminar este suplido?', () => deleteSuplido(s.id))} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={13} /></button>
                             </div>
                           ))}
@@ -692,15 +745,9 @@ export const IngresosPage = ({ area }: Props) => {
               <input type="date" value={form.fechaPago ?? ''} onChange={(e) => setField('fechaPago', e.target.value)} className="input-form" />
             </div>
             {/* 16-17. Factura emitida + No factura */}
-            <div className="col-span-2 flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.facturaEmitida} onChange={(e) => setField('facturaEmitida', e.target.checked)} className="rounded" />
-                Factura emitida
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" checked={!!form.sinFactura} onChange={(e) => setField('sinFactura', e.target.checked)} className="rounded" />
-                No factura
-              </label>
+            <div className="col-span-2 flex items-center gap-8">
+              <Switch checked={!!form.facturaEmitida} onChange={(v) => setField('facturaEmitida', v)} label="Factura emitida" />
+              <Switch checked={!!form.sinFactura} onChange={(v) => setField('sinFactura', v)} label="No factura" />
             </div>
             {form.facturaEmitida && (
               <div>
@@ -714,10 +761,10 @@ export const IngresosPage = ({ area }: Props) => {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={closeModal} className="flex-1 py-2 border border-gray-200 text-sm font-medium rounded-xl hover:bg-gray-50">Cancelar</button>
-            <button onClick={save} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">
+            <Button variant="secondary" onClick={closeModal} className="flex-1">Cancelar</Button>
+            <Button variant="primary" onClick={save} className="flex-1">
               {editing ? 'Guardar cambios' : 'Añadir ingreso'}
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>
@@ -731,22 +778,13 @@ export const IngresosPage = ({ area }: Props) => {
               <input value={gastoForm.concepto} onChange={(e) => setGastoForm((f) => ({ ...f, concepto: e.target.value }))} className="input-form" />
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <EventExpensePaymentFields value={gastoForm} onChange={patch => setGastoForm(f => f ? {...f,...patch} : f)} />
               <div>
                 <label className="label-form">Categoría</label>
-                <select value={gastoForm.categoria} onChange={(e) => setGastoForm((f) => ({ ...f, categoria: e.target.value as GastoEventoCategoria }))} className="input-form">
-                  {CAT_GASTO_EVENTO.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <EventCategoryField value={gastoForm.categoria} onChange={categoria => setGastoForm({...gastoForm,categoria})} />
               </div>
-              <div>
-                <label className="label-form">Importe (€) *</label>
-                <input type="number" step="0.01" value={gastoForm.importe} onChange={(e) => setGastoForm((f) => ({ ...f, importe: parseFloat(e.target.value) || 0 }))} className="input-form" />
-              </div>
-              <div>
-                <label className="label-form">Tipo de gasto</label>
-                <select value={gastoForm.tipo} onChange={(e) => setGastoForm((f) => ({ ...f, tipo: e.target.value as GastoTipo }))} className="input-form">
-                  {TIPOS_GASTO_EVENTO.map((t) => <option key={t} value={t}>{t === 'fijo' ? 'Fijo' : 'Variable'}</option>)}
-                </select>
-              </div>
+              <EventExpenseVatFields value={gastoForm} onChange={patch=>setGastoForm(f=>f?{...f,...patch}:f)}/>
+
               <div>
                 <label className="label-form">Fecha</label>
                 <input type="date" value={gastoForm.fecha} onChange={(e) => setGastoForm((f) => ({ ...f, fecha: e.target.value }))} className="input-form" />
@@ -762,14 +800,14 @@ export const IngresosPage = ({ area }: Props) => {
               Este gasto quedará vinculado a este ingreso y aparecerá automáticamente en {area === 'montada' ? '"Gastos de eventos"' : '"Gastos de actuación"'} y en el cálculo de beneficio de este ingreso.
             </p>
             <div className="flex gap-3 pt-2">
-              <button onClick={closeGasto} className="flex-1 py-2 border border-gray-200 text-sm rounded-xl hover:bg-gray-50">Cancelar</button>
-              <button onClick={saveGasto} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">Añadir gasto</button>
+              <Button variant="secondary" onClick={closeGasto} className="flex-1">Cancelar</Button>
+              <Button variant="primary" onClick={saveGasto} className="flex-1">Añadir gasto</Button>
             </div>
           </div>
         )}
       </Modal>
 
-      {area === 'dj' && (
+      {area === 'dj' && !isRealMadrid && (
         <Modal isOpen={showSuplidosListado} onClose={() => setShowSuplidosListado(false)} title="Suplidos por cobrar" size="lg">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
@@ -812,7 +850,7 @@ export const IngresosPage = ({ area }: Props) => {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {suplidosListado.length === 0 ? (
-                      <tr><td colSpan={8} className="text-center py-8 text-gray-400 text-sm">Sin suplidos registrados</td></tr>
+                      <tr><td colSpan={11} className="text-center py-8 text-gray-400 text-sm">Sin suplidos registrados</td></tr>
                     ) : suplidosListado.map(({ suplido: s, ingreso: i }) => (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2.5 font-medium text-gray-800">{i?.concepto ?? '—'}</td>
@@ -823,7 +861,7 @@ export const IngresosPage = ({ area }: Props) => {
                         <td className="px-4 py-2.5 text-right font-mono text-gray-600">{fmt(s.cantidadRecuperada ?? 0)}</td>
                         <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-900">{fmt(suplidoPendiente(s))}</td>
                         <td className="px-4 py-2.5 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{s.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}</span>
+                          <Badge tone={s.estado === 'cobrado' ? 'success' : 'danger'}>{s.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}</Badge>
                         </td>
                       </tr>
                     ))}
@@ -877,11 +915,15 @@ export const IngresosPage = ({ area }: Props) => {
           </div>
           <p className="text-[11px] text-gray-400">Este suplido no se sumará como ingreso ni como gasto — solo se usa para controlar dinero pendiente de recuperar.</p>
           <div className="flex gap-3 pt-2">
-            <button onClick={closeSuplidoFormModal} className="flex-1 py-2 border border-gray-200 text-sm rounded-xl hover:bg-gray-50">Cancelar</button>
-            <button onClick={saveSuplidoForm} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">{editingSuplidoForm ? 'Guardar' : 'Añadir suplido'}</button>
+            <Button variant="secondary" onClick={closeSuplidoFormModal} className="flex-1">Cancelar</Button>
+            <Button variant="primary" onClick={saveSuplidoForm} className="flex-1">{editingSuplidoForm ? 'Guardar' : 'Añadir suplido'}</Button>
           </div>
         </div>
       </Modal>
+
+      {facturaIngreso && (
+        <GenerarFacturaModal ingreso={facturaIngreso} onClose={() => setFacturaIngreso(null)} />
+      )}
 
     </div>
   );

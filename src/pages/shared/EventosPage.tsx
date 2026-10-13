@@ -1,25 +1,30 @@
+import { EventExpensePaymentFields } from '../../components/forms/EventExpensePaymentFields';
+import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronDown, CalendarDays } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import type { Area, Evento, EventType, EventStatus, GastoEvento, GastoEventoCategoria, PagoEvento, PaymentMethod } from '../../types';
+import type { Area, Evento, EventType, EventStatus, GastoEvento, PagoEvento, PaymentMethod } from '../../types';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
 const TIPOS: EventType[] = ['boda', 'real_madrid', 'alquiler', 'evento_privado', 'dj_personal', 'empresa', 'otro'];
 const ESTADOS: EventStatus[] = ['pendiente', 'confirmado', 'realizado', 'cobrado', 'facturado'];
-const CAT_GE: GastoEventoCategoria[] = ['Cámara', 'DJ', 'Montador', 'Técnico', 'Decoración', 'Gasolina', 'Transporte', 'Personal', 'Alquiler', 'Proveedor', 'Otro'];
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 
-const estadoColor: Record<EventStatus, string> = {
-  pendiente:  'bg-gray-100 text-gray-600',
-  confirmado: 'bg-blue-100 text-blue-700',
-  realizado:  'bg-purple-100 text-purple-700',
-  cobrado:    'bg-green-100 text-green-700',
-  facturado:  'bg-amber-100 text-amber-700',
+const estadoTone: Record<EventStatus, 'neutral' | 'info' | 'gold' | 'success'> = {
+  pendiente:  'neutral',
+  confirmado: 'info',
+  realizado:  'gold',
+  cobrado:    'success',
+  facturado:  'gold',
 };
 
 interface Props { area: Area }
@@ -46,9 +51,14 @@ export const EventosPage = ({ area }: Props) => {
   const deleteGastoEvento = useStore((s) => s.deleteGastoEvento);
   const addPagoEvento     = useStore((s) => s.addPagoEvento);
   const deletePagoEvento  = useStore((s) => s.deletePagoEvento);
-  const canCreate = useAuthStore((s) => s.canCreate);
-  const canEdit   = useAuthStore((s) => s.canEdit);
-  const canDelete = useAuthStore((s) => s.canDelete);
+  // Fase F: permiso real por línea (sin variante Real Madrid en esta página).
+  const permLinea = area === 'montada' ? 'montada_sound' : 'dj';
+  const canCreateLinea = useAuthStore((s) => s.canCreateLinea);
+  const canEditLinea   = useAuthStore((s) => s.canEditLinea);
+  const canDeleteLinea = useAuthStore((s) => s.canDeleteLinea);
+  const canCreate = () => canCreateLinea(permLinea);
+  const canEdit   = () => canEditLinea(permLinea);
+  const canDelete = () => canDeleteLinea(permLinea);
   const showConfirm = useConfirmStore((s) => s.show);
 
   const [search, setSearch]       = useState('');
@@ -79,25 +89,25 @@ export const EventosPage = ({ area }: Props) => {
   const openEdit = (e: Evento) => { setEditing(e); setForm({ ...e }); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditing(null); };
 
-  const save = () => {
+  const save = async () => {
     if (!form.nombre || !form.cliente) return;
     if (editing) {
-      updateEvento(editing.id, form);
+      if (!await updateEvento(editing.id, form)) return;
     } else {
-      addEvento({ ...EMPTY_EV(area), ...form, id: uid(), createdAt: new Date().toISOString() } as Evento);
+      if (!await addEvento({ ...EMPTY_EV(area), ...form, id: uid(), createdAt: new Date().toISOString() } as Evento)) return;
     }
     closeModal();
   };
 
-  const saveGe = () => {
+  const saveGe = async () => {
     if (!geForm?.concepto || !geForm.ingresoId) return;
-    addGastoEvento({ ...geForm, id: uid(), createdAt: new Date().toISOString() } as GastoEvento);
+    if (!await addGastoEvento({ ...geForm, id: uid(), createdAt: new Date().toISOString() } as GastoEvento)) return;
     setGeForm(null);
   };
 
-  const savePago = () => {
+  const savePago = async () => {
     if (!pagoForm?.importe || !pagoForm.ingresoId) return;
-    addPagoEvento({ ...pagoForm, id: uid(), createdAt: new Date().toISOString() } as PagoEvento);
+    if (!await addPagoEvento({ ...pagoForm, id: uid(), createdAt: new Date().toISOString() } as PagoEvento)) return;
     setPagoForm(null);
   };
 
@@ -108,17 +118,15 @@ export const EventosPage = ({ area }: Props) => {
           <h1 className="text-2xl font-bold text-gray-900">{area === 'montada' ? 'Eventos' : 'Actuaciones'}</h1>
           <p className="text-sm text-gray-500">{filtered.length} registros</p>
         </div>
-        {canCreate(area) && (
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors">
-            <Plus size={16} /> Nuevo evento
-          </button>
+        {canCreate() && (
+          <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo evento</Button>
         )}
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar nombre o cliente…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-amber-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar nombre o cliente…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-gold-400 transition-colors" />
         </div>
         <select value={filterEst} onChange={(e) => setFilterEst(e.target.value as EventStatus | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
           <option value="">Todos los estados</option>
@@ -128,8 +136,10 @@ export const EventosPage = ({ area }: Props) => {
 
       {/* Lista */}
       <div className="space-y-2">
-        {filtered.length === 0 && <p className="text-center py-12 text-gray-400 text-sm">Sin eventos</p>}
-        {filtered.map((ev) => {
+        {filtered.length === 0 && (
+          <EmptyState icon={<CalendarDays size={22} />} title="Sin eventos" description="Crea el primero con el botón «Nuevo evento»." />
+        )}
+        {filtered.map((ev, idx) => {
           const gesEv = gastosEvento.filter((g) => g.ingresoId === ev.id);
           const pagEv = pagosEvento.filter((p) => p.ingresoId === ev.id);
           const totalCostes = gesEv.reduce((a, g) => a + g.importe, 0);
@@ -137,85 +147,101 @@ export const EventosPage = ({ area }: Props) => {
           const isOpen = expandedId === ev.id;
 
           return (
-            <div key={ev.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <motion.div
+              key={ev.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: Math.min(idx, 8) * 0.02 }}
+              className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden"
+            >
               {/* Header fila */}
-              <div className="flex items-center gap-4 px-5 py-4">
+              <button
+                onClick={() => setExpandedId(isOpen ? null : ev.id)}
+                className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-gray-50/60 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900">{ev.nombre}</p>
                   <p className="text-xs text-gray-500">{ev.cliente} · {ev.fecha} · {ev.tipo.replace(/_/g, ' ')}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right hidden sm:block">
                   <p className="font-mono font-semibold text-gray-900">{fmt(ev.presupuesto)}</p>
                   <p className="text-xs text-gray-400">Ppto · Pag: {fmt(totalPagos)}</p>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${estadoColor[ev.estado]}`}>{ev.estado}</span>
-                <div className="flex gap-1">
-                  {canEdit(area) && <button onClick={() => openEdit(ev)} className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg"><Edit2 size={13} /></button>}
-                  {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar este evento?', () => deleteEvento(ev.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
-                  <button onClick={() => setExpandedId(isOpen ? null : ev.id)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
-                    {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  </button>
+                <Badge tone={estadoTone[ev.estado]}>{ev.estado}</Badge>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  {canEdit() && <button onClick={() => openEdit(ev)} aria-label="Editar evento" className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg transition-colors"><Edit2 size={13} /></button>}
+                  {canDelete() && <button onClick={() => showConfirm('¿Eliminar este evento?', () => deleteEvento(ev.id))} aria-label="Eliminar evento" className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={13} /></button>}
                 </div>
-              </div>
+                <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-gray-400 flex-shrink-0">
+                  <ChevronDown size={15} />
+                </motion.span>
+              </button>
 
               {/* Detalle expandido */}
-              {isOpen && (
-                <div className="border-t border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Costes */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Costes del evento</p>
-                      {canCreate(area) && (
-                        <button onClick={() => setGeForm(EMPTY_GE(ev.id, area))} className="text-xs text-amber-600 hover:text-amber-500 font-medium">+ Añadir</button>
-                      )}
-                    </div>
-                    {gesEv.length === 0 && <p className="text-xs text-gray-400">Sin costes</p>}
-                    {gesEv.map((g) => (
-                      <div key={g.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-gray-800">{g.concepto}</p>
-                          <p className="text-[10px] text-gray-400">{g.categoria} · {g.fecha}</p>
-                        </div>
-                        <p className="text-xs font-mono font-semibold text-gray-700">{fmt(g.importe)}</p>
-                        {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar coste?', () => deleteGastoEvento(g.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                  <div className="border-t border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Costes */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Costes del evento</p>
+                        {canCreate() && (
+                          <button onClick={() => setGeForm(EMPTY_GE(ev.id, area))} className="text-xs text-gold-600 hover:text-gold-500 font-medium transition-colors">+ Añadir</button>
+                        )}
                       </div>
-                    ))}
-                    {gesEv.length > 0 && <p className="text-xs text-right font-semibold text-gray-700 mt-1">Total: {fmt(totalCostes)}</p>}
+                      {gesEv.length === 0 && <p className="text-xs text-gray-400">Sin costes</p>}
+                      {gesEv.map((g) => (
+                        <div key={g.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-gray-800">{g.concepto}</p>
+                            <p className="text-[10px] text-gray-400">{g.categoria} · {g.fecha}</p>
+                          </div>
+                          <p className="text-xs font-mono font-semibold text-gray-700">{fmt(g.importe)}</p>
+                          {canDelete() && <button onClick={() => showConfirm('¿Eliminar coste?', () => deleteGastoEvento(g.id))} aria-label="Eliminar coste" className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={11} /></button>}
+                        </div>
+                      ))}
+                      {gesEv.length > 0 && <p className="text-xs text-right font-semibold text-gray-700 mt-1">Total: {fmt(totalCostes)}</p>}
+                    </div>
+
+                    {/* Pagos */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Pagos recibidos</p>
+                        {canCreate() && (
+                          <button onClick={() => setPagoForm({ ingresoId: ev.id, area, fecha: new Date().toISOString().slice(0, 10), importe: 0, metodoPago: 'transferencia', concepto: 'Pago' })} className="text-xs text-gold-600 hover:text-gold-500 font-medium transition-colors">+ Añadir</button>
+                        )}
+                      </div>
+                      {pagEv.length === 0 && <p className="text-xs text-gray-400">Sin pagos</p>}
+                      {pagEv.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-gray-800">{p.concepto}</p>
+                            <p className="text-[10px] text-gray-400">{p.metodoPago} · {p.fecha}</p>
+                          </div>
+                          <p className="text-xs font-mono font-semibold text-accent-700">{fmt(p.importe)}</p>
+                          {canDelete() && <button onClick={() => showConfirm('¿Eliminar pago?', () => deletePagoEvento(p.id))} aria-label="Eliminar pago" className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={11} /></button>}
+                        </div>
+                      ))}
+                      {pagEv.length > 0 && <p className="text-xs text-right font-semibold text-accent-700 mt-1">Total: {fmt(totalPagos)}</p>}
+                    </div>
                   </div>
 
-                  {/* Pagos */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Pagos recibidos</p>
-                      {canCreate(area) && (
-                        <button onClick={() => setPagoForm({ ingresoId: ev.id, area, fecha: new Date().toISOString().slice(0, 10), importe: 0, metodoPago: 'transferencia', concepto: 'Pago' })} className="text-xs text-amber-600 hover:text-amber-500 font-medium">+ Añadir</button>
-                      )}
-                    </div>
-                    {pagEv.length === 0 && <p className="text-xs text-gray-400">Sin pagos</p>}
-                    {pagEv.map((p) => (
-                      <div key={p.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-gray-800">{p.concepto}</p>
-                          <p className="text-[10px] text-gray-400">{p.metodoPago} · {p.fecha}</p>
-                        </div>
-                        <p className="text-xs font-mono font-semibold text-green-700">{fmt(p.importe)}</p>
-                        {canDelete(area) && <button onClick={() => showConfirm('¿Eliminar pago?', () => deletePagoEvento(p.id))} className="text-gray-300 hover:text-red-400"><Trash2 size={11} /></button>}
-                      </div>
-                    ))}
-                    {pagEv.length > 0 && <p className="text-xs text-right font-semibold text-green-700 mt-1">Total: {fmt(totalPagos)}</p>}
+                  <div className="px-5 pb-4 flex flex-wrap gap-4 text-xs text-gray-500">
+                    <span>Presupuesto: <strong className="text-gray-800">{fmt(ev.presupuesto)}</strong></span>
+                    <span>Costes: <strong className="text-red-600">{fmt(totalCostes)}</strong></span>
+                    <span>Beneficio real: <strong className={ev.presupuesto - totalCostes >= 0 ? 'text-accent-700' : 'text-red-600'}>{fmt(ev.presupuesto - totalCostes)}</strong></span>
                   </div>
-                </div>
-              )}
-
-              {/* Benefit real inline */}
-              {isOpen && (
-                <div className="px-5 pb-4 flex gap-4 text-xs text-gray-500">
-                  <span>Presupuesto: <strong className="text-gray-800">{fmt(ev.presupuesto)}</strong></span>
-                  <span>Costes: <strong className="text-red-600">{fmt(totalCostes)}</strong></span>
-                  <span>Beneficio real: <strong className={ev.presupuesto - totalCostes >= 0 ? 'text-green-700' : 'text-red-600'}>{fmt(ev.presupuesto - totalCostes)}</strong></span>
-                </div>
-              )}
-            </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           );
         })}
       </div>
@@ -258,8 +284,8 @@ export const EventosPage = ({ area }: Props) => {
             <textarea value={form.notas ?? ''} onChange={(e) => setField('notas', e.target.value)} rows={2} className="input-form" />
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={closeModal} className="flex-1 py-2 border border-gray-200 text-sm font-medium rounded-xl hover:bg-gray-50">Cancelar</button>
-            <button onClick={save} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">{editing ? 'Guardar' : 'Crear evento'}</button>
+            <Button variant="secondary" onClick={closeModal} className="flex-1">Cancelar</Button>
+            <Button variant="primary" onClick={save} className="flex-1">{editing ? 'Guardar' : 'Crear evento'}</Button>
           </div>
         </div>
       </Modal>
@@ -273,11 +299,10 @@ export const EventosPage = ({ area }: Props) => {
               <input value={geForm.concepto ?? ''} onChange={(e) => setGeForm((f) => f ? { ...f, concepto: e.target.value } : f)} className="input-form" />
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <EventExpensePaymentFields value={geForm} onChange={patch => setGeForm(f => f ? {...f,...patch} : f)} />
               <div>
                 <label className="label-form">Categoría</label>
-                <select value={geForm.categoria} onChange={(e) => setGeForm((f) => f ? { ...f, categoria: e.target.value as GastoEventoCategoria } : f)} className="input-form">
-                  {CAT_GE.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <EventCategoryField value={geForm.categoria} onChange={categoria => setGeForm(f => f ? {...f,categoria} : f)} />
               </div>
               <div>
                 <label className="label-form">Importe (€)</label>
@@ -289,8 +314,8 @@ export const EventosPage = ({ area }: Props) => {
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setGeForm(null)} className="flex-1 py-2 border border-gray-200 text-sm rounded-xl hover:bg-gray-50">Cancelar</button>
-              <button onClick={saveGe} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">Añadir</button>
+              <Button variant="secondary" onClick={() => setGeForm(null)} className="flex-1">Cancelar</Button>
+              <Button variant="primary" onClick={saveGe} className="flex-1">Añadir</Button>
             </div>
           </div>
         )}
@@ -321,8 +346,8 @@ export const EventosPage = ({ area }: Props) => {
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setPagoForm(null)} className="flex-1 py-2 border border-gray-200 text-sm rounded-xl hover:bg-gray-50">Cancelar</button>
-              <button onClick={savePago} className="flex-1 py-2 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400">Registrar</button>
+              <Button variant="secondary" onClick={() => setPagoForm(null)} className="flex-1">Cancelar</Button>
+              <Button variant="primary" onClick={savePago} className="flex-1">Registrar</Button>
             </div>
           </div>
         )}

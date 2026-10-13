@@ -1,0 +1,2 @@
+import {CheckCircle2,Clock,CircleHelp} from 'lucide-react';
+export function ExpenseStatus({status}:{status?:string}){const paid=status==='pagado',pending=status==='pendiente',Icon=paid?CheckCircle2:pending?Clock:CircleHelp;return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${paid?'bg-emerald-50 text-emerald-700':pending?'bg-red-50 text-red-700':'bg-gray-100 text-gray-600'}`}><Icon size={14}/>{paid?'Pagado':pending?'Pendiente':'Sin indicar'}</span>;}

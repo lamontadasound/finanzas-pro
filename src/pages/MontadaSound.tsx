@@ -65,7 +65,7 @@ export const MontadaSound = () => {
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-white">La Montada Sound</h1>
-        <p className="text-sm text-zinc-500 mt-0.5">Empresa de eventos — sonido, iluminación y producción</p>
+        
       </div>
       <div className="flex gap-1 bg-surface-800 border border-surface-400/20 rounded-xl p-1 w-fit">
         {TABS.map((t) => (
@@ -139,7 +139,10 @@ const ResumenTab = ({
   const totBenefReal    = monthlyEnriched.reduce((s, r) => s + r.beneficioReal, 0);
   const totPendiente    = monthlyEnriched.reduce((s, r) => s + r.totalPendiente, 0);
   const chartData       = monthlyEnriched.map((r) => ({ mes: r.label.slice(0, 3), ingresos: r.ing, gastos: r.gTotal, 'benef. real': r.beneficioReal }));
-  let acum = 0;
+  const monthlyConAcumulado = useMemo(() => monthlyEnriched.reduce<(typeof monthlyEnriched[number] & { acum: number })[]>((acc, row) => {
+    const acum = (acc[acc.length - 1]?.acum ?? 0) + row.balance;
+    return [...acc, { ...row, acum }];
+  }, []), [monthlyEnriched]);
 
   return (
     <div className="space-y-5">
@@ -147,7 +150,7 @@ const ResumenTab = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
           <p className="text-xs text-zinc-500 mb-1">Ingresos (base)</p>
-          <p className="text-lg font-bold text-green-400">{fmt(totIng)}</p>
+          <p className="text-lg font-bold text-accent-400">{fmt(totIng)}</p>
         </div>
         <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
           <p className="text-xs text-zinc-500 mb-1">Gastos gles.</p>
@@ -160,7 +163,7 @@ const ResumenTab = ({
         </div>
         <div className="bg-surface-800 border border-surface-400/20 rounded-xl px-4 py-3">
           <p className="text-xs text-zinc-500 mb-1">Pendiente de cobro</p>
-          <p className={`text-lg font-bold ${totPendiente > 0 ? 'text-yellow-400' : 'text-green-400'}`}>{fmt(totPendiente)}</p>
+          <p className={`text-lg font-bold ${totPendiente > 0 ? 'text-yellow-400' : 'text-accent-400'}`}>{fmt(totPendiente)}</p>
           <p className="text-xs text-zinc-600 mt-0.5">{monthlyEnriched.flatMap((r) => r.pendientes).length} evento(s)</p>
         </div>
       </div>
@@ -183,7 +186,7 @@ const ResumenTab = ({
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="ingresos" name="Ingresos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             <Bar dataKey="gastos"   name="Gastos gles" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="benef. real" name="Benef. real" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="benef. real" name="Benef. real" fill="#8d675a" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -202,35 +205,35 @@ const ResumenTab = ({
             <th className="text-right px-4 py-3 text-zinc-500">Acumulado</th>
           </tr></thead>
           <tbody>
-            {monthlyEnriched.map((row) => { acum += row.balance; const hasData = row.ing > 0 || row.gTotal > 0; return (
+            {monthlyConAcumulado.map((row) => { const hasData = row.ing > 0 || row.gTotal > 0; return (
               <tr key={row.num} className={`border-b border-surface-400/10 hover:bg-surface-700/50 ${!hasData ? 'opacity-40' : ''}`}>
                 <td className="px-4 py-2.5 text-zinc-300 font-medium">{row.label}</td>
-                <td className="px-4 py-2.5 text-right text-green-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
+                <td className="px-4 py-2.5 text-right text-accent-400">{row.ing > 0 ? fmt(row.ing) : '—'}</td>
                 <td className="px-4 py-2.5 text-right text-red-400">{row.costesEvento > 0 ? fmt(row.costesEvento) : '—'}</td>
                 <td className={`px-4 py-2.5 text-right font-semibold ${row.ing > 0 ? (row.beneficioReal >= 0 ? 'text-gold-400' : 'text-red-400') : 'text-zinc-600'}`}>
                   {row.ing > 0 ? fmt(row.beneficioReal) : '—'}
                 </td>
                 <td className="px-4 py-2.5 text-right text-zinc-400">{row.gTotal > 0 ? fmt(row.gTotal) : '—'}</td>
-                <td className="px-4 py-2.5 text-right text-green-400">{row.totalCobrado > 0 ? fmt(row.totalCobrado) : '—'}</td>
+                <td className="px-4 py-2.5 text-right text-accent-400">{row.totalCobrado > 0 ? fmt(row.totalCobrado) : '—'}</td>
                 <td className="px-4 py-2.5 text-right">
                   {row.totalPendiente > 0
                     ? <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span>
                     : <span className="text-zinc-600">—</span>
                   }
                 </td>
-                <td className={`px-4 py-2.5 text-right font-semibold ${acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(acum)}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold ${row.acum >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(row.acum)}</td>
               </tr>
             ); })}
           </tbody>
           <tfoot><tr className="bg-surface-700/50 font-semibold">
             <td className="px-4 py-3 text-zinc-300">TOTAL</td>
-            <td className="px-4 py-3 text-right text-green-400">{fmt(totIng)}</td>
+            <td className="px-4 py-3 text-right text-accent-400">{fmt(totIng)}</td>
             <td className="px-4 py-3 text-right text-red-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.costesEvento, 0))}</td>
             <td className={`px-4 py-3 text-right ${totBenefReal >= 0 ? 'text-gold-400' : 'text-red-400'}`}>{fmt(totBenefReal)}</td>
             <td className="px-4 py-3 text-right text-zinc-400">{fmt(totGas)}</td>
-            <td className="px-4 py-3 text-right text-green-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.totalCobrado, 0))}</td>
+            <td className="px-4 py-3 text-right text-accent-400">{fmt(monthlyEnriched.reduce((s, r) => s + r.totalCobrado, 0))}</td>
             <td className={`px-4 py-3 text-right ${totPendiente > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>{fmt(totPendiente)}</td>
-            <td className="px-4 py-3 text-right text-blue-400">{fmt(acum)}</td>
+            <td className="px-4 py-3 text-right text-blue-400">{fmt(totIng - totGas)}</td>
           </tr></tfoot>
         </table>
       </div>
@@ -263,11 +266,11 @@ const ResumenTab = ({
                       </span>
                     )}
                     {row.pendientes.length === 0 && row.cobrados.length > 0 && (
-                      <span className="px-2 py-0.5 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">✓ Todo cobrado</span>
+                      <span className="px-2 py-0.5 bg-accent-500/10 text-accent-400 text-xs rounded-full font-medium">✓ Todo cobrado</span>
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-zinc-500">Cobrado: <span className="text-green-400 font-medium">{fmt(row.totalCobrado)}</span></span>
+                    <span className="text-zinc-500">Cobrado: <span className="text-accent-400 font-medium">{fmt(row.totalCobrado)}</span></span>
                     {row.totalPendiente > 0 && (
                       <span className="text-zinc-500">Pendiente: <span className="text-yellow-400 font-semibold">{fmt(row.totalPendiente)}</span></span>
                     )}
@@ -282,15 +285,15 @@ const ResumenTab = ({
                     {row.cobrados.map((i) => (
                       <div key={i.id} className="flex items-center justify-between py-1.5 border-b border-surface-400/5 last:border-0">
                         <div className="flex items-center gap-3">
-                          <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                          <span className="w-2 h-2 rounded-full bg-accent-400 flex-shrink-0" />
                           <div>
                             <p className="text-sm text-zinc-200">{i.concepto}</p>
                             <p className="text-xs text-zinc-500">{i.cliente} · {fmtDate(i.fechaEvento)}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-green-400">{fmt(i.total)}</p>
-                          <p className="text-xs text-green-400/70">Cobrado ✓</p>
+                          <p className="text-sm font-semibold text-accent-400">{fmt(i.total)}</p>
+                          <p className="text-xs text-accent-400/70">Cobrado ✓</p>
                         </div>
                       </div>
                     ))}
@@ -413,7 +416,7 @@ const IngresosTab = ({
           <button onClick={nextMonth} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><ChevronRight size={16} /></button>
         </div>
         <div className="flex gap-3 ml-1 text-sm text-zinc-400 flex-wrap">
-          <span>Base: <span className="text-green-400 font-semibold">{fmt(totBase)}</span></span>
+          <span>Base: <span className="text-accent-400 font-semibold">{fmt(totBase)}</span></span>
           <span>IVA: <span className="text-zinc-300">{fmt(totIVA)}</span></span>
           <span>Total: <span className="text-white font-semibold">{fmt(totTotal)}</span></span>
         </div>
@@ -423,7 +426,7 @@ const IngresosTab = ({
           </button>
           <button
             onClick={() => { setForm(emptyIngreso()); setModal(true); }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"
+            className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"
           >
             <Plus size={15} /> Nuevo ingreso
           </button>
@@ -471,12 +474,12 @@ const IngresosTab = ({
                         {EVENT_TYPE_LABELS[i.tipoEvento]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-green-400 font-medium">{fmt(i.baseImponible)}</td>
+                    <td className="px-4 py-3 text-right text-accent-400 font-medium">{fmt(i.baseImponible)}</td>
                     <td className="px-4 py-3 text-right text-zinc-400 text-xs">{i.porcentajeIVA}%<br />{fmt(i.importeIVA)}</td>
                     <td className="px-4 py-3 text-right text-white font-semibold">{fmt(i.total)}</td>
                     <td className="px-4 py-3 text-center">
                       {i.facturaEmitida
-                        ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/15 text-green-400">{i.numeroFactura ? i.numeroFactura : 'Sí'}</span>
+                        ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-accent-500/15 text-accent-400">{i.numeroFactura ? i.numeroFactura : 'Sí'}</span>
                         : <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/10 text-zinc-500">No</span>
                       }
                     </td>
@@ -577,7 +580,7 @@ const IngresosTab = ({
           <div className="col-span-2 flex items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.facturaEmitida} onChange={(e) => setField('facturaEmitida', e.target.checked)} className="accent-gold-500 w-4 h-4" />
-              <span className="text-sm font-medium text-white">Factura emitida: <span className={form.facturaEmitida ? 'text-green-400' : 'text-zinc-500'}>{form.facturaEmitida ? 'Sí' : 'No'}</span></span>
+              <span className="text-sm font-medium text-white">Factura emitida: <span className={form.facturaEmitida ? 'text-accent-400' : 'text-zinc-500'}>{form.facturaEmitida ? 'Sí' : 'No'}</span></span>
             </label>
             {form.facturaEmitida && (
               <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value)} className="flex-1 bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none font-mono" placeholder="Nº factura" />
@@ -585,7 +588,7 @@ const IngresosTab = ({
           </div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={saveNew} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">
+            <button onClick={saveNew} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">
               Crear ingreso →
             </button>
           </div>
@@ -665,7 +668,7 @@ const GastosTab = ({
       <td className={`px-3 py-2 ${right ? 'text-right' : ''}`}>
         <div className="flex items-center gap-1">
           <input autoFocus value={cellVal} onChange={(e) => setCellVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(g); if (e.key === 'Escape') setEditingCell(null); }} className="w-full bg-surface-600 border border-gold-500/50 rounded px-2 py-1 text-white text-xs outline-none" />
-          <button onClick={() => commitEdit(g)} className="text-green-400 flex-shrink-0"><Check size={12} /></button>
+          <button onClick={() => commitEdit(g)} className="text-accent-400 flex-shrink-0"><Check size={12} /></button>
           <button onClick={() => setEditingCell(null)} className="text-zinc-500 flex-shrink-0"><X size={12} /></button>
         </div>
       </td>
@@ -695,7 +698,7 @@ const GastosTab = ({
         </div>
         <div className="ml-auto flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-700 border border-surface-400/30 text-zinc-300 text-sm rounded-lg hover:text-white"><Download size={13} />Excel</button>
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo gasto</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={15} /> Nuevo gasto</button>
         </div>
       </div>
 
@@ -727,7 +730,7 @@ const GastosTab = ({
                   <td className="px-3 py-2 text-right text-zinc-500">{g.porcentajeIVA}% · {fmt(g.importeIVA)}</td>
                   <td className="px-3 py-2 text-right text-red-400 font-medium">{fmt(g.total)}</td>
                   <EC g={g} field="proveedor" val={g.proveedor ?? '—'} />
-                  <td className="px-3 py-2 text-center">{g.deducible ? <Check size={12} className="text-green-400 mx-auto" /> : <X size={12} className="text-zinc-600 mx-auto" />}</td>
+                  <td className="px-3 py-2 text-center">{g.deducible ? <Check size={12} className="text-accent-400 mx-auto" /> : <X size={12} className="text-zinc-600 mx-auto" />}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
                       <button onClick={() => openEdit(g)} className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={12} /></button>
@@ -802,7 +805,7 @@ const GastosTab = ({
           </div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir gasto'}</button>
+            <button onClick={save} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir gasto'}</button>
           </div>
         </div>
       </Modal>

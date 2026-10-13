@@ -7,7 +7,7 @@ import { fmt, fmtDate, uid, calcIVA } from '../utils/helpers';
 import { Modal } from '../components/ui/Modal';
 import type { Equipo as EquipoType, Area } from '../types';
 
-const CATEGORIAS = ['Sonido', 'Audio', 'Iluminación', 'Video', 'DJ', 'Transporte', 'Accesorios', 'Otros'];
+const CATEGORIAS = ['Sonido', 'Audio', 'Iluminación', 'Estructuras', 'Video', 'DJ', 'Transporte', 'Accesorios', 'Otros'];
 
 const empty = (): Omit<EquipoType, 'id' | 'createdAt'> => ({
   area: 'montada', nombre: '', categoria: 'Sonido',
@@ -38,7 +38,7 @@ export const Equipo = () => {
 
   const openNew = () => { setForm(empty()); setEditId(null); setModal(true); };
   const openEdit = (e: EquipoType) => { setForm({ ...e }); setEditId(e.id); setModal(true); };
-  const setField = (k: keyof typeof form, v: any) => setForm((f) => {
+  const setField = (k: keyof typeof form, v: unknown) => setForm((f) => {
     const next = { ...f, [k]: v };
     if (k === 'baseImponible' || k === 'porcentajeIVA') { const r = calcIVA(Number(next.baseImponible), Number(next.porcentajeIVA)); return { ...next, ...r }; }
     return next;
@@ -62,11 +62,11 @@ export const Equipo = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Inversiones & Equipo</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Registro de inversiones en equipo técnico</p>
+          
         </div>
         <div className="flex gap-2">
           <button onClick={exportXlsx} className="flex items-center gap-2 px-3 py-1.5 bg-surface-700 border border-surface-400/30 text-zinc-300 text-sm rounded-lg hover:text-white transition-colors"><Download size={14} />Excel</button>
-          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={14} />Añadir equipo</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400"><Plus size={14} />Añadir equipo</button>
         </div>
       </div>
 
@@ -117,7 +117,7 @@ export const Equipo = () => {
                   <td className="px-4 py-3 text-right text-white font-semibold">{fmt(e.total)}</td>
                   <td className="px-4 py-3 text-zinc-400">{fmtDate(e.fechaCompra)}</td>
                   <td className="px-4 py-3 text-zinc-500">{e.proveedor ?? '—'}</td>
-                  <td className="px-4 py-3 text-center text-xs">{e.facturaRecibida ? <span className="text-green-400">✓</span> : <span className="text-zinc-600">—</span>}</td>
+                  <td className="px-4 py-3 text-center text-xs">{e.facturaRecibida ? <span className="text-accent-400">✓</span> : <span className="text-zinc-600">—</span>}</td>
                   <td className="px-4 py-3"><div className="flex gap-1">
                     <button onClick={() => openEdit(e)} className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-surface-600"><Edit2 size={13} /></button>
                     <button onClick={() => showConfirm('¿Eliminar este elemento? Esta acción no se puede deshacer.', () => deleteEquipo(e.id))} className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-400/10"><Trash2 size={13} /></button>
@@ -150,7 +150,7 @@ export const Equipo = () => {
           <div className="col-span-2"><label className="text-xs text-zinc-400 mb-1 block">Observaciones</label><textarea value={form.observaciones ?? ''} onChange={(e) => setField('observaciones', e.target.value)} rows={2} className="w-full bg-surface-600 border border-surface-400/30 rounded-lg px-3 py-2 text-white text-sm outline-none resize-none" /></div>
           <div className="col-span-2 flex justify-end gap-2 pt-2">
             <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancelar</button>
-            <button onClick={save} className="px-4 py-2 bg-gold-500 text-black text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir equipo'}</button>
+            <button onClick={save} className="px-4 py-2 bg-gold-500 text-white text-sm font-semibold rounded-lg hover:bg-gold-400">{editId ? 'Guardar cambios' : 'Añadir equipo'}</button>
           </div>
         </div>
       </Modal>

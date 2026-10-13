@@ -1,162 +1,287 @@
+// ── Informe contable — comparativa anual consolidada (Fase E) ──────────────
+// Drill-down: sociedad completa → línea de negocio, sin duplicar páginas ni
+// cálculos — todo pasa por `src/lib/contabilidad.ts`, la misma fuente que
+// usa Resumen contable.
 import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useStore } from '../../store/useStore';
-import type { Area } from '../../types';
+import { Download, ChevronLeft } from 'lucide-react';
+import { usePermittedFinancialData } from '../../hooks/usePermittedFinancialData';
+import { StatCard } from '../../components/ui/StatCard';
+import { Button } from '../../components/ui/Button';
+import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLines';
+import { lineaDeIngreso, lineaDeGasto, calcularResumenFinanciero, ivaEstimadoALiquidar } from '../../lib/contabilidad';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
-type Rango = 'mes' | 'trimestre' | 'año';
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const TRIMESTRES = ['T1 (Ene–Mar)', 'T2 (Abr–Jun)', 'T3 (Jul–Sep)', 'T4 (Oct–Dic)'];
 
 export const InformesContablesPage = () => {
-  const allFacturas = useStore((s) => s.facturas);
-  const allEquipo    = useStore((s) => s.equipo);
-  const allImpuestos = useStore((s) => s.impuestos);
+  const { ingresos: allIngresos, gastos: allGastos, gastosEvento: allGastosEvento, lineasVisibles } = usePermittedFinancialData();
 
-  const [rango, setRango] = useState<Rango>('año');
   const [year, setYear] = useState(new Date().getFullYear());
-  const [mes, setMes] = useState(new Date().getMonth());
-  const [trimestre, setTrimestre] = useState(Math.floor(new Date().getMonth() / 3));
-  const [filterArea, setFilterArea] = useState<Area | 'todos'>('todos');
+  const [lineaSeleccionada, setLineaSeleccionada] = useState<LineaId | null>(null);
 
-  const inRange = (fecha: string) => {
-    const d = new Date(fecha);
-    if (rango === 'mes') return d.getFullYear() === year && d.getMonth() === mes;
-    if (rango === 'trimestre') return d.getFullYear() === year && Math.floor(d.getMonth() / 3) === trimestre;
-    return d.getFullYear() === year;
-  };
+  const yearOpts = useMemo(() => {
+    const years = new Set<number>();
+    allIngresos.forEach((i) => years.add(new Date(i.fechaEvento).getFullYear()));
+    if (!years.size) years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allIngresos]);
 
-  const facturas = useMemo(() => {
-    let list = allFacturas.filter((f) => inRange(f.fecha));
-    if (filterArea !== 'todos') list = list.filter((f) => f.area === filterArea);
-    return list;
+  // ── Filtrado del año, opcionalmente por línea ──────────────────────────────
+  const ingresosLinea = (linea: LineaId | null) => allIngresos.filter((i) => {
+    if (new Date(i.fechaEvento).getFullYear() !== year) return false;
+    return linea == null || lineaDeIngreso(i) === linea;
+  });
+  const gastosLinea = (linea: LineaId | null) => allGastos.filter((g) => {
+    if (new Date(g.fecha).getFullYear() !== year) return false;
+    return linea == null || lineaDeGasto(g) === linea;
+  });
+  const gastosEventoDe = (ingresoIds: Set<string>) => allGastosEvento.filter((g) => ingresoIds.has(g.ingresoId));
+
+  const resumenSociedad = useMemo(() => {
+    const ing = ingresosLinea(null);
+    const gas = gastosLinea(null);
+    const ids = new Set(ing.map((i) => i.id));
+    return calcularResumenFinanciero(ing, gas, gastosEventoDe(ids));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allFacturas, rango, year, mes, trimestre, filterArea]);
+  }, [allIngresos, allGastos, allGastosEvento, year]);
 
-  const equipo = useMemo(() => filterArea === 'todos' ? allEquipo : allEquipo.filter((e) => e.area === filterArea), [allEquipo, filterArea]);
+  const porLinea = useMemo(() => LINEA_IDS.filter((id) => lineasVisibles.includes(id)).map((id) => {
+    const ing = ingresosLinea(id);
+    const gas = gastosLinea(id);
+    const ids = new Set(ing.map((i) => i.id));
+    return { linea: id, ...calcularResumenFinanciero(ing, gas, gastosEventoDe(ids)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [allIngresos, allGastos, allGastosEvento, year, lineasVisibles]);
 
-  const emitidas  = facturas.filter((f) => f.tipo === 'emitida');
-  const recibidas = facturas.filter((f) => f.tipo === 'recibida');
-  const totalFacturadoIngresos = emitidas.reduce((a, f) => a + f.total, 0);
-  const totalFacturadoGastos   = recibidas.reduce((a, f) => a + f.total, 0);
-  const ivaRepercutido = emitidas.reduce((a, f) => a + f.importeIVA, 0);
-  const ivaSoportado    = recibidas.filter((f) => f.ivaDeducible).reduce((a, f) => a + f.importeIVA, 0);
-  const diferenciaIva   = ivaRepercutido - ivaSoportado;
-  const facturasPendientes = facturas.filter((f) => !f.pagada).length;
-  const facturasCobradas   = emitidas.filter((f) => f.pagada).length;
-  const facturasPagadas    = recibidas.filter((f) => f.pagada).length;
+  const resumenActivo = lineaSeleccionada
+    ? porLinea.find((l) => l.linea === lineaSeleccionada)!
+    : resumenSociedad;
 
-  const amortizacionTotal = equipo.reduce((a, e) => a + ((e.vidaUtil && e.vidaUtil > 0) ? e.baseImponible / e.vidaUtil : 0), 0);
-  const inversionTotal = equipo.reduce((a, e) => a + e.total, 0);
+  // ── Mensual (dentro de la vista activa: sociedad o línea) ────────────────
+  const mensual = useMemo(() => {
+    const linea = lineaSeleccionada;
+    return MESES_FULL.map((mesLabel, m) => {
+      const ing = allIngresos.filter((i) => {
+        const d = new Date(i.fechaEvento);
+        if (d.getFullYear() !== year || d.getMonth() !== m) return false;
+        return linea == null || lineaDeIngreso(i) === linea;
+      });
+      const gas = allGastos.filter((g) => {
+        const d = new Date(g.fecha);
+        if (d.getFullYear() !== year || d.getMonth() !== m) return false;
+        return linea == null || lineaDeGasto(g) === linea;
+      });
+      const ids = new Set(ing.map((i) => i.id));
+      const gasEv = allGastosEvento.filter((g) => ids.has(g.ingresoId));
+      const r = calcularResumenFinanciero(ing, gas, gasEv);
+      return { mes: mesLabel, ...r };
+    });
+  }, [allIngresos, allGastos, allGastosEvento, year, lineaSeleccionada]);
 
-  const impuestosTotales   = allImpuestos.reduce((a, i) => a + i.importe, 0);
-  const impuestosPagados   = allImpuestos.filter((i) => i.estado === 'pagado').reduce((a, i) => a + i.importe, 0);
-  const impuestosPendientes = impuestosTotales - impuestosPagados;
-  const proximosPagos = allImpuestos
-    .filter((i) => i.estado === 'pendiente')
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))
-    .slice(0, 3);
+  // ── Trimestral (agregado de los 3 meses correspondientes) ─────────────────
+  const trimestral = useMemo(() => TRIMESTRES.map((label, t) => {
+    const meses = mensual.slice(t * 3, t * 3 + 3);
+    return meses.reduce((acc, m) => ({
+      trimestre: label,
+      ingresosSinIVA: acc.ingresosSinIVA + m.ingresosSinIVA,
+      gastosDeducibles: acc.gastosDeducibles + m.gastosDeducibles,
+      beneficioAntesImpuestos: acc.beneficioAntesImpuestos + m.beneficioAntesImpuestos,
+      totalCobrado: acc.totalCobrado + m.totalCobrado,
+      totalPendiente: acc.totalPendiente + m.totalPendiente,
+      ivaRepercutido: acc.ivaRepercutido + m.ivaRepercutido,
+      ivaSoportado: acc.ivaSoportado + m.ivaSoportado,
+      resultadoDespuesImpuestos: acc.resultadoDespuesImpuestos + m.resultadoDespuesImpuestos,
+    }), { trimestre: label, ingresosSinIVA: 0, gastosDeducibles: 0, beneficioAntesImpuestos: 0, totalCobrado: 0, totalPendiente: 0, ivaRepercutido: 0, ivaSoportado: 0, resultadoDespuesImpuestos: 0 });
+  }), [mensual]);
 
   const exportCSV = () => {
-    const header = 'Concepto;Importe';
-    const rows = [
-      `Total facturado ingresos;${totalFacturadoIngresos.toFixed(2)}`,
-      `Total facturado gastos;${totalFacturadoGastos.toFixed(2)}`,
-      `IVA repercutido;${ivaRepercutido.toFixed(2)}`,
-      `IVA soportado;${ivaSoportado.toFixed(2)}`,
-      `Diferencia IVA;${diferenciaIva.toFixed(2)}`,
-      `Facturas pendientes;${facturasPendientes}`,
-      `Facturas cobradas;${facturasCobradas}`,
-      `Facturas pagadas;${facturasPagadas}`,
-      `Inversión total;${inversionTotal.toFixed(2)}`,
-      `Amortización anual estimada;${amortizacionTotal.toFixed(2)}`,
-    ];
+    const header = 'Mes;Ingresos sin IVA;Gastos deducibles;Beneficio;Cobrado;Pendiente;IVA repercutido;IVA soportado;Resultado tras impuestos';
+    const rows = mensual.map((m) =>
+      [m.mes, m.ingresosSinIVA.toFixed(2), m.gastosDeducibles.toFixed(2), m.beneficioAntesImpuestos.toFixed(2),
+       m.totalCobrado.toFixed(2), m.totalPendiente.toFixed(2), m.ivaRepercutido.toFixed(2), m.ivaSoportado.toFixed(2),
+       m.resultadoDespuesImpuestos.toFixed(2)].join(';')
+    );
     const csv = [header, ...rows].join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `informe-contable-${year}.csv` });
+    const nombre = lineaSeleccionada ? BUSINESS_LINES[lineaSeleccionada].shortLabel : 'sociedad';
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `informe-contable-${nombre}-${year}.csv` });
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
+
+  const ivaLiquidar = ivaEstimadoALiquidar(resumenActivo.ivaRepercutido, resumenActivo.ivaSoportado);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Informes contables</h1>
-          <p className="text-sm text-gray-500">IVA, facturación e inversiones — La Montada Sound + DJs</p>
+          <h1 className="text-2xl font-bold text-gray-900">Informe contable</h1>
+          <p className="text-sm text-gray-500">
+            {lineaSeleccionada ? (
+              <button onClick={() => setLineaSeleccionada(null)} className="inline-flex items-center gap-1 text-gold-600 hover:text-gold-500 font-medium">
+                <ChevronLeft size={13} /> Sociedad completa
+              </button>
+            ) : 'Sociedad completa'}
+            {lineaSeleccionada && <> · {BUSINESS_LINES[lineaSeleccionada].label}</>}
+          </p>
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
-          <Download size={14} /> Exportar CSV
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-3 items-center">
-        {(['mes', 'trimestre', 'año'] as Rango[]).map((r) => (
-          <button key={r} onClick={() => setRango(r)} className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize ${rango === r ? 'bg-amber-500 text-black' : 'bg-white border border-gray-200 text-gray-600'}`}>{r}</button>
-        ))}
-        <div className="flex items-center gap-2">
-          <button onClick={() => setYear((v) => v - 1)} className="px-2 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">‹</button>
-          <span className="text-sm font-semibold text-gray-700 w-12 text-center">{year}</span>
-          <button onClick={() => setYear((v) => v + 1)} className="px-2 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">›</button>
-        </div>
-        {rango === 'mes' && (
-          <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
-            {MESES_FULL.map((m, i) => <option key={i} value={i}>{m}</option>)}
-          </select>
-        )}
-        {rango === 'trimestre' && (
-          <select value={trimestre} onChange={(e) => setTrimestre(Number(e.target.value))} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
-            <option value={0}>Q1</option><option value={1}>Q2</option><option value={2}>Q3</option><option value={3}>Q4</option>
-          </select>
-        )}
-        <select value={filterArea} onChange={(e) => setFilterArea(e.target.value as Area | 'todos')} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
-          <option value="todos">Ambas áreas</option>
-          <option value="montada">La Montada Sound</option>
-          <option value="dj">DJs</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Facturado ingresos</p><p className="text-xl font-bold text-gray-900">{fmt(totalFacturadoIngresos)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Facturado gastos</p><p className="text-xl font-bold text-gray-900">{fmt(totalFacturadoGastos)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">IVA repercutido</p><p className="text-xl font-bold text-gray-900">{fmt(ivaRepercutido)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">IVA soportado</p><p className="text-xl font-bold text-gray-900">{fmt(ivaSoportado)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Diferencia IVA</p><p className={`text-xl font-bold ${diferenciaIva >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(diferenciaIva)}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Facturas pendientes</p><p className="text-xl font-bold text-gray-900">{facturasPendientes}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Facturas cobradas</p><p className="text-xl font-bold text-gray-900">{facturasCobradas}</p></div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5"><p className="text-xs text-gray-500 uppercase">Facturas pagadas</p><p className="text-xl font-bold text-gray-900">{facturasPagadas}</p></div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-gray-800 mb-3">Inversiones y amortización (orientativa)</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><p className="text-xs text-gray-500">Inversión total registrada</p><p className="font-semibold text-gray-800">{fmt(inversionTotal)}</p></div>
-          <div><p className="text-xs text-gray-500">Amortización anual estimada</p><p className="font-semibold text-gray-800">{fmt(amortizacionTotal)}</p></div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-800">Impuestos</h2>
-          <Link to="/contabilidad/impuestos" className="text-xs font-medium text-amber-600 hover:text-amber-500">Ver detalle →</Link>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
-          <div><p className="text-xs text-gray-500">Impuestos totales</p><p className="font-semibold text-gray-900 text-lg">{fmt(impuestosTotales)}</p></div>
-          <div><p className="text-xs text-gray-500">Pagados</p><p className="font-semibold text-green-700 text-lg">{fmt(impuestosPagados)}</p></div>
-          <div><p className="text-xs text-gray-500">Pendientes</p><p className="font-semibold text-amber-600 text-lg">{fmt(impuestosPendientes)}</p></div>
-          <div>
-            <p className="text-xs text-gray-500">Próximos pagos</p>
-            {proximosPagos.length === 0 ? (
-              <p className="text-sm text-gray-400 mt-1">Sin pagos pendientes</p>
-            ) : (
-              <ul className="mt-1 space-y-0.5">
-                {proximosPagos.map((p) => (
-                  <li key={p.id} className="text-xs text-gray-600 truncate">{p.fecha} · {p.concepto} · {fmt(p.importe)}</li>
-                ))}
-              </ul>
-            )}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setYear((v) => v - 1)} className="px-2 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">‹</button>
+            <span className="text-sm font-semibold text-gray-700 w-12 text-center">{year}</span>
+            <button onClick={() => setYear((v) => v + 1)} className="px-2 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">›</button>
           </div>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
+            {yearOpts.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <Button variant="dark" icon={<Download size={14} />} onClick={exportCSV}>Exportar CSV</Button>
         </div>
       </div>
+
+      {/* Comparación por línea de negocio — click para entrar al detalle */}
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">Comparación por línea de negocio — {year}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Haz clic en una línea para ver su detalle</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Línea</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Ingresos</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Gastos</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Beneficio</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Cobrado</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Resultado tras imp.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {porLinea.map((l) => (
+                <tr key={l.linea} onClick={() => setLineaSeleccionada(l.linea)} className={`cursor-pointer hover:bg-gray-50 transition-colors ${lineaSeleccionada === l.linea ? 'bg-gold-50/60' : ''}`}>
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{BUSINESS_LINES[l.linea].label}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(l.ingresosSinIVA)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-red-600">{fmt(l.gastosDeducibles)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono font-semibold ${l.beneficioAntesImpuestos >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(l.beneficioAntesImpuestos)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-600">{fmt(l.totalCobrado)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-amber-700">{fmt(l.totalPendiente)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(l.resultadoDespuesImpuestos)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+              <tr>
+                <td className="px-4 py-2.5 text-xs uppercase text-gray-600">Consolidado</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-900">{fmt(resumenSociedad.ingresosSinIVA)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-red-700">{fmt(resumenSociedad.gastosDeducibles)}</td>
+                <td className={`px-4 py-2.5 text-right font-mono ${resumenSociedad.beneficioAntesImpuestos >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>{fmt(resumenSociedad.beneficioAntesImpuestos)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-800">{fmt(resumenSociedad.totalCobrado)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-800">{fmt(resumenSociedad.totalPendiente)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-800">{fmt(resumenSociedad.resultadoDespuesImpuestos)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* KPIs de la vista activa (sociedad o línea seleccionada) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Ingresos sin IVA" value={resumenActivo.ingresosSinIVA} format={fmt} />
+        <StatCard label="Gastos deducibles" value={resumenActivo.gastosDeducibles} format={fmt} tone="danger" />
+        <StatCard label="Beneficio antes de impuestos" value={resumenActivo.beneficioAntesImpuestos} format={fmt} tone={resumenActivo.beneficioAntesImpuestos >= 0 ? 'success' : 'danger'} />
+        <StatCard label="Resultado tras impuestos (aprox.)" value={resumenActivo.resultadoDespuesImpuestos} format={fmt} />
+        <StatCard label="Total cobrado" value={resumenActivo.totalCobrado} format={fmt} tone="success" />
+        <StatCard label="Total pendiente" value={resumenActivo.totalPendiente} format={fmt} tone="gold" />
+        <StatCard label="IVA repercutido" value={resumenActivo.ivaRepercutido} format={fmt} />
+        <StatCard label={ivaLiquidar >= 0 ? 'IVA estimado a pagar' : 'IVA estimado a compensar'} value={Math.abs(ivaLiquidar)} format={fmt} tone={ivaLiquidar >= 0 ? 'gold' : 'success'} />
+      </div>
+
+      {/* Comparativa trimestral */}
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">Comparativa trimestral — {year}</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Trimestre</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Ingresos</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Gastos</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Beneficio</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Cobrado</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Resultado tras imp.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {trimestral.map((t) => (
+                <tr key={t.trimestre}>
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{t.trimestre}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(t.ingresosSinIVA)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-red-600">{fmt(t.gastosDeducibles)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono font-semibold ${t.beneficioAntesImpuestos >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(t.beneficioAntesImpuestos)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-600">{fmt(t.totalCobrado)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-amber-700">{fmt(t.totalPendiente)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(t.resultadoDespuesImpuestos)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Tabla mensual */}
+      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">Detalle mensual — {year}</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-100 bg-gray-50">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Mes</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Ingresos</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Gastos</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Beneficio</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cobrado</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">IVA rep.</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Resultado tras imp.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {mensual.map((m) => (
+                <tr key={m.mes} className={`hover:bg-gray-50 ${m.numIngresos === 0 ? 'opacity-40' : ''}`}>
+                  <td className="px-4 py-3 font-medium text-gray-800">{m.mes}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt(m.ingresosSinIVA)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-red-600">{fmt(m.gastosDeducibles)}</td>
+                  <td className={`px-4 py-3 text-right font-mono font-semibold ${m.beneficioAntesImpuestos >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(m.beneficioAntesImpuestos)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.totalCobrado)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-amber-700">{fmt(m.totalPendiente)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.ivaRepercutido)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt(m.resultadoDespuesImpuestos)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+              <tr>
+                <td className="px-4 py-3 text-xs uppercase text-gray-600">Total {year}</td>
+                <td className="px-4 py-3 text-right font-mono text-gray-900">{fmt(resumenActivo.ingresosSinIVA)}</td>
+                <td className="px-4 py-3 text-right font-mono text-red-700">{fmt(resumenActivo.gastosDeducibles)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${resumenActivo.beneficioAntesImpuestos >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>{fmt(resumenActivo.beneficioAntesImpuestos)}</td>
+                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(resumenActivo.totalCobrado)}</td>
+                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(resumenActivo.totalPendiente)}</td>
+                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(resumenActivo.ivaRepercutido)}</td>
+                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(resumenActivo.resultadoDespuesImpuestos)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400 px-1">Resultado tras impuestos: estimación orientativa (25% de Impuesto de Sociedades sobre el beneficio) — a validar con la gestoría.</p>
     </div>
   );
 };
