@@ -13,7 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import type { Area, Evento, EventType, EventStatus, GastoEvento, PagoEvento, PaymentMethod } from '../../types';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 const TIPOS: EventType[] = ['boda', 'real_madrid', 'alquiler', 'evento_privado', 'dj_personal', 'empresa', 'otro'];
 const ESTADOS: EventStatus[] = ['pendiente', 'confirmado', 'realizado', 'cobrado', 'facturado'];

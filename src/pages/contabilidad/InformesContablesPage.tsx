@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLines';
 import { lineaDeIngreso, lineaDeGasto, calcularResumenFinanciero, ivaEstimadoALiquidar } from '../../lib/contabilidad';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const TRIMESTRES = ['T1 (Ene–Mar)', 'T2 (Abr–Jun)', 'T3 (Jul–Sep)', 'T4 (Oct–Dic)'];
 

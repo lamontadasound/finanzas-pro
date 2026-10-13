@@ -9,7 +9,7 @@ import { HeatmapErrorBoundary } from '../../components/charts-app/HeatmapErrorBo
 import type { LineaId } from '../../config/businessLines';
 import { resolveLinea } from '../../config/resolveLinea';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 

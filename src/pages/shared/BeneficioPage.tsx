@@ -5,7 +5,7 @@ import type { Area } from '../../types';
 import { StatCard } from '../../components/ui/StatCard';
 import { MotionTabs } from '../../components/ui/MotionTabs';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const pctFmt = (n: number) => `${n.toFixed(1)}%`;
 
 type Rango = 'mes' | 'trimestre' | 'año';

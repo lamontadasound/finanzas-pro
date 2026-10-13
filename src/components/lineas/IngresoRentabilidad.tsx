@@ -1,24 +1,94 @@
-import {Link} from 'react-router-dom';
-import type {Ingreso,GastoEvento} from '../../types';
-import {ingresoRentabilidad,gastoEventoSinIVA,gastoEventoConIVA} from '../../lib/ingresoRentabilidad';
-import {expensePaymentLabel} from '../../lib/eventExpensePayment';
-import {resolveLinea} from '../../config/resolveLinea';
-import {Modal} from '../ui/Modal';
-import {Button} from '../ui/Button';
-const fmt=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
-const paths={montada_sound:'/lineas/montada-sound/gastos-eventos',dj:'/dj/gastos-actuacion',real_madrid:'/lineas/real-madrid/gastos-actuacion',montada_installations:'/lineas/installations/gastos-instalacion'};
-export function IngresoRentabilidad({ingreso,gastos,onClose,onAddExpense}:{ingreso:Ingreso;gastos:GastoEvento[];onClose:()=>void;onAddExpense?:()=>void}){
- const r=ingresoRentabilidad(ingreso,gastos);
- return <Modal isOpen onClose={onClose} title={`Rentabilidad · ${ingreso.concepto}`} subtitle={`${ingreso.cliente} · ${ingreso.fechaEvento}`} size="xl"><div className="space-y-5">
- <p className="text-sm text-gray-500">{ingreso.tipoEvento} · Estado: <strong>{ingreso.estadoPago}</strong>{ingreso.numeroFactura&&` · Factura ${ingreso.numeroFactura}`}</p>
- <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{[
- ['Total sin IVA',ingreso.baseImponible,'text-gray-900'],['Total con IVA',ingreso.total,'text-blue-700'],['Gastos sin IVA',r.coste,'text-red-600'],['Beneficio',r.beneficio,r.beneficio>=0?'text-emerald-700':'text-red-600'],
- ].map(([label,value,color])=><div key={label} className="rounded-2xl bg-gray-50 p-4"><p className="text-xs text-gray-500">{label}</p><p className={`mt-2 font-semibold tabular-nums break-words ${color}`}>{fmt(Number(value))}</p></div>)}</div>
- <div className="rounded-2xl border border-gray-200 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Margen sobre ingresos</h3><strong className={r.beneficio>=0?'text-emerald-700':'text-red-600'}>{r.margen==null?'No calculable':r.margen.toLocaleString('es-ES',{maximumFractionDigits:1})+' %'}</strong></div><div className="mt-3 h-2 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true"><div className={`h-full rounded-full ${r.beneficio>=0?'bg-emerald-500':'bg-red-500'}`} style={{width:`${Math.min(100,Math.abs(r.margen??0))}%`}}/></div><p className="text-xs text-gray-500 mt-3">Beneficio = total sin IVA − gastos del evento sin IVA. Antes de gastos generales e impuestos.{ingreso.estadoPago==='presupuesto'?' Es una estimación del presupuesto.':ingreso.estadoPago==='cancelado'?' Ingreso cancelado: estas cifras no representan una previsión activa.':''}</p></div>
- <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm"><div><dt className="text-gray-500">IVA del ingreso</dt><dd className="font-semibold">{fmt(ingreso.importeIVA)}</dd></div><div><dt className="text-gray-500">Gastos con IVA</dt><dd className="font-semibold">{fmt(r.costeConIVA)}</dd></div><div><dt className="text-gray-500">Cobrado con IVA</dt><dd className="font-semibold text-emerald-700">{fmt(r.cobrado)}</dd></div><div><dt className="text-gray-500">Pendiente de cobro</dt><dd className={`font-semibold ${r.pendiente>0?'text-red-600':'text-emerald-700'}`}>{fmt(r.pendiente)}</dd></div></dl>
- <section><div className="flex flex-wrap items-center justify-between gap-3 mb-3"><h3 className="font-semibold">Gastos vinculados ({r.gastos.length})</h3>{onAddExpense&&<Button variant="secondary" onClick={onAddExpense}>Añadir gasto</Button>}</div>{r.gastos.length?<div className="overflow-x-auto border border-gray-200 rounded-2xl"><table className="w-full text-sm"><thead className="bg-gray-50"><tr>{['Concepto','Categoría','Pago','Sin IVA','Con IVA'].map(label=><th key={label} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>{r.gastos.map(g=><tr key={g.id} className="border-t border-gray-100"><td className="p-3">{g.concepto}<small className="block text-gray-500">{g.fecha}</small></td><td className="p-3">{g.categoria}</td><td className={`p-3 ${g.estadoPago==='pagado'?'text-emerald-700':g.estadoPago==='pendiente'?'text-red-600':'text-gray-500'}`}>{expensePaymentLabel(g)}</td><td className="p-3 whitespace-nowrap tabular-nums">{fmt(gastoEventoSinIVA(g))}</td><td className="p-3 whitespace-nowrap tabular-nums">{fmt(gastoEventoConIVA(g))}</td></tr>)}</tbody></table></div>:<p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">Todavía no hay gastos vinculados. El beneficio cambiará cuando registres los costes del evento.</p>}
- {r.sinDesglose>0&&<p className="text-xs text-amber-800 mt-3">{r.sinDesglose} gasto(s) sin desglose de IVA: se usa el importe registrado como coste. Su IVA no puede separarse con los datos actuales.</p>}
- <Link onClick={onClose} to={`${paths[resolveLinea(ingreso)]}?ingreso=${encodeURIComponent(ingreso.id)}`} className="inline-block text-sm font-semibold underline mt-4">Abrir gastos de este evento</Link></section>
- {ingreso.notas&&<section className="rounded-2xl bg-gray-50 p-4 text-sm"><h3 className="font-semibold mb-2">Notas</h3><p className="whitespace-pre-wrap">{ingreso.notas}</p></section>}
- </div></Modal>;
+import { Link } from 'react-router-dom';
+import { Plus, ChevronRight } from 'lucide-react';
+import type { Ingreso, GastoEvento } from '../../types';
+import { ingresoRentabilidad, gastoEventoSinIVA, gastoEventoConIVA } from '../../lib/ingresoRentabilidad';
+import { resolveLinea } from '../../config/resolveLinea';
+import { Modal } from '../ui/Modal';
+import { ExpenseStatus } from '../ui/ExpenseStatus';
+import { Pill, SplitBar, Btn } from '../kit';
+import { ESTADO_LABEL, ESTADO_TONE } from '../ingresos/IngresosViews';
+import { fmt } from '../../utils/helpers';
+
+const paths = {
+  montada_sound: '/lineas/montada-sound/gastos-eventos',
+  dj: '/dj/gastos-actuacion',
+  real_madrid: '/lineas/real-madrid/gastos-actuacion',
+  montada_installations: '/lineas/installations/gastos-instalacion',
+};
+
+/** Ficha del evento: cifras clave, margen y gastos vinculados. */
+export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense }: {
+  ingreso: Ingreso; gastos: GastoEvento[]; onClose: () => void; onAddExpense?: () => void;
+}) {
+  const r = ingresoRentabilidad(ingreso, gastos);
+  const margen = r.margen == null ? null : Math.round(r.margen * 10) / 10;
+  return (
+    <Modal isOpen onClose={onClose} title={ingreso.concepto} size="lg">
+      <div className="flex items-center gap-2 flex-wrap -mt-1 mb-5 text-[14px] text-ink-3">
+        <span>{ingreso.cliente}</span><span>·</span><span>{ingreso.fechaEvento}</span><span>·</span><span>{ingreso.tipoEvento}</span>
+        <span className="ml-auto flex gap-2">
+          <Pill tone={ESTADO_TONE[ingreso.estadoPago]}>{ESTADO_LABEL[ingreso.estadoPago] ?? ingreso.estadoPago}</Pill>
+          {ingreso.numeroFactura && <Pill tone="info">{ingreso.numeroFactura}</Pill>}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {[
+          ['Sin IVA', fmt(ingreso.baseImponible), ''],
+          ['Con IVA', fmt(ingreso.total), ''],
+          ['Gastos s/IVA', fmt(r.coste), ''],
+          ['Beneficio', fmt(r.beneficio), r.beneficio >= 0 ? 'text-[#1f9d55]' : 'text-[#d70015]'],
+        ].map(([label, value, cls]) => (
+          <div key={label} className="rounded-2xl bg-[var(--widget-2)] p-3.5">
+            <p className="text-[12px] text-ink-3">{label}</p>
+            <p className={`num mt-1 text-[18px] font-semibold tracking-[-0.02em] ${cls}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-[var(--widget-2)] p-4">
+        <div className="flex justify-between text-[14px] mb-2.5">
+          <span className="font-semibold">Margen</span>
+          <span className={`num font-semibold ${r.beneficio >= 0 ? 'text-[#1f9d55]' : 'text-[#d70015]'}`}>{margen == null ? '—' : `${margen.toLocaleString('es-ES')} %`}</span>
+        </div>
+        <SplitBar parts={[
+          { label: 'Gastos', value: r.coste, color: '#d70015' },
+          { label: 'Beneficio', value: Math.max(0, r.beneficio), color: '#1f9d55' },
+        ]} />
+        <div className="flex justify-between mt-3 text-[13px] text-ink-3">
+          <span>Cobrado <b className="num text-ink">{fmt(r.cobrado)}</b></span>
+          <span>Pendiente <b className={`num ${r.pendiente > 0 ? 'text-[#c26a00]' : 'text-ink'}`}>{fmt(r.pendiente)}</b></span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-6 mb-2">
+        <h3 className="widget-title">Gastos <span className="text-ink-3 font-normal">{r.gastos.length}</span></h3>
+        {onAddExpense && <Btn variant="secondary" onClick={onAddExpense}><Plus size={15} strokeWidth={2.4} />Añadir gasto</Btn>}
+      </div>
+      {r.gastos.length ? (
+        <div className="rounded-2xl bg-[var(--widget-2)] divide-y divide-black/[.06]">
+          {r.gastos.map((g) => (
+            <div key={g.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[14.5px] font-medium truncate">{g.concepto}</p>
+                <p className="text-[12.5px] text-ink-3">{g.categoria} · {g.fecha}</p>
+              </div>
+              <ExpenseStatus status={g.estadoPago} />
+              <div className="text-right">
+                <p className="num text-[14.5px] font-semibold">{fmt(gastoEventoConIVA(g))}</p>
+                <p className="num text-[12px] text-ink-3">{fmt(gastoEventoSinIVA(g))} s/IVA</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-2xl bg-[var(--widget-2)] p-4 text-[14px] text-ink-3">Sin gastos todavía.</p>
+      )}
+
+      <Link onClick={onClose} to={`${paths[resolveLinea(ingreso)]}?ingreso=${encodeURIComponent(ingreso.id)}`} className="mt-4 inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--blue)]">
+        Abrir gastos de este evento <ChevronRight size={15} />
+      </Link>
+      {ingreso.notas && <p className="mt-5 rounded-2xl bg-[var(--widget-2)] p-4 text-[14px] whitespace-pre-wrap">{ingreso.notas}</p>}
+    </Modal>
+  );
 }

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 const lines = [{id:'dj',name:'DJ · 100% para ti'}, {id:'montada_sound',name:'La Montada Sound'}, {id:'real_madrid',name:'Real Madrid'}, {id:'montada_installations',name:'Installations'}];
 type Amounts = Record<string,{assigned:string;received:string}>;
 const empty = ():Amounts => Object.fromEntries(lines.map(l=>[l.id,{assigned:'',received:''}]));
-const euros=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+const euros=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
 export function PersonalMonthlySummary(){
  const profile=useAuthStore(s=>s.profile);
  if(profile?.rol!=='admin')return null;

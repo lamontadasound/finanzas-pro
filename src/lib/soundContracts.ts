@@ -20,7 +20,7 @@ export function contratoPdf(c:SoundContract){
  if(v.representante)line(`Representante: ${v.representante}`);if(v.pareja&&c.tipo==='boda')line(`Contrayentes: ${v.pareja}`);
  line(`Contacto: ${[v.contacto,v.email,v.telefono].filter(Boolean).join(' · ')}`);
  line('SERVICIO CONTRATADO',11,true);line(`Fecha: ${v.fecha}\nLugar: ${v.lugar}\nHorario: ${v.horario}`);line(v.servicios);
- const euro=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+ const euro=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
  line('IMPORTE Y PAGO',11,true);line(`Total sin IVA: ${euro(v.base)}\nIVA (${v.iva}%): ${euro(Math.round(v.base*v.iva)/100)}\nTotal con IVA: ${euro(contractTotal(v))}`);line(v.pago);
  if(c.tipo==='alquiler'){line('ENTREGA Y DEVOLUCIÓN',11,true);line(v.devolucion);if(v.fianza)line(`Fianza: ${v.fianza}`);}
  if(y+(d.splitTextToSize(v.condiciones,174) as string[]).length*5+60>274){d.addPage();page();y=24;}
@@ -36,7 +36,7 @@ function contratoReferenciaPdf(c:SoundContract){
  const next=()=>{d.addPage();header();};header();
  const text=(value:string,bold=false,size=10)=>{d.setFont('helvetica',bold?'bold':'normal');d.setFontSize(size);d.setTextColor(28,28,28);for(const line of d.splitTextToSize(value,166) as string[]){if(y>268)next();d.text(line,26,y);y+=4.8;}y+=3;};
  const section=(title:string,body:string)=>{if(y>248)next();text(title,true);text(body);y+=2;};
- const money=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+ const money=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
  text(c.tipo==='alquiler'?'CONTRATO DE ALQUILER DE EQUIPOS AUDIOVISUALES':'CONTRATO DE SERVICIOS AUDIOVISUALES PARA EVENTOS',true,11);
  y+=3;text(`Entre ${v.emisor}, con domicilio en ${v.direccionEmisor}, y NIF ${v.nifEmisor}, en adelante "La Montada Sound", y ${v.cliente}, con NIF/DNI ${v.nif}, domicilio en ${v.direccion}, en adelante "El Cliente".`);
  if(v.representante)text(`Representante: ${v.representante}`);

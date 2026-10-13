@@ -21,7 +21,7 @@ import type { Area, Ingreso, PaymentMethod, PaymentStatus, GastoEvento, GastoEve
 import type { LineaId } from '../../config/businessLines';
 import { resolveLinea } from '../../config/resolveLinea';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 const ESTADOS: PaymentStatus[] = ['presupuesto', 'pendiente', 'parcial', 'pagado', 'cancelado'];
 const PCTS_IVA = [0, 10, 21];

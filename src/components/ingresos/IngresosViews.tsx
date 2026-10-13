@@ -20,8 +20,8 @@ const spring = { type: 'spring' as const, bounce: 0, duration: 0.5 };
 
 /* ── Nivel 1: años ──────────────────────────────────────────────────────── */
 export const YearGrid = ({
-  years, onOpen,
-}: { years: { year: number; count: number; total: number; months: number[] }[]; onOpen: (y: number) => void }) => {
+  years, onOpen, unit = ['ingreso', 'ingresos'],
+}: { years: { year: number; count: number; total: number; months: number[] }[]; onOpen: (y: number) => void; unit?: [string, string] }) => {
   const current = new Date().getFullYear();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -53,7 +53,7 @@ export const YearGrid = ({
             </div>
             <div className="flex items-baseline justify-between gap-2">
               <span className="num text-[19px] font-semibold tracking-[-0.02em]">{fmtShort(y.total)}</span>
-              <span className="text-[13px] text-ink-3">{y.count} {y.count === 1 ? 'ingreso' : 'ingresos'}</span>
+              <span className="text-[13px] text-ink-3">{y.count} {y.count === 1 ? unit[0] : unit[1]}</span>
             </div>
           </motion.button>
         );
@@ -64,8 +64,11 @@ export const YearGrid = ({
 
 /* ── Nivel 2: meses ─────────────────────────────────────────────────────── */
 export const MonthGrid = ({
-  year, months, onOpen,
-}: { year: number; months: { count: number; total: number; pendiente: number }[]; onOpen: (m: number) => void }) => {
+  year, months, onOpen, unit = ['evento', 'eventos'], pendingLabel = 'por cobrar', emptyLabel = 'Sin ingresos',
+}: {
+  year: number; months: { count: number; total: number; pendiente: number }[]; onOpen: (m: number) => void;
+  unit?: [string, string]; pendingLabel?: string; emptyLabel?: string;
+}) => {
   const now = new Date();
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -87,13 +90,13 @@ export const MonthGrid = ({
               {current && <span className="now-dot" aria-label="Mes actual" />}
             </div>
             {empty ? (
-              <span className="mt-auto text-[13px] text-ink-4">Sin ingresos</span>
+              <span className="mt-auto text-[13px] text-ink-4">{emptyLabel}</span>
             ) : (
               <>
                 <span className="mt-auto num text-[22px] font-semibold tracking-[-0.03em]">{fmtShort(m.total)}</span>
                 <span className="mt-1 flex items-center gap-2 text-[12.5px] text-ink-3">
-                  {m.count} {m.count === 1 ? 'evento' : 'eventos'}
-                  {m.pendiente > 0 && <span className="text-[#c26a00]">· {fmtShort(m.pendiente)} por cobrar</span>}
+                  {m.count} {m.count === 1 ? unit[0] : unit[1]}
+                  {m.pendiente > 0 && <span className="text-[#c26a00]">· {fmtShort(m.pendiente)} {pendingLabel}</span>}
                 </span>
               </>
             )}
@@ -105,7 +108,7 @@ export const MonthGrid = ({
 };
 
 /* ── Nivel 3: lista del mes ─────────────────────────────────────────────── */
-const DateGlyph = ({ date }: { date: string }) => {
+export const DateGlyph = ({ date }: { date: string }) => {
   const d = new Date(date);
   const valid = !Number.isNaN(d.getTime());
   return (

@@ -1,7 +1,7 @@
 import {useStore} from '../../../store/useStore';
 import {resolveLinea} from '../../../config/resolveLinea';
 import {Link} from 'react-router-dom';
-const fmt=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+const fmt=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
 export const InstallationsResumen=()=>{
  const incomes=useStore(s=>s.ingresos).filter(i=>resolveLinea(i)==='montada_installations');
  const expenses=useStore(s=>s.gastos).filter(g=>resolveLinea(g)==='montada_installations');

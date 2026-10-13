@@ -8,7 +8,7 @@ import {Button} from '../../components/ui/Button';
 import {resolveLinea} from '../../config/resolveLinea';
 import {uid} from '../../utils/helpers';
 import type {MovimientoSocio,MovimientoSocioTipo} from '../../types';
-const euro=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+const euro=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
 const months=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const labels:Record<MovimientoSocioTipo,string>={aportacion_personal:'Aportación de capital',reintegro_aportacion:'Retirada de capital',beneficio_reinvertido:'Beneficio reinvertido',reparto_beneficio_cobrado:'Reparto de beneficio',adelanto_socio:'Adelanto del socio',devolucion_adelanto:'Devolución de adelanto',ajuste:'Ajuste histórico'};
 export function RepartoSociosPage({linea='montada_sound'}:{linea?:'montada_sound'|'montada_installations'}){return <RepartoBody key={linea} linea={linea}/>;}

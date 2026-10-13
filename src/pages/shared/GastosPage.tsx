@@ -16,7 +16,7 @@ import { Paperclip } from 'lucide-react';
 import type { Area, Gasto, GastoCategoria, GastoTipo, PagadoPor, PaymentMethod } from '../../types';
 import type { LineaId } from '../../config/businessLines';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 

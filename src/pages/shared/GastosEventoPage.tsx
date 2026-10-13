@@ -6,7 +6,14 @@ import { EventExpensePaymentFields } from '../../components/forms/EventExpensePa
 import {eventCategoryOptions} from '../../lib/eventCategories';
 import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Search, Folder, ChevronLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { PageHeader, Metric, Btn } from '../../components/kit';
+import { GastosSwitch } from '../../components/kit/GastosSwitch';
+import { YearGrid, MonthGrid, DateGlyph } from '../../components/ingresos/IngresosViews';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { RowMenu2 } from '../../components/ui2/RowMenu';
+import { useExpenseCategories, categoryColor } from '../../lib/expenseCategoryConfig';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -18,7 +25,7 @@ import type { Area, GastoEvento, GastoEventoCategoria, PagadoPor, Suplido } from
 import type { LineaId } from '../../config/businessLines';
 import { resolveLinea } from '../../config/resolveLinea';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const PAGADORES: PagadoPor[] = ['La Montada', 'Julia', 'Rodrigo', 'Julia y Rodrigo', 'Marco'];
@@ -69,6 +76,7 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
   const canEdit   = () => canEditLinea(permLinea);
   const canDelete = () => canDeleteLinea(permLinea);
   const showConfirm = useConfirmStore((s) => s.show);
+  const { categories } = useExpenseCategories();
 
   const titulo = tituloOverride ?? (area === 'montada' ? 'Gastos de eventos' : 'Gastos de actuación');
   const lineaLabel = tituloOverride ? (filterLinea === 'real_madrid' ? 'Real Madrid' : 'DJs') : (area === 'montada' ? 'La Montada Sound' : 'DJs');
@@ -100,7 +108,7 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
   );
 
   // ── Navegación por Año → Mes ──────────────────────────────────────────────
-  const [selectedYear, setSelectedYear]   = useState<number | null>(null);
+  const [selectedYear, setSelectedYear]   = useState<number | null>(() => new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   // ── Carpetas: una por actuación/ingreso que tiene gastos, agrupadas por la
@@ -231,200 +239,165 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
     closeModal();
   };
 
+  const resumenAnios = anios.map(([year, d]) => {
+    const months = Array(12).fill(0) as number[];
+    todasLasCarpetas.forEach((c) => {
+      const dt = new Date(c.ingreso.fechaEvento);
+      if (dt.getFullYear() === year) months[dt.getMonth()] += c.total;
+    });
+    return { year, count: d.count, total: d.total, months };
+  });
+  const resumenMeses = Array.from({ length: 12 }, (_, m) => {
+    const del = todasLasCarpetas.filter((c) => {
+      const dt = new Date(c.ingreso.fechaEvento);
+      return dt.getFullYear() === selectedYear && dt.getMonth() === m;
+    });
+    const pend = gastos.filter((g) => del.some((c) => c.ingresoId === g.ingresoId) && g.estadoPago === 'pendiente')
+      .reduce((a, g) => a + gastoEventoConIVA(g), 0);
+    return { count: del.length, total: del.reduce((a, c) => a + c.total, 0), pendiente: pend };
+  });
+  const gastosDelMes = gastos.filter((g) => carpetas.some((c) => c.ingresoId === g.ingresoId));
+
+  const header = (
+    <PageHeader title={carpetaActual ? carpetaActual.concepto : 'Gastos'}>
+      <GastosSwitch eventosLabel={area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
+      {canCreate() && ingresos.length > 0 && (
+        <Btn variant="primary" onClick={() => openNew(selectedIngresoId ?? undefined)}><Plus size={16} strokeWidth={2.4} />Nuevo gasto</Btn>
+      )}
+    </PageHeader>
+  );
+
   if (ingresos.length === 0) {
     return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{titulo}</h1>
-          
-        </div>
-        <div className="bg-white border border-gray-200 rounded-card p-10 text-center">
-          <p className="text-gray-500 text-sm">Todavía no hay ingresos creados en esta área.</p>
-          <p className="text-gray-400 text-xs mt-1">Crea primero un ingreso para poder vincularle gastos, o usa el botón "Añadir gasto" desde el propio listado de ingresos.</p>
-        </div>
+      <div>
+        {header}
+        <EmptyState icon={<Folder size={22} />} title={`Sin ${singular}s todavía`} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      {gastos.some(g=>g.baseImponible==null&&g.importeIVA==null)&&<p role="status" className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Hay gastos antiguos sin desglose de IVA. Abre «Editar» para indicar base e IVA; hasta entonces los resúmenes de costes son provisionales.</p>}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{titulo}</h1>
-        </div>
-        {canCreate() && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => openNew()}>Nuevo gasto</Button>
-        )}
-      </div>
+    <div>
+      {header}
 
       {selectedIngresoId == null && (
         <>
-          {/* Breadcrumb Año → Mes */}
-          <div className="flex items-center gap-2 text-sm">
-            <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Años</button>
-            {selectedYear != null && (
-              <>
-                <span className="text-gray-300">/</span>
-                <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>{selectedYear}</button>
-              </>
-            )}
-            {selectedYear != null && selectedMonth != null && (
-              <>
-                <span className="text-gray-300">/</span>
-                <span className="font-medium text-gray-900">{MESES_FULL[selectedMonth]}</span>
-              </>
-            )}
-          </div>
+          {selectedYear != null && (
+            <nav className="crumbs" aria-label="Ruta">
+              <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }}>Años</button>
+              <ChevronRight size={14} />
+              {selectedMonth == null ? <b>{selectedYear}</b> : (
+                <>
+                  <button onClick={() => setSelectedMonth(null)}>{selectedYear}</button>
+                  <ChevronRight size={14} />
+                  <b>{MESES_FULL[selectedMonth]}</b>
+                </>
+              )}
+            </nav>
+          )}
 
-          {/* Nivel 1: años */}
           {selectedYear == null && (
-            anios.length === 0 ? (
-              <p className="text-center py-16 text-gray-400 text-sm">Todavía no hay gastos registrados. Añádelos desde aquí o desde el botón "Añadir gasto" en cada ingreso.</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {anios.map(([y, data]) => (
-                  <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
-                    <div className="flex items-center gap-2 mb-2"><Folder size={16} className="text-gold-500" /><span className="text-lg font-bold text-gray-900">{y}</span></div>
-                    <p className="text-xs text-gray-500">{data.count} {singular}s con gastos</p>
-                    <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-                  </button>
-                ))}
-              </div>
-            )
+            anios.length === 0
+              ? <EmptyState icon={<Folder size={22} />} title="Todavía no hay gastos" />
+              : <YearGrid years={resumenAnios} onOpen={(y) => { setSelectedYear(y); setSelectedMonth(null); }} unit={[`${singular}`, `${singular}s`]} />
           )}
 
-          {/* Nivel 2: meses dentro del año */}
           {selectedYear != null && selectedMonth == null && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <button onClick={() => setSelectedYear(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a años</button>
-                <p className="text-sm text-gray-600">Total sin IVA {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
+            <>
+              <div className="bento mb-4">
+                <Metric label="Gastos sin IVA" value={totalAnio} />
+                <Metric label={`${singular[0].toUpperCase()}${singular.slice(1)}s con gastos`} value={resumenMeses.reduce((a, m) => a + m.count, 0)} kind="count" delay={0.03} />
+                <Metric label="Pendiente de pagar" value={resumenMeses.reduce((a, m) => a + m.pendiente, 0)} delay={0.06} tone="warning" />
+                <Metric label="Media por evento" value={resumenMeses.reduce((a, m) => a + m.count, 0) ? totalAnio / resumenMeses.reduce((a, m) => a + m.count, 0) : 0} delay={0.09} />
               </div>
-              {mesesDelAnio.length === 0 ? (
-                <p className="text-center py-16 text-gray-400 text-sm">Sin gastos en {selectedYear}</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {mesesDelAnio.map(([m, data]) => (
-                    <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
-                      <div className="flex items-center gap-2 mb-2"><Folder size={16} className="text-gold-500" /><span className="font-bold text-gray-900">{MESES_FULL[m]}</span></div>
-                      <p className="text-xs text-gray-500">{data.count} {singular}s con gastos</p>
-                      <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              <MonthGrid year={selectedYear} months={resumenMeses} onOpen={setSelectedMonth}
+                unit={[singular, `${singular}s`]} pendingLabel="sin pagar" emptyLabel="Sin gastos" />
+            </>
           )}
 
-          {/* Nivel 3: carpetas por actuación/evento dentro del mes */}
           {selectedYear != null && selectedMonth != null && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <button onClick={() => setSelectedMonth(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a meses</button>
-                <p className="text-sm text-gray-600">Total sin IVA {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
+            <>
+              <div className="bento mb-4">
+                <Metric label="Sin IVA" value={totalMes} />
+                <Metric label="Con IVA" value={gastosDelMes.reduce((a, g) => a + gastoEventoConIVA(g), 0)} delay={0.03} />
+                <Metric label="Gastos" value={gastosDelMes.length} kind="count" delay={0.06} />
+                <Metric label="Sin pagar" value={gastosDelMes.filter((g) => g.estadoPago === 'pendiente').reduce((a, g) => a + gastoEventoConIVA(g), 0)} delay={0.09} tone="warning" />
               </div>
-
-              <div className="flex flex-wrap gap-3">
-                <div className="relative flex-1 min-w-[200px] max-w-sm">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${singular} o cliente…`} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-gold-400" />
-                </div>
-
-                <select value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value as GastoEventoCategoria | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-                  <option value="">Todas las categorías</option>
-                  {eventCategoryOptions(gastos.map(g=>g.categoria)).map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-
-              {carpetas.length === 0 ? (
-                <p className="text-center py-16 text-gray-400 text-sm">Sin resultados</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {carpetas.map((c) => (
-                    <button key={c.ingresoId} onClick={() => setSelectedIngresoId(c.ingresoId)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Folder size={16} className="text-gold-500 flex-shrink-0" />
-                        <span className="font-bold text-gray-900 truncate">{c.ingreso.concepto}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">{c.ingreso.cliente} · {c.ingreso.fechaEvento}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{lineaLabel}</p>
-                      <p className="text-sm font-semibold text-gray-700 mt-2">{c.count} gastos · Total sin IVA: {fmt(c.total)}</p>
-                    </button>
+              {carpetas.length === 0 ? <EmptyState icon={<Folder size={22} />} title="Sin gastos este mes" /> : (
+                <div className="widget list" style={{ padding: 0 }}>
+                  {carpetas.map((c, idx) => (
+                    <motion.button
+                      key={c.ingresoId}
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.5, delay: idx * 0.03 }}
+                      onClick={() => setSelectedIngresoId(c.ingresoId)}
+                      className="list-row"
+                    >
+                      <DateGlyph date={c.ingreso.fechaEvento} />
+                      <span className="list-main"><b>{c.ingreso.concepto}</b><small>{c.ingreso.cliente} · {c.count} {c.count === 1 ? 'gasto' : 'gastos'}</small></span>
+                      <span className="list-amount num">{fmt(c.total)}<small>sin IVA</small></span>
+                      <ChevronRight size={18} className="text-ink-4 shrink-0" />
+                    </motion.button>
                   ))}
                 </div>
               )}
-            </div>
+            </>
           )}
         </>
       )}
 
-      {/* Nivel 2: gastos dentro de la carpeta */}
-      {selectedIngresoId!=null&&!carpetaActual&&<div className="rounded-xl bg-gray-50 p-5"><p>Este ingreso no está disponible en esta línea o con tus permisos.</p><button className="underline mt-3" onClick={()=>setSelectedIngresoId(null)}>Volver a gastos</button></div>}
+      {selectedIngresoId != null && !carpetaActual && (
+        <div className="widget p-6"><p>Este evento no está disponible en esta línea.</p><button className="crumbs-link mt-3" onClick={() => setSelectedIngresoId(null)}>Volver a gastos</button></div>
+      )}
       {selectedIngresoId != null && carpetaActual && (
-        <div className="space-y-4">
-          <button onClick={() => setSelectedIngresoId(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a {singular}s</button>
+        <>
+          <nav className="crumbs" aria-label="Ruta">
+            <button onClick={() => setSelectedIngresoId(null)}>Gastos</button>
+            <ChevronRight size={14} />
+            <b>{carpetaActual.cliente} · {carpetaActual.fechaEvento}</b>
+          </nav>
+          <div className="bento mb-4">
+            <Metric label="Ingreso sin IVA" value={carpetaActual.baseImponible} />
+            <Metric label="Ingreso con IVA" value={carpetaActual.total} delay={0.03} />
+            <Metric label="Gastos sin IVA" value={totalGastosCarpeta} delay={0.06} />
+            <Metric label="Beneficio" value={beneficioCarpeta} delay={0.09} tone={beneficioCarpeta >= 0 ? 'positive' : 'negative'} />
+          </div>
 
-          <div className="bg-white border border-gray-200 rounded-card shadow-card p-4 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
-              <div className="min-w-0 break-words">
-                <h2 className="text-lg font-bold text-gray-900">{carpetaActual.concepto}</h2>
-                <p className="text-sm text-gray-500">{carpetaActual.cliente} · {carpetaActual.fechaEvento} · {lineaLabel}</p>
+          {gastosCarpeta.length === 0 ? <EmptyState icon={<Folder size={22} />} title="Sin gastos en este evento" /> : (
+            <div className="widget overflow-hidden" style={{ padding: 0 }}>
+              <div className="gx-grid gx-head" aria-hidden>
+                <span /><span>Concepto</span><span>Categoría</span><span>Pagado por</span><span>Fecha</span>
+                <span className="r">Sin IVA</span><span className="r">Con IVA</span><span>Pago</span><span />
               </div>
-              {canCreate() && (
-                <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => openNew(selectedIngresoId)}>Añadir gasto</Button>
-              )}
+              {gastosCarpeta.map((g, idx) => {
+                const color = categoryColor(g.categoria, categories);
+                return (
+                  <motion.div
+                    key={g.id}
+                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45, delay: idx * 0.025 }}
+                    className="gx-grid gx-row"
+                  >
+                    <span className="cat-glyph" style={{ background: `${color}1f`, color }}>{g.categoria?.slice(0, 1).toUpperCase() || '·'}</span>
+                    <span className="gx-main"><b>{g.concepto}</b><small>{g.categoria} · {g.pagadoPor ?? 'La Montada'} · {g.fecha}</small></span>
+                    <span className="gx-cat"><span className="cat-tag" style={{ color, background: `${color}14` }}>{g.categoria}</span></span>
+                    <span className="gx-col">{g.pagadoPor ?? '—'}</span>
+                    <span className="gx-col num">{g.fecha}</span>
+                    <span className="r num">{fmt(gastoEventoSinIVA(g))}</span>
+                    <span className="r num gx-strong">{fmt(gastoEventoConIVA(g))}</span>
+                    <span className="gx-pay"><ExpenseStatus status={g.estadoPago} /></span>
+                    <span className="flex justify-end">
+                      <RowMenu2 actions={[
+                        ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(g) }] : []),
+                        ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este gasto?', () => deleteGastoEvento(g.id)) }] : []),
+                      ]} />
+                    </span>
+                  </motion.div>
+                );
+              })}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
-              <div><p className="text-xs text-gray-500">Total sin IVA</p><p className="font-semibold text-gray-900">{fmt(carpetaActual.baseImponible)}</p></div><div><p className="text-xs text-gray-500">Total con IVA</p><p className="font-semibold text-blue-700">{fmt(carpetaActual.total)}</p></div>
-              <div><p className="text-xs text-gray-500">Gastos sin IVA</p><p className="font-semibold text-red-600">{fmt(totalGastosCarpeta)}</p></div>
-              <div><p className="text-xs text-gray-500">Beneficio del evento</p><p className={`font-semibold ${beneficioCarpeta >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(beneficioCarpeta)}</p></div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-gray-100 bg-gray-50">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado por</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total sin IVA</th><th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total con IVA</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {gastosCarpeta.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">Sin gastos registrados</td></tr>
-                  ) : gastosCarpeta.map((g) => (
-                    <tr key={g.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{g.concepto}</td>
-                      <td className="px-4 py-3 text-gray-600">{g.categoria}</td>
-                      <td className="px-4 py-3 text-gray-600">{g.pagadoPor ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{g.fecha}</td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{g.baseImponible==null&&g.importeIVA==null?<span className="text-amber-700 text-xs">Sin desglose</span>:fmt(gastoEventoSinIVA(g))}</td><td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(gastoEventoConIVA(g))}</td>
-                      <td className="px-4 py-3 text-center">
-                        <ExpenseStatus status={g.estadoPago}/>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          {canEdit() && <button onClick={() => openEdit(g)} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Edit2 size={13} /></button>}
-                          {canDelete() && <button onClick={() => showConfirm('¿Eliminar este gasto?', () => deleteGastoEvento(g.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
 
           {area === 'dj' && filterLinea !== 'real_madrid' && (
-            <div className="bg-white border border-gray-200 rounded-card shadow-card p-4 sm:p-6 space-y-4">
+            <div className="widget p-5 sm:p-6 space-y-4 mt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-gray-900">Suplidos</h3>
                 <div>
@@ -498,7 +471,7 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
               )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar gasto' : 'Nuevo gasto'} size="lg">

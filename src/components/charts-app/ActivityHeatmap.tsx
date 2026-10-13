@@ -36,7 +36,7 @@ const CELL_GAP = 3;
 const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const DIAS_ABR = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
-const fmtEUR = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmtEUR = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const fmtFecha = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
 interface TooltipState {

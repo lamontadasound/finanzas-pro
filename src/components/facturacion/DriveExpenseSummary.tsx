@@ -5,7 +5,7 @@ import {driveExpenseTotals,type DriveExpense,type DriveExpenseAmount} from '../.
 import {supabase} from '../../lib/supabase';
 import {Modal} from '../ui/Modal';
 import {StatCard2} from '../ui2/StatCard';
-const fmt=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+const fmt=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
 const months=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 export function DriveExpenseSummary({year='todos',month='todos',quarter='todos',income,outputVat,archive=false,statement=false}:{year?:number|'todos';month?:number|'todos';quarter?:number|'todos';income?:number;outputVat?:number;archive?:boolean;statement?:boolean}){
  const {rows,error,loading,refreshing,refresh,reload,admin}=useDriveExpenses();

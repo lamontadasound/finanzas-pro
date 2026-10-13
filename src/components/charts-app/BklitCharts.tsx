@@ -150,7 +150,7 @@ export const BklitBarCard = ({ title, description, data, xDataKey, dataKey, colo
     <ul className="expense-chart-legend">
       {data.map((d, i) => <li key={String(d[xDataKey])}>
         <span className="expense-category-dot" style={{backgroundColor:colors[i]}} aria-hidden="true"/>
-        <span>{String(d[xDataKey])}</span><strong>{Number(d[dataKey]??0).toLocaleString('es-ES',{style:'currency',currency:'EUR'})}</strong>
+        <span>{String(d[xDataKey])}</span><strong>{Number(d[dataKey]??0).toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions)}</strong>
       </li>)}
     </ul>
   </ContentCard2>;

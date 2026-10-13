@@ -15,7 +15,7 @@ import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLi
 import { lineaDeIngreso, lineaDeGasto, agregarIngresos, agregarGastos, calcularResumenFinanciero, cobradoDe, pendienteDe } from '../../lib/contabilidad';
 import type { Ingreso, PaymentStatus } from '../../types';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const TRIMESTRES = ['T1', 'T2', 'T3', 'T4'];

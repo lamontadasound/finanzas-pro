@@ -7,7 +7,7 @@ interface Props {
   className?: string;
 }
 
-const fmtDefault = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmtDefault = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 // ── Contador animado para cifras financieras ────────────────────────────────
 // Prioridad absoluta: el valor correcto SIEMPRE debe estar visible. La

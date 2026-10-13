@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { BUSINESS_LINES, LINEA_IDS } from '../config/businessLines';
 import { juliaSummary } from '../lib/juliaSummary';
 
-const euro = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const euro = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const monthName = (month: number) => new Date(2026, month, 1).toLocaleDateString('es-ES', { month: 'long' });
 const icons = { montada_sound: Building2, dj: Music2, real_madrid: Trophy, montada_installations: HardHat };
 

@@ -1,13 +1,18 @@
-import {useId,useState} from 'react';
-import {useStore} from '../../store/useStore';
-import {useExpenseCategories,categoryOptions} from '../../lib/expenseCategoryConfig';
-export function EventCategoryField({value='',onChange}:{value?:string;onChange:(value:string)=>void}){
- const id=useId();const gastos=useStore(s=>s.gastosEvento);
+import {useExpenseCategories,categoryOptions,categoryKey,type ExpenseScope} from '../../lib/expenseCategoryConfig';
+
+/**
+ * Selector cerrado de categorías. La lista se gestiona solo desde
+ * Configuración; aquí no se pueden crear categorías nuevas. Si un gasto
+ * antiguo tiene una categoría que ya no está configurada, se conserva como
+ * opción para no perder el dato al editar.
+ */
+export function EventCategoryField({value='',onChange,scope='evento'}:{value?:string;onChange:(value:string)=>void;scope?:ExpenseScope}){
  const {categories}=useExpenseCategories();
- const options=categoryOptions(categories,'evento',gastos.map(g=>g.categoria));
- const [custom,setCustom]=useState(false);
- const isCustom=custom||!!value&&!options.includes(value);
- return <div className="space-y-2"><select aria-label="Categoría del gasto" className="input-form" value={isCustom?'__custom__':value} onChange={e=>{const next=e.target.value;setCustom(next==='__custom__');onChange(next==='__custom__'?'':next);}}>
- {!value&&!isCustom&&<option value="">Elige categoría</option>}{options.map(c=><option key={c} value={c}>{c}</option>)}<option value="__custom__">＋ Escribir otra categoría</option>
- </select>{isCustom&&<><label htmlFor={id} className="label-form">Nombre de la categoría</label><input id={id} className="input-form" value={value} onChange={e=>onChange(e.target.value)} maxLength={80} placeholder="Ej. Alojamiento, Catering…"/><p className="text-xs text-gray-500">Estará disponible en la lista al guardar el gasto.</p></>}</div>;
+ const options=categoryOptions(categories,scope);
+ const legacy=!!value&&!options.some(o=>categoryKey(o)===categoryKey(value));
+ return <select aria-label="Categoría del gasto" className="input-form" value={value} onChange={e=>onChange(e.target.value)}>
+  {!value&&<option value="">Elige categoría</option>}
+  {options.map(c=><option key={c} value={c}>{c}</option>)}
+  {legacy&&<option value={value}>{value}</option>}
+ </select>;
 }

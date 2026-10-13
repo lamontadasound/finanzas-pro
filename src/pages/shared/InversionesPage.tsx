@@ -17,7 +17,7 @@ import { subirDocumento, obtenerUrlFirmada, eliminarArchivoStorage } from '../..
 import type { InversionArea, Equipo, PaymentMethod, Ingreso, Gasto, GastoEvento } from '../../types';
 import type { LineaId } from '../../config/businessLines';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const pctFmt = (n: number) => `${n.toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`;
 
 const CATEGORIAS_EQUIPO = ['Sonido', 'Iluminación', 'Estructuras', 'Pantallas', 'Decoración', 'Mesas de Mezclas', 'Mesas Sonido', 'Dispositivos', 'Cabinas', 'Micrófonos', 'Flightcase'];

@@ -15,7 +15,7 @@ import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLi
 import { cobradoDe, pendienteDe, diasPendienteDe, lineaDeIngreso, estadoPagoDesdeCobrado } from '../../lib/contabilidad';
 import type { Area, Ingreso, PaymentMethod } from '../../types';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 

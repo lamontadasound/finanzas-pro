@@ -30,7 +30,7 @@ import type { Area, Factura } from '../../types';
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const PCTS_IVA = [0, 10, 21];
 
 const ESTADO_LABEL: Record<NonNullable<Factura['estado']>, string> = {

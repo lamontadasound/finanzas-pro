@@ -17,7 +17,7 @@ import { uid } from '../../utils/helpers';
 import { resolveLinea } from '../../config/resolveLinea';
 import type { Ingreso, Factura } from '../../types';
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 export function GenerarFacturaModal({ ingreso, onClose }: { ingreso: Ingreso; onClose: () => void }) {
   const facturas = useStore((s) => s.facturas);
