@@ -1,6 +1,6 @@
 import {
   AudioLines, Disc3, Crown, Cable, House, Calculator, Settings2,
-  LayoutGrid, ArrowDownLeft, Receipt, Radar, Contact, FileText, Signature,
+  LayoutGrid, ArrowDownLeft, Receipt, Contact, FileText, Signature,
   ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users, SlidersHorizontal,
 } from 'lucide-react';
 import type { LineaId } from '../../config/businessLines';
@@ -55,8 +55,7 @@ export const SPACES: Space[] = [
       { to: `${montada}/resumen`, label: 'Resumen', icon: LayoutGrid },
       { to: `${montada}/ingresos`, label: 'Ingresos', icon: ArrowDownLeft },
       { to: `${montada}/gastos-eventos`, label: 'Gastos', icon: Receipt, alsoActive: [`${montada}/gastos`] },
-      { to: `${montada}/crm`, label: 'CRM', icon: Radar },
-      { to: `${montada}/clientes`, label: 'Clientes', icon: Contact },
+      { to: `${montada}/clientes`, label: 'Clientes', icon: Contact, alsoActive: [`${montada}/crm`] },
       { to: `${montada}/presupuestos`, label: 'Presupuestos', icon: FileText },
       { to: `${montada}/contratos`, label: 'Contratos', icon: Signature },
       { to: `${montada}/generar-facturas`, label: 'Facturas', icon: ReceiptText },
