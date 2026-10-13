@@ -145,3 +145,55 @@ export const Btn = ({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; size?: 'md' | 'lg' }) => (
   <button className={clsx('btn', `btn-${variant}`, size === 'lg' && 'btn-lg', className)} {...rest}>{children}</button>
 );
+
+/* ── Formularios agrupados (estilo Ajustes de iOS) ──────────────────────── */
+export const FormGroup = ({ title, children, className }: { title?: ReactNode; children: ReactNode; className?: string }) => (
+  <section className={clsx('fgroup', className)}>
+    {title && <h3 className="fgroup-title">{title}</h3>}
+    <div className="fgroup-body">{children}</div>
+  </section>
+);
+
+export const Field = ({ label, children, wide, hint }: { label: string; children: ReactNode; wide?: boolean; hint?: ReactNode }) => (
+  <label className={clsx('field', wide && 'field-wide')}>
+    <span className="field-label">{label}</span>
+    {children}
+    {hint && <span className="field-hint">{hint}</span>}
+  </label>
+);
+
+export function Chips<T extends string | number>({
+  value, options, onChange, label,
+}: { value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="chips" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button
+          type="button" key={String(o.value)} role="radio" aria-checked={o.value === value}
+          className="chip" onClick={() => onChange(o.value)}
+        >{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Interruptor que despliega un panel (p. ej. "Reserva"). */
+export const ToggleCard = ({
+  label, checked, onChange, children,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void; children?: ReactNode }) => (
+  <div className="togglecard" data-on={checked}>
+    <button type="button" role="switch" aria-checked={checked} className="togglecard-head" onClick={() => onChange(!checked)}>
+      <span>{label}</span>
+      <span className="ios-switch" data-on={checked}><motion.span layout transition={{ type: 'spring', stiffness: 600, damping: 34 }} /></span>
+    </button>
+    <motion.div
+      initial={false}
+      animate={{ height: checked ? 'auto' : 0, opacity: checked ? 1 : 0 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+      style={{ overflow: 'hidden' }}
+      aria-hidden={!checked}
+    >
+      {checked && <div className="togglecard-body">{children}</div>}
+    </motion.div>
+  </div>
+);

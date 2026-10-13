@@ -4,8 +4,11 @@ import {ingresoRentabilidad} from '../../lib/ingresoRentabilidad';
 import { EventExpensePaymentFields } from '../../components/forms/EventExpensePaymentFields';
 import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, Folder, ChevronLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
 import { uid } from '../../utils/helpers';
+import { pendienteDe } from '../../lib/contabilidad';
+import { PageHeader, Metric, Btn, FormGroup, Field, Chips, ToggleCard } from '../../components/kit';
+import { YearGrid, MonthGrid, IngresoRows, MESES_FULL, ESTADO_LABEL } from '../../components/ingresos/IngresosViews';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
@@ -14,12 +17,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { ContentCard2 } from '../../components/ui2/ContentCard';
-import { Button2 } from '../../components/ui2/Button';
-import { Badge2 } from '../../components/ui2/Badge';
-import { SearchInput2 } from '../../components/ui2/SearchInput';
-import { RowMenu2 } from '../../components/ui2/RowMenu';
-import { GenerarFacturaModal } from '../../components/facturacion/GenerarFacturaModal';
 import type { Area, Ingreso, PaymentMethod, PaymentStatus, GastoEvento, GastoEventoCategoria, PagadoPor, Suplido } from '../../types';
 import type { LineaId } from '../../config/businessLines';
 import { resolveLinea } from '../../config/resolveLinea';
@@ -30,10 +27,12 @@ const ESTADOS: PaymentStatus[] = ['presupuesto', 'pendiente', 'parcial', 'pagado
 const PCTS_IVA = [0, 10, 21];
 
 // ── Formulario de ingresos: listas cerradas específicas de este formulario ──
-const TIPOS_EVENTO_FORM = ['Boda', 'Alquiler', 'Evento corporativo', 'Real Madrid', 'DJ Session', 'Juan y Erra'];
+const TIPOS_EVENTO_FORM = ['Boda', 'Fiesta', 'Alquiler', 'Evento corporativo', 'Real Madrid', 'DJ Session'];
 const LINEAS_NEGOCIO = ['La Montada Sound', 'DJs', 'Real Madrid'] as const;
 const ESTADOS_FORM: PaymentStatus[] = ['pendiente', 'parcial', 'pagado'];
 const METODOS_FORM: PaymentMethod[] = ['transferencia', 'tarjeta', 'efectivo'];
+const METODO_LABEL: Record<string, string> = { transferencia: 'Transferencia', tarjeta: 'Tarjeta', efectivo: 'Efectivo', bizum: 'Bizum' };
+const LINEA_LABEL: Record<string, string> = { montada_sound: 'La Montada Sound', dj: 'DJ', real_madrid: 'Real Madrid', montada_installations: 'Instalaciones' };
 const PAGADORES: PagadoPor[] = ['La Montada', 'Julia', 'Rodrigo', 'Julia y Rodrigo', 'Marco'];
 
 const estadoTone: Record<PaymentStatus, 'neutral' | 'gold' | 'info' | 'success' | 'danger' | 'warning'> = {
@@ -44,7 +43,6 @@ const estadoTone: Record<PaymentStatus, 'neutral' | 'gold' | 'info' | 'success' 
   cancelado:   'danger',
 };
 
-const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const suplidoPendiente = (s: Suplido) => Math.max(0, s.importe - (s.cantidadRecuperada ?? 0));
 
@@ -108,11 +106,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
 
   const [detailId,setDetailId]=useState<string|null>(null);
   const detailIngreso=ingresos.find(i=>i.id===detailId);
-  const [search, setSearch]       = useState('');
-  const [filterEstado, setFilter] = useState<PaymentStatus | ''>('');
-  const [filterCliente, setFilterCliente] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [facturaIngreso, setFacturaIngreso] = useState<Ingreso | null>(null);
   const [editing, setEditing]     = useState<Ingreso | null>(null);
   const [form, setForm]           = useState<Partial<Ingreso>>(EMPTY(area, filterLinea));
   const [gastoTarget, setGastoTarget] = useState<Ingreso | null>(null);
@@ -122,8 +116,6 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   const [suplidoFormData, setSuplidoFormData] = useState<Partial<Suplido>>({});
   const [gastoForm, setGastoForm] = useState<{ concepto: string; categoria: GastoEventoCategoria; estadoPago?: GastoEvento['estadoPago']; metodoPago?: GastoEvento['metodoPago']; pagadoPor: PagadoPor; importe: number; fecha: string }>({ concepto: '', categoria: 'DJ', estadoPago: 'pendiente', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
   const showConfirm = useConfirmStore((s) => s.show);
-  const [sortField, setSortField] = useState<'fechaEvento' | 'total' | 'cliente'>('fechaEvento');
-  const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('desc');
 
   // ── Suplidos por cobrar (solo DJs) ────────────────────────────────────────
   const suplidosArea = useMemo(() => allSuplidos.filter((s) => s.area === area), [allSuplidos, area]);
@@ -159,7 +151,10 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   );
 
   // ── Navegación por Año → Mes (carpetas) ──────────────────────────────────
-  const [selectedYear, setSelectedYear]   = useState<number | null>(null);
+  const [selectedYear, setSelectedYear]   = useState<number | null>(() => {
+    const now = new Date().getFullYear();
+    return allIngresos.some((i) => i.area === area && new Date(i.fechaEvento).getFullYear() === now) ? now : null;
+  });
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const anios = useMemo(() => {
@@ -196,7 +191,6 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
     }).reduce((a, i) => a + i.baseImponible, 0);
   }, [ingresos, selectedYear, selectedMonth]);
 
-  const clientesDisponibles = useMemo(() => Array.from(new Set(ingresos.map((i) => i.cliente).filter(Boolean))).sort(), [ingresos]);
 
   const enElMes = useMemo(() => {
     if (selectedYear == null || selectedMonth == null) return [];
@@ -206,24 +200,41 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
     });
   }, [ingresos, selectedYear, selectedMonth]);
 
-  const filtered = useMemo(() => {
-    let list = [...enElMes];
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((i) => i.concepto.toLowerCase().includes(q) || i.cliente.toLowerCase().includes(q));
-    }
-    if (filterEstado) list = list.filter((i) => i.estadoPago === filterEstado);
-    if (filterCliente) list = list.filter((i) => i.cliente === filterCliente);
-    list.sort((a, b) => {
-      const av = a[sortField] ?? '';
-      const bv = b[sortField] ?? '';
-      const cmp = String(av).localeCompare(String(bv), 'es', { numeric: true });
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return list;
-  }, [enElMes, search, filterEstado, filterCliente, sortField, sortDir]);
+  const filtered = useMemo(
+    () => [...enElMes].sort((a, b) => a.fechaEvento.localeCompare(b.fechaEvento)),
+    [enElMes],
+  );
 
-  const totalFiltrado = filtered.reduce((a, i) => a + i.total, 0);
+  const beneficioMes = useMemo(
+    () => enElMes.reduce((a, i) => a + ingresoRentabilidad(i, allGastosEvento).beneficio, 0),
+    [enElMes, allGastosEvento],
+  );
+
+  const resumenAnios = useMemo(() => anios.map(([year, d]) => {
+    const months = Array(12).fill(0) as number[];
+    ingresos.forEach((i) => {
+      const dt = new Date(i.fechaEvento);
+      if (dt.getFullYear() === year) months[dt.getMonth()] += i.baseImponible;
+    });
+    return { year, count: d.count, total: d.total, months };
+  }), [anios, ingresos]);
+
+  const delAnio = useMemo(
+    () => (selectedYear == null ? [] : ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === selectedYear)),
+    [ingresos, selectedYear],
+  );
+  const totalAnioConIva = delAnio.reduce((a, i) => a + i.total, 0);
+  const pendienteAnio = delAnio.reduce((a, i) => a + pendienteDe(i), 0);
+  const countAnio = delAnio.length;
+  const resumenMeses = useMemo(() => {
+    const out = Array.from({ length: 12 }, () => ({ count: 0, total: 0, pendiente: 0 }));
+    delAnio.forEach((i) => {
+      const m = new Date(i.fechaEvento).getMonth();
+      out[m].count += 1; out[m].total += i.baseImponible; out[m].pendiente += pendienteDe(i);
+    });
+    return out;
+  }, [delAnio]);
+
 
   const openNew = () => {
     setEditing(null);
@@ -339,353 +350,180 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   };
 
 
-  const sort = (f: typeof sortField) => {
-    if (sortField === f) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortField(f); setSortDir('asc'); }
-  };
 
-  const sortIcon = (f: typeof sortField) =>
-    sortField === f ? <ChevronDown size={12} className={sortDir === 'desc' ? '' : 'rotate-180'} /> : null;
+  const actionsFor = (i: Ingreso) => [
+    ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
+    ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
+  ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{tituloOverride ?? 'Ingresos'}</h1>
-          <p className="text-sm text-gray-400">{filtered.length} registros · Total: {fmt(totalFiltrado)}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {area === 'dj' && !isRealMadrid && (
-            <button onClick={() => setShowSuplidosListado(true)} className="text-left bg-white border border-gray-100 rounded-2xl px-4 py-2 hover:shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all">
-              <p className="text-xs text-gray-400">Suplidos por cobrar</p>
-              <p className={`text-sm font-bold ${totalSuplidosPendientes > 0 ? 'text-gold-700' : 'text-gray-800'}`}>{fmt(totalSuplidosPendientes)}</p>
-            </button>
-          )}
-          {canCreate() && (
-            <Button2 variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo ingreso</Button2>
-          )}
-        </div>
-      </div>
-
-      {/* Breadcrumb navegación Año → Mes */}
-      <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Años</button>
-        {selectedYear != null && (
-          <>
-            <span className="text-gray-300">/</span>
-            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>{selectedYear}</button>
-          </>
+    <div>
+      <PageHeader title={selectedMonth != null && selectedYear != null ? `${MESES_FULL[selectedMonth]} ${selectedYear}` : selectedYear != null ? String(selectedYear) : (tituloOverride ?? 'Ingresos')}>
+        {area === 'dj' && !isRealMadrid && (
+          <button onClick={() => setShowSuplidosListado(true)} className="btn btn-secondary">
+            Suplidos por cobrar <span className={`num ${totalSuplidosPendientes > 0 ? 'text-[#c26a00]' : ''}`}>{fmt(totalSuplidosPendientes)}</span>
+          </button>
         )}
-        {selectedYear != null && selectedMonth != null && (
-          <>
-            <span className="text-gray-300">/</span>
-            <span className="font-medium text-gray-900">{MESES_FULL[selectedMonth]}</span>
-          </>
+        {canCreate() && (
+          <Btn variant="primary" onClick={openNew}><Plus size={16} strokeWidth={2.4} />Nuevo ingreso</Btn>
         )}
-      </div>
+      </PageHeader>
 
-      {/* Nivel 1: carpetas de años */}
+      {selectedYear != null && (
+        <nav className="crumbs" aria-label="Ruta">
+          <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }}>Años</button>
+          <ChevronRight size={14} />
+          {selectedMonth == null ? <b>{selectedYear}</b> : (
+            <>
+              <button onClick={() => setSelectedMonth(null)}>{selectedYear}</button>
+              <ChevronRight size={14} />
+              <b>{MESES_FULL[selectedMonth]}</b>
+            </>
+          )}
+        </nav>
+      )}
+
       {selectedYear == null && (
-        anios.length === 0 ? (
-          <EmptyState icon={<Folder size={22} />} title="Sin ingresos registrados todavía" />
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {anios.map(([y, data]) => (
-              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-100 rounded-[24px] p-5 text-left hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] transition-all duration-220 ease-smooth">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-gold-50 flex items-center justify-center">
-                    <Folder size={14} className="text-gold-600" />
-                  </div>
-                  <span className="text-lg font-bold text-gray-900">{y}</span>
-                </div>
-                <p className="text-xs text-gray-400">{data.count} ingresos</p>
-                <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-              </button>
-            ))}
-          </div>
-        )
+        resumenAnios.length === 0
+          ? <EmptyState icon={<Folder size={22} />} title="Sin ingresos registrados todavía" />
+          : <YearGrid years={resumenAnios} onOpen={(y) => { setSelectedYear(y); setSelectedMonth(null); }} />
       )}
 
-      {/* Nivel 2: carpetas de meses dentro del año */}
       {selectedYear != null && selectedMonth == null && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <button onClick={() => setSelectedYear(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a años</button>
-            <p className="text-sm text-gray-600">Total sin IVA {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
+        <>
+          <div className="bento mb-4">
+            <Metric label="Sin IVA" value={totalAnio} />
+            <Metric label="Con IVA" value={totalAnioConIva} delay={0.03} />
+            <Metric label="Por cobrar" value={pendienteAnio} delay={0.06} tone={pendienteAnio > 0 ? 'warning' : 'neutral'} />
+            <Metric label="Eventos" value={countAnio} kind="count" delay={0.09} />
           </div>
-          {mesesDelAnio.length === 0 ? (
-            <p className="text-center py-16 text-gray-400 text-sm">Sin ingresos en {selectedYear}</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {mesesDelAnio.map(([m, data]) => (
-                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-100 rounded-[24px] p-5 text-left hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] transition-all duration-220 ease-smooth">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-gold-50 flex items-center justify-center">
-                      <Folder size={14} className="text-gold-600" />
-                    </div>
-                    <span className="font-bold text-gray-900">{MESES_FULL[m]}</span>
-                  </div>
-                  <p className="text-xs text-gray-400">{data.count} ingresos</p>
-                  <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <MonthGrid year={selectedYear} months={resumenMeses} onOpen={setSelectedMonth} />
+        </>
       )}
 
-      {/* Nivel 3: tabla del mes seleccionado */}
       {selectedYear != null && selectedMonth != null && (
-      <>
-      <div className="flex items-center justify-between">
-        <button onClick={() => setSelectedMonth(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a meses</button>
-        <p className="text-sm text-gray-600">Total sin IVA {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
-      </div>
-
-      {/* Tabla estilo Motoko: cabecera + filtros dentro de una sola tarjeta */}
-      <ContentCard2 padding="none">
-        <div className="flex flex-wrap items-center gap-3 p-5 border-b border-gray-100">
-          <SearchInput2
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar concepto o cliente…"
-            className="flex-1 min-w-[220px]"
-          />
-          <select
-            value={filterEstado}
-            onChange={(e) => setFilter(e.target.value as PaymentStatus | '')}
-            className="text-sm border border-gray-200 rounded-full px-4 py-2.5 bg-white text-gray-600"
-          >
-            <option value="">Todos los estados</option>
-            {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select
-            value={filterCliente}
-            onChange={(e) => setFilterCliente(e.target.value)}
-            className="text-sm border border-gray-200 rounded-full px-4 py-2.5 bg-white text-gray-600"
-          >
-            <option value="">Todos los clientes</option>
-            {clientesDisponibles.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
-        {/* Vista tabla — desktop */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className="text-left px-6 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('fechaEvento')}>
-                  <span className="flex items-center gap-1">Fecha {sortIcon('fechaEvento')}</span>
-                </th>
-                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Concepto</th>
-                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('cliente')}>
-                  <span className="flex items-center gap-1">Cliente {sortIcon('cliente')}</span>
-                </th>
-                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total sin IVA</th>
-                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => sort('total')}>
-                  <span className="flex items-center gap-1 justify-end">Total con IVA {sortIcon('total')}</span>
-                </th>
-                <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Gastos sin IVA</th><th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Beneficio</th><th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Margen</th><th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
-                <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Nº Factura</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-12 text-gray-400 text-sm">Sin resultados</td></tr>
-              ) : filtered.map((i) => {
-                const rentabilidad=ingresoRentabilidad(i,allGastosEvento);
-                return (
-                <tr key={i.id} onClick={()=>setDetailId(i.id)} className="hover:bg-gray-50/70 transition-colors cursor-pointer">
-                  <td className="px-6 py-3.5 text-gray-500 whitespace-nowrap">{i.fechaEvento}</td>
-                  <td className="px-4 py-3.5 font-medium text-gray-900">
-                    <button className="text-left hover:underline" onClick={e=>{e.stopPropagation();setDetailId(i.id);}} aria-label={`Ver rentabilidad de ${i.concepto}`}>{i.concepto}</button><p className="text-xs text-gray-400 font-normal mt-1">Ver rentabilidad</p>
-                  </td>
-                  <td className="px-4 py-3.5 text-gray-600">{i.cliente}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-gray-600">{fmt(i.baseImponible)}</td>
-                  <td className="px-4 py-3.5 text-right font-mono font-semibold text-gray-900">{fmt(i.total)}</td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-red-600 whitespace-nowrap">{fmt(rentabilidad.coste)}</td><td className={`px-4 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap ${rentabilidad.beneficio>=0?'text-emerald-700':'text-red-600'}`}>{fmt(rentabilidad.beneficio)}</td><td className="px-4 py-3.5 text-right tabular-nums">{rentabilidad.margen==null?'—':rentabilidad.margen.toLocaleString('es-ES',{maximumFractionDigits:1})+' %'}</td>
-                  <td className="px-4 py-3.5 text-center">
-                    <Badge2 tone={estadoTone[i.estadoPago]}>{i.estadoPago}</Badge2>
-                  </td>
-                  <td className="px-4 py-3.5 text-gray-600 font-mono text-xs">
-                    {i.numeroFactura || <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-6 py-3.5" onClick={e=>e.stopPropagation()}>
-                    <div className="flex items-center gap-1 justify-end">
-                      {canCreate() && (
-                        <button onClick={() => openGasto(i)} className="text-xs text-gold-600 hover:text-gold-700 font-medium whitespace-nowrap mr-1">
-                          + Añadir gasto
-                        </button>
-                      )}
-                      <RowMenu2
-                        actions={[
-                          ...(canCreate() ? [{ label: 'Generar factura', onClick: () => setFacturaIngreso(i) }] : []),
-                          ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
-                          ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
-                        ]}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              );})}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Vista tarjetas — móvil (misma información y acciones, sin comprimir) */}
-        <div className="md:hidden divide-y divide-gray-50">
-          {filtered.length === 0 ? (
-            <p className="text-center py-12 text-gray-400 text-sm">Sin resultados</p>
-          ) : filtered.map((i) => {
-            const rentabilidad=ingresoRentabilidad(i,allGastosEvento);
-            return (
-              <div key={i.id} className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <button className="font-medium text-gray-900 text-left hover:underline" onClick={()=>setDetailId(i.id)} aria-label={`Ver rentabilidad de ${i.concepto}`}>{i.concepto}</button>
-                    <p className="text-xs text-gray-400">{i.cliente} · {i.fechaEvento}</p>
-                  </div>
-                  <RowMenu2
-                    actions={[
-                      ...(canCreate() ? [{ label: 'Añadir gasto', onClick: () => openGasto(i) }] : []),
-                      ...(canCreate() ? [{ label: 'Generar factura', onClick: () => setFacturaIngreso(i) }] : []),
-                      ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
-                      ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
-                    ]}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Badge2 tone={estadoTone[i.estadoPago]}>{i.estadoPago}</Badge2>
-                  <p className="font-mono font-semibold text-gray-900">{fmt(i.total)}</p>
-                </div>
-                <dl className="grid grid-cols-2 gap-3 text-xs"><div><dt className="text-gray-500">Total sin IVA</dt><dd className="font-semibold mt-1">{fmt(i.baseImponible)}</dd></div><div><dt className="text-gray-500">Total con IVA</dt><dd className="font-semibold mt-1">{fmt(i.total)}</dd></div><div><dt className="text-gray-500">Gastos sin IVA</dt><dd className="font-semibold text-red-600 mt-1">{fmt(rentabilidad.coste)}</dd></div><div><dt className="text-gray-500">Beneficio</dt><dd className={`font-semibold mt-1 ${rentabilidad.beneficio>=0?'text-emerald-700':'text-red-600'}`}>{fmt(rentabilidad.beneficio)}</dd></div></dl><button className="text-xs font-semibold underline" onClick={()=>setDetailId(i.id)}>Ver detalle de rentabilidad</button>
-              </div>
-            );
-          })}
-        </div>
-      </ContentCard2>
-      </>
+        <>
+          <div className="bento mb-4">
+            <Metric label="Sin IVA" value={totalMes} />
+            <Metric label="Con IVA" value={enElMes.reduce((a, i) => a + i.total, 0)} delay={0.03} />
+            <Metric label="Beneficio" value={beneficioMes} delay={0.06} tone={beneficioMes >= 0 ? 'positive' : 'negative'} />
+            <Metric label="Por cobrar" value={enElMes.reduce((a, i) => a + pendienteDe(i), 0)} delay={0.09} />
+          </div>
+          {filtered.length === 0
+            ? <EmptyState icon={<Folder size={22} />} title="Sin ingresos este mes" />
+            : <IngresoRows
+                items={filtered}
+                gastosEvento={allGastosEvento}
+                onOpen={(i) => setDetailId(i.id)}
+                onAddGasto={canCreate() ? openGasto : undefined}
+                actionsFor={actionsFor}
+              />}
+        </>
       )}
 
       {detailIngreso&&<IngresoRentabilidad ingreso={detailIngreso} gastos={allGastosEvento} onClose={()=>setDetailId(null)} onAddExpense={canCreate()?()=>{setDetailId(null);openGasto(detailIngreso);}:undefined}/>}
       {/* Modal edición */}
-      <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar ingreso' : 'Nuevo ingreso'} size="lg">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {/* 1. Concepto del evento */}
-            <div className="col-span-2">
-              <label className="label-form">Concepto del evento *</label>
-              <input value={form.concepto ?? ''} onChange={(e) => setField('concepto', e.target.value)} className="input-form" placeholder="Descripción del ingreso" />
-            </div>
-            {/* 2. Cliente — texto libre, sin obligar a elegir uno existente */}
-            <div>
-              <label className="label-form">Cliente *</label>
-              <input value={form.cliente ?? ''} onChange={(e) => setField('cliente', e.target.value)} className="input-form" placeholder="Nombre del cliente" />
-            </div>
-            {/* 3. Tipo de evento — cerrado a 3 opciones, sin vínculo a eventos existentes */}
-            <div>
-              <label className="label-form">Tipo de evento</label>
-              <select value={form.tipoEvento ?? TIPOS_EVENTO_FORM[0]} onChange={(e) => setField('tipoEvento', e.target.value)} className="input-form">
-                {isRealMadrid
-                  ? TIPOS_EVENTO_REAL_MADRID.map((t) => <option key={t} value={t}>{TIPO_EVENTO_RM_LABEL[t]}</option>)
-                  : TIPOS_EVENTO_FORM.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            {/* Línea de negocio — campo distinto de "Tipo de evento". Bloqueado
-                cuando se accede desde una línea concreta (filterLinea) para
-                evitar que un ingreso quede mal clasificado entre DJ/Real Madrid. */}
-            <div>
-              <label className="label-form">Línea de negocio</label>
-              {filterLinea ? (
-                <div className="input-form bg-gray-50 text-gray-700 font-medium">{form.lineaNegocio}</div>
-              ) : (
-                <select value={form.lineaNegocio ?? (area === 'montada' ? 'La Montada Sound' : 'DJs')} onChange={(e) => setField('lineaNegocio', e.target.value as Ingreso['lineaNegocio'])} className="input-form">
-                  {LINEAS_NEGOCIO.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              )}
-            </div>
-            {area === 'dj' && !isRealMadrid && (
-              <div>
-                <label className="label-form">DJ relacionado</label>
-                <input value={form.djRelacionado ?? ''} onChange={(e) => setField('djRelacionado', e.target.value)} className="input-form" placeholder="Nombre del DJ" />
-              </div>
+      <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar evento' : 'Nuevo ingreso'} size="lg">
+        <FormGroup title="Evento">
+          <Field label="Concepto" wide>
+            <input value={form.concepto ?? ''} onChange={(e) => setField('concepto', e.target.value)} className="input-form" placeholder="Boda Laura y Pablo" />
+          </Field>
+          <Field label="Cliente">
+            <input value={form.cliente ?? ''} onChange={(e) => setField('cliente', e.target.value)} className="input-form" />
+          </Field>
+          <Field label="Fecha del evento">
+            <input type="date" value={form.fechaEvento ?? ''} onChange={(e) => setField('fechaEvento', e.target.value)} className="input-form" />
+          </Field>
+          <div className="field field-wide">
+            <span className="field-label">Tipo de evento</span>
+            {isRealMadrid ? (
+              <Chips label="Tipo de evento" value={String(form.tipoEvento ?? 'real_madrid')} onChange={(v) => setField('tipoEvento', v)}
+                options={TIPOS_EVENTO_REAL_MADRID.map((t) => ({ value: t, label: TIPO_EVENTO_RM_LABEL[t] }))} />
+            ) : (
+              <Chips label="Tipo de evento" value={String(form.tipoEvento ?? TIPOS_EVENTO_FORM[0])} onChange={(v) => setField('tipoEvento', v)}
+                options={[...TIPOS_EVENTO_FORM, ...(form.tipoEvento && !TIPOS_EVENTO_FORM.includes(form.tipoEvento) ? [form.tipoEvento] : [])].map((t) => ({ value: t, label: t }))} />
             )}
-            {/* 4. Fecha del evento */}
-            <div>
-              <label className="label-form">Fecha del evento</label>
-              <input type="date" value={form.fechaEvento ?? ''} onChange={(e) => setField('fechaEvento', e.target.value)} className="input-form" />
-            </div>
-            {/* 5. Base imponible */}
-            <div>
-              <label className="label-form">Base imponible (€)</label>
-              <input type="number" step="0.01" value={form.baseImponible ?? 0} onChange={(e) => setField('baseImponible', parseFloat(e.target.value) || 0)} className="input-form" />
-            </div>
-            {/* 6. IVA */}
-            <div>
-              <label className="label-form">IVA (%)</label>
-              <select value={form.porcentajeIVA} onChange={(e) => setField('porcentajeIVA', Number(e.target.value))} className="input-form">
-                {PCTS_IVA.map((p) => <option key={p} value={p}>{p}%</option>)}
+          </div>
+          <Field label="Línea de negocio">
+            {filterLinea || area === 'montada' ? (
+              <div className="readout">{LINEA_LABEL[String(form.lineaNegocio ?? '')] ?? form.lineaNegocio ?? 'La Montada Sound'}</div>
+            ) : (
+              <select value={form.lineaNegocio ?? 'DJs'} onChange={(e) => setField('lineaNegocio', e.target.value as Ingreso['lineaNegocio'])} className="input-form">
+                {LINEAS_NEGOCIO.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
-            </div>
-            {/* 7. Total con IVA */}
-            <div>
-              <label className="label-form">Total con IVA</label>
-              <div className="input-form bg-gray-50 text-gray-700 font-semibold">{fmt(form.total ?? 0)}</div>
-            </div>
-            {/* 8. Estado del pago — cerrado a 3 opciones (se calcula solo, editable manualmente) */}
-            <div>
-              <label className="label-form">Estado del pago</label>
-              <select value={form.estadoPago} onChange={(e) => setField('estadoPago', e.target.value)} className="input-form">
-                {(ESTADOS_FORM.includes(form.estadoPago as PaymentStatus) ? ESTADOS_FORM : [form.estadoPago as PaymentStatus, ...ESTADOS_FORM]).map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            {(form.pagosRecibidos ?? 0) > 0 && (
-              <div className="col-span-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
-                Cobrado mediante pagos registrados: <span className="font-semibold text-gray-700">{fmt(form.pagosRecibidos ?? 0)}</span> — gestiona estos pagos desde Contabilidad → Pagos recibidos.
-              </div>
             )}
+          </Field>
+          {area === 'dj' && !isRealMadrid && (
+            <Field label="DJ relacionado">
+              <input value={form.djRelacionado ?? ''} onChange={(e) => setField('djRelacionado', e.target.value)} className="input-form" />
+            </Field>
+          )}
+        </FormGroup>
 
-            {/* Reserva opcional — oculta hasta que se marque "Sí" */}
-            <div className="col-span-2 border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Reserva</p>
-              <Switch
-                label="¿Tiene reserva?"
-                checked={!!form.tieneReserva}
-                onChange={(tiene) => {
-                  setField('tieneReserva', tiene);
-                  if (!tiene) {
-                    setField('reserva', 0);
-                    setField('fechaCobroReserva', undefined);
-                    setField('metodoPagoReserva', undefined);
-                  }
-                }}
-              />
-              {form.tieneReserva && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="label-form">Cantidad de la reserva (€)</label>
-                    <input type="number" step="0.01" value={form.reserva ?? 0} onChange={(e) => setField('reserva', parseFloat(e.target.value) || 0)} className="input-form" />
-                  </div>
-                  <div>
-                    <label className="label-form">Fecha de cobro de la reserva</label>
-                    <input type="date" value={form.fechaCobroReserva ?? ''} onChange={(e) => setField('fechaCobroReserva', e.target.value)} className="input-form" />
-                  </div>
-                  <div>
-                    <label className="label-form">Método de pago <span className="text-gray-400 font-normal">(opcional)</span></label>
-                    <select value={form.metodoPagoReserva ?? ''} onChange={(e) => setField('metodoPagoReserva', e.target.value || undefined)} className="input-form">
-                      <option value="">—</option>
-                      {METODOS_FORM.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
+        <FormGroup title="Importe">
+          <Field label="Base imponible">
+            <input type="number" inputMode="decimal" step="0.01" value={form.baseImponible ?? 0} onChange={(e) => setField('baseImponible', parseFloat(e.target.value) || 0)} className="input-form num" />
+          </Field>
+          <div className="field">
+            <span className="field-label">IVA</span>
+            <Chips label="IVA" value={Number(form.porcentajeIVA ?? 21)} onChange={(v) => setField('porcentajeIVA', v)}
+              options={PCTS_IVA.map((p) => ({ value: p, label: `${p}%` }))} />
+          </div>
+          <Field label="Total con IVA" wide>
+            <div className="readout readout-lg">{fmt(form.total ?? 0)}</div>
+          </Field>
+        </FormGroup>
 
-            {/* Suplidos opcionales — solo DJs, no afectan a ingresos/gastos/IVA/beneficio/reserva */}
+        <FormGroup title="Cobro">
+          <Field label="Estado del pago">
+            <select value={form.estadoPago} onChange={(e) => setField('estadoPago', e.target.value)} className="input-form">
+              {(ESTADOS_FORM.includes(form.estadoPago as PaymentStatus) ? ESTADOS_FORM : [form.estadoPago as PaymentStatus, ...ESTADOS_FORM]).map((st) => <option key={st} value={st}>{ESTADO_LABEL[st] ?? st}</option>)}
+            </select>
+          </Field>
+          <Field label="Pendiente de cobro">
+            <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.tieneReserva ? (form.reserva ?? 0) : 0)))}</div>
+          </Field>
+          <ToggleCard
+            label="Reserva"
+            checked={!!form.tieneReserva}
+            onChange={(tiene) => {
+              setField('tieneReserva', tiene);
+              if (!tiene) {
+                setField('reserva', 0);
+                setField('fechaCobroReserva', undefined);
+                setField('metodoPagoReserva', undefined);
+              }
+            }}
+          >
+            <Field label="Cantidad pagada">
+              <input type="number" inputMode="decimal" step="0.01" value={form.reserva ?? 0} onChange={(e) => setField('reserva', parseFloat(e.target.value) || 0)} className="input-form num" />
+            </Field>
+            <Field label="Fecha del cobro">
+              <input type="date" value={form.fechaCobroReserva ?? ''} onChange={(e) => setField('fechaCobroReserva', e.target.value)} className="input-form" />
+            </Field>
+            <Field label="Método">
+              <select value={form.metodoPagoReserva ?? ''} onChange={(e) => setField('metodoPagoReserva', e.target.value || undefined)} className="input-form">
+                <option value="">—</option>
+                {METODOS_FORM.map((m) => <option key={m} value={m}>{METODO_LABEL[m] ?? m}</option>)}
+              </select>
+            </Field>
+            <Field label="Importe pendiente">
+              <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.reserva ?? 0)))}</div>
+            </Field>
+          </ToggleCard>
+          <Field label="Fecha del pago">
+            <input type="date" value={form.fechaPago ?? ''} onChange={(e) => setField('fechaPago', e.target.value)} className="input-form" />
+          </Field>
+          <Field label="Método de pago">
+            <select value={form.metodoPago} onChange={(e) => setField('metodoPago', e.target.value)} className="input-form">
+              {(METODOS_FORM.includes(form.metodoPago as PaymentMethod) ? METODOS_FORM : [form.metodoPago as PaymentMethod, ...METODOS_FORM]).map((m) => <option key={m} value={m}>{METODO_LABEL[m] ?? m}</option>)}
+            </select>
+          </Field>
+          {(form.pagosRecibidos ?? 0) > 0 && (
+            <p className="field-hint field-wide">Incluye {fmt(form.pagosRecibidos ?? 0)} registrados en Pagos.</p>
+          )}
             {area === 'dj' && !isRealMadrid && (
-              <div className="col-span-2 border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+              <div className="field-wide space-y-3">
                 <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Suplidos</p>
                 <div>
                   <Switch label="¿Hay suplidos?" checked={mostrarSuplidosForm} onChange={toggleSuplidos} />
@@ -724,48 +562,44 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
               </div>
             )}
 
-            {/* 11. Importe pendiente — descuenta cobros registrados + reserva */}
-            <div>
-              <label className="label-form">Importe pendiente</label>
-              <div className="input-form bg-gray-50 text-gray-700 font-semibold">
-                {fmt(Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.tieneReserva ? (form.reserva ?? 0) : 0)))}
-              </div>
-            </div>
+        </FormGroup>
 
-            {/* 12. Método de pago — cerrado a 3 opciones */}
-            <div>
-              <label className="label-form">Método de pago</label>
-              <select value={form.metodoPago} onChange={(e) => setField('metodoPago', e.target.value)} className="input-form">
-                {(METODOS_FORM.includes(form.metodoPago as PaymentMethod) ? METODOS_FORM : [form.metodoPago as PaymentMethod, ...METODOS_FORM]).map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            {/* 13. Fecha del pago */}
-            <div>
-              <label className="label-form">Fecha del pago</label>
-              <input type="date" value={form.fechaPago ?? ''} onChange={(e) => setField('fechaPago', e.target.value)} className="input-form" />
-            </div>
-            {/* 16-17. Factura emitida + No factura */}
-            <div className="col-span-2 flex items-center gap-8">
-              <Switch checked={!!form.facturaEmitida} onChange={(v) => setField('facturaEmitida', v)} label="Factura emitida" />
-              <Switch checked={!!form.sinFactura} onChange={(v) => setField('sinFactura', v)} label="No factura" />
-            </div>
-            {form.facturaEmitida && (
-              <div>
-                <label className="label-form">Nº Factura</label>
-                <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value)} className="input-form" placeholder="LMS-2026-001" />
-              </div>
-            )}
-            <div className="col-span-2">
-              <label className="label-form">Notas</label>
-              <textarea value={form.notas ?? ''} onChange={(e) => setField('notas', e.target.value)} rows={2} className="input-form resize-none" />
-            </div>
+        <FormGroup title="Factura">
+          <div className="field field-wide">
+            <Chips
+              label="Factura"
+              value={form.facturaEmitida ? 'emitida' : form.sinFactura ? 'no' : 'pendiente'}
+              onChange={(v) => {
+                setField('facturaEmitida', v === 'emitida');
+                setField('sinFactura', v === 'no');
+              }}
+              options={[
+                { value: 'pendiente', label: 'Sin emitir' },
+                { value: 'emitida', label: 'Factura emitida' },
+                { value: 'no', label: 'No factura' },
+              ]}
+            />
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" onClick={closeModal} className="flex-1">Cancelar</Button>
-            <Button variant="primary" onClick={save} className="flex-1">
-              {editing ? 'Guardar cambios' : 'Añadir ingreso'}
-            </Button>
-          </div>
+          {form.facturaEmitida && (
+            <>
+              <Field label="Nº de factura">
+                <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value)} className="input-form num" placeholder="LMS-2026-001" />
+              </Field>
+              <Field label="Fecha de la factura">
+                <input type="date" value={form.fechaFactura ?? ''} onChange={(e) => setField('fechaFactura', e.target.value)} className="input-form" />
+              </Field>
+            </>
+          )}
+          <Field label="Notas" wide>
+            <textarea value={form.notas ?? ''} onChange={(e) => setField('notas', e.target.value)} rows={2} className="input-form resize-none" />
+          </Field>
+        </FormGroup>
+
+        <div className="sheet-actions">
+          <Btn variant="secondary" size="lg" onClick={closeModal}>Cancelar</Btn>
+          <Btn variant="primary" size="lg" onClick={save} disabled={!form.concepto || !form.cliente}>
+            {editing ? 'Guardar' : 'Añadir ingreso'}
+          </Btn>
         </div>
       </Modal>
 
@@ -921,9 +755,6 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
         </div>
       </Modal>
 
-      {facturaIngreso && (
-        <GenerarFacturaModal ingreso={facturaIngreso} onClose={() => setFacturaIngreso(null)} />
-      )}
 
     </div>
   );

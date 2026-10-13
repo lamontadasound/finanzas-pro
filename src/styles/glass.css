@@ -343,3 +343,127 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: radial-gradient(120% 80% at 100% 0%, rgb(255 255 255 / .22), transparent 55%);
 }
 .hero-card > * { position: relative; }
+
+/* ── Tiles (carpetas de año / mes) ───────────────────────────────────────── */
+.tile { transition: transform .18s var(--spring), box-shadow .2s ease; -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) { .tile:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgb(0 0 0 / .04), 0 24px 44px -26px rgb(40 30 20 / .35) !important; } }
+.tile:not(:disabled):active { transform: scale(.98); }
+.tile[data-current="true"] { box-shadow: 0 0 0 2px var(--tint-a), var(--shadow-widget) !important; }
+.tile[data-empty="true"] { background: rgb(255 255 255 / .45) !important; box-shadow: none !important; cursor: default; }
+.now-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tint-a); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tint-a) 18%, transparent); }
+
+.crumbs { display: flex; align-items: center; gap: 4px; margin: -12px 0 18px; font-size: 14px; color: var(--ink-3); }
+.crumbs button { padding: 2px 6px; border-radius: 7px; color: var(--blue); font-weight: 500; }
+.crumbs button:hover { background: var(--blue-bg); }
+.crumbs b { color: var(--ink); font-weight: 600; padding: 2px 6px; }
+
+/* ── Fecha estilo Calendario ─────────────────────────────────────────────── */
+.date-glyph {
+  width: 44px; height: 46px; border-radius: 11px; overflow: hidden; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  background: #fff; box-shadow: 0 0 0 .5px rgb(0 0 0 / .1), 0 2px 6px -3px rgb(0 0 0 / .2);
+}
+.date-glyph > span { width: 100%; text-align: center; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--tint-a); padding: 2px 0 1px; }
+.date-glyph > b { font-size: 19px; font-weight: 600; line-height: 26px; color: var(--ink); }
+
+/* ── Lista de ingresos ───────────────────────────────────────────────────── */
+.ing-grid { display: grid; align-items: center; column-gap: 10px; }
+.ing-head { display: none; }
+.ing-row { padding: 14px 16px; cursor: pointer; transition: background-color .15s ease; position: relative; }
+.ing-row + .ing-row::before { content: ''; position: absolute; top: 0; left: 70px; right: 16px; height: .5px; background: var(--hair-strong); }
+.ing-row:hover { background: rgb(0 0 0 / .022); }
+.ing-row:active { background: rgb(0 0 0 / .045); }
+.ing-concepto { min-width: 0; display: flex; flex-direction: column; }
+.ing-concepto b { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ing-concepto small { font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ing-row .r { text-align: right; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+.ing-row .ing-strong { color: var(--ink); font-weight: 600; }
+.ing-factura { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ing-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.chip-btn {
+  display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 99px;
+  font-size: 12.5px; font-weight: 600; color: var(--blue); background: var(--blue-bg);
+  transition: transform .12s var(--spring), filter .15s;
+}
+.chip-btn:hover { filter: brightness(.96); }
+.chip-btn:active { transform: scale(.94); }
+
+/* Escritorio: tabla completa */
+@media (min-width: 1100px) {
+  .ing-grid { grid-template-columns: 44px minmax(150px, 1.5fr) repeat(6, minmax(76px, 1fr)) 92px 84px 104px; }
+  .ing-head {
+    display: grid; padding: 12px 16px 10px; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+    border-bottom: .5px solid var(--hair-strong);
+  }
+  .ing-head .r { text-align: right; }
+}
+/* Tablet y móvil: tarjeta tipo Revolut con cifras en rejilla */
+.ing-figs { display: none; }
+@media (max-width: 1099.98px) {
+  .ing-row { grid-template-columns: 44px minmax(0, 1fr) auto; row-gap: 10px; column-gap: 12px; }
+  .ing-row > .r { display: none; }
+  .ing-row > .ing-concepto { grid-column: 2; grid-row: 1; }
+  .ing-row > .ing-actions { grid-column: 3; grid-row: 1; }
+  .ing-row > .date-glyph { grid-column: 1; grid-row: 1; }
+  .ing-row > .ing-estado { grid-column: 2; grid-row: 2; display: flex; }
+  .ing-row > .ing-factura { grid-column: 3; grid-row: 2; text-align: right; align-self: center; }
+  .ing-figs {
+    grid-column: 2 / -1; grid-row: 3; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px;
+    padding: 10px 12px; border-radius: 12px; background: var(--widget-2);
+  }
+  .ing-figs dt { font-size: 11px; color: var(--ink-3); }
+  .ing-figs dd { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+}
+@media (max-width: 520px) {
+  .ing-figs { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ing-row + .ing-row::before { left: 16px; }
+}
+
+/* ── Formularios agrupados ───────────────────────────────────────────────── */
+.fgroup + .fgroup { margin-top: 22px; }
+.fgroup-title { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 0 4px 8px; letter-spacing: 0; }
+.fgroup-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; border-radius: 16px; background: var(--widget-2); }
+@media (max-width: 560px) { .fgroup-body { grid-template-columns: minmax(0, 1fr); } }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-wide { grid-column: 1 / -1; }
+.field-label { font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+.field-hint { font-size: 12px; color: var(--ink-3); }
+.field .input-form { background: #fff !important; }
+.readout {
+  display: flex; align-items: center; min-height: 42px; padding: 0 12px; border-radius: var(--r-control);
+  background: rgb(0 0 0 / .035); font-weight: 600; font-family: var(--font-num); font-variant-numeric: tabular-nums;
+}
+.readout-lg { font-size: 22px; letter-spacing: -0.02em; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  height: 34px; padding: 0 14px; border-radius: 99px; font-size: 14px; font-weight: 500;
+  background: #fff; color: var(--ink-2); box-shadow: 0 0 0 1px var(--hair-strong);
+  transition: background-color .15s, color .15s, box-shadow .15s, transform .12s var(--spring);
+}
+.chip:active { transform: scale(.95); }
+.chip[aria-checked="true"] { background: var(--ink); color: #fff; box-shadow: none; }
+
+.togglecard { grid-column: 1 / -1; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--hair); transition: box-shadow .2s; }
+.togglecard[data-on="true"] { box-shadow: 0 0 0 1.5px var(--green), 0 10px 24px -18px var(--green); }
+.togglecard-head { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 15px; font-weight: 600; }
+.togglecard-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 2px 14px 14px; }
+@media (max-width: 560px) { .togglecard-body { grid-template-columns: minmax(0, 1fr); } }
+.ios-switch { width: 51px; height: 31px; border-radius: 99px; padding: 2px; display: flex; background: rgb(120 120 128 / .16); transition: background-color .25s ease; }
+.ios-switch[data-on="true"] { background: #34c759; justify-content: flex-end; }
+.ios-switch > span { width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgb(0 0 0 / .15), 0 1px 1px rgb(0 0 0 / .16); }
+
+/* ── Hojas modales ───────────────────────────────────────────────────────── */
+.finance-scrim { background: rgb(20 18 16 / .32) !important; -webkit-backdrop-filter: blur(6px) saturate(120%); backdrop-filter: blur(6px) saturate(120%); }
+.finance-modal-panel {
+  background: rgb(252 252 251 / .94) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+  border: .5px solid rgb(255 255 255 / .8) !important; border-radius: 26px !important;
+  box-shadow: 0 40px 90px -30px rgb(0 0 0 / .45), 0 0 0 .5px rgb(0 0 0 / .08) !important;
+}
+.finance-sheet-heading { background: rgb(252 252 251 / .86) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: .5px solid var(--hair-strong) !important; }
+.finance-sheet-heading h2 { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -0.02em; }
+.finance-sheet-heading p { display: none; }
+.finance-sheet-heading button { border-radius: 50% !important; background: rgb(0 0 0 / .06); color: var(--ink-2) !important; width: 30px; height: 30px; display: grid; place-items: center; padding: 0 !important; }
+.sheet-actions { display: flex; gap: 10px; margin: 22px 0 -24px; position: sticky; bottom: 0; padding: 16px 0 20px; background: linear-gradient(transparent, rgb(252 252 251) 28%); z-index: 2; }
+.sheet-actions > * { flex: 1; }
