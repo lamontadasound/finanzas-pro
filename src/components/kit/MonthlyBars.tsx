@@ -22,12 +22,13 @@ const niceMax = (v: number) => {
  * el color del espacio y tooltip flotante sobre el mes señalado.
  */
 export const MonthlyBars = ({
-  data, series, year, height = 240,
+  data, series, year, height = 240, showTotals = true,
 }: {
   data: Record<string, number>[];
   series: BarSeries[];
   year: number;
   height?: number;
+  showTotals?: boolean;
 }) => {
   const [hover, setHover] = useState<number | null>(null);
   const totals = data.map((d) => series.reduce((s, x) => s + Math.max(0, d[x.key] ?? 0), 0));
@@ -43,7 +44,7 @@ export const MonthlyBars = ({
           <span key={s.key} className="flex items-center gap-1.5 text-[13px] text-ink-2">
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
             {s.label}
-            <b className="num text-ink ml-1">{fmtShort(data.reduce((a, d) => a + (d[s.key] ?? 0), 0))}</b>
+            {showTotals && <b className="num text-ink ml-1">{fmtShort(data.reduce((a, d) => a + (d[s.key] ?? 0), 0))}</b>}
           </span>
         ))}
       </div>

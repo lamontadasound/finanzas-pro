@@ -63,9 +63,9 @@ describe('Totales sin IVA en carpetas', () => {
     expect(screen.getByRole('button', {name: /Finca El Encinar.*150,00\s€/})).toBeTruthy();
   });
   it('mantiene el informe mensual sin el bloque de pagos duplicado', () => {
-    render(<InformesPage area="montada" />);
+    render(<MemoryRouter><InformesPage area="montada" /></MemoryRouter>);
     expect(screen.getByRole('heading', {name: 'Informes'})).toBeTruthy();
-    expect(screen.getByRole('columnheader', {name: 'Total sin IVA'})).toBeTruthy();
+    expect(screen.getByRole('heading', {name: 'Cómo se reparte cada mes'})).toBeTruthy();
     expect(screen.queryByText(/Pagos pendientes de/)).toBeNull();
     expect(screen.queryByText('Total pendiente de cobrar')).toBeNull();
   });

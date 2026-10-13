@@ -1,24 +1,18 @@
 import { useState, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { Area, GastoTipo } from '../../types';
-import { Button } from '../../components/ui/Button';
-import { BklitBarCard, BklitGaugeCard } from '../../components/charts-app/BklitCharts';
-import { ActivityHeatmap } from '../../components/charts-app/ActivityHeatmap';
-import { HeatmapErrorBoundary } from '../../components/charts-app/HeatmapErrorBoundary';
+import type { Area } from '../../types';
+import { motion } from 'framer-motion';
+import { PageHeader, YearStepper, Btn, Metric, Widget } from '../../components/kit';
+import { MonthlyBars } from '../../components/kit/MonthlyBars';
+import { gastoEventoSinIVA, ingresoRentabilidad } from '../../lib/ingresoRentabilidad';
+import { useExpenseCategories, categoryColor } from '../../lib/expenseCategoryConfig';
 import type { LineaId } from '../../config/businessLines';
 import { resolveLinea } from '../../config/resolveLinea';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-// Escala de 5 niveles (claro→oscuro) coherente con el acento de cada línea.
-const HEATMAP_PALETTE: Record<string, readonly [string, string, string, string, string]> = {
-  montada_sound: ['#f2f1fd', '#c8c4f6', '#7b72e3', '#4f46e5', '#28237a'],
-  dj:            ['#eff6ff', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
-  real_madrid:   ['#f5f3ff', '#ddd6fe', '#a78bfa', '#7c3aed', '#4c1d95'],
-};
 
 interface Props {
   area: Area;
@@ -31,12 +25,10 @@ interface Props {
 }
 
 export const InformesPage = ({ area, filterLinea }: Props) => {
-  const lineaKey = filterLinea ?? (area === 'montada' ? 'montada_sound' : 'dj');
-  const heatmapColors = HEATMAP_PALETTE[lineaKey] ?? HEATMAP_PALETTE.dj;
+  const { categories } = useExpenseCategories();
   const allIngresos     = useStore((s) => s.ingresos);
   const allGastos       = useStore((s) => s.gastos);
   const allGastosEvento = useStore((s) => s.gastosEvento);
-  const allEquipo       = useStore((s) => s.equipo);
   const ingresos     = useMemo(
     () => allIngresos.filter((i) => i.area === area && (!filterLinea || resolveLinea({ id: i.id, area: i.area, tipoEvento: i.tipoEvento, lineaNegocio: i.lineaNegocio }) === filterLinea)),
     [allIngresos, area, filterLinea],
@@ -51,21 +43,16 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
     () => allGastosEvento.filter((g) => g.area === area && (!filterLinea || ingresoIds.has(g.ingresoId))),
     [allGastosEvento, area, filterLinea, ingresoIds],
   );
-  const equipo       = useMemo(
-    () => allEquipo.filter((e) => filterLinea === 'real_madrid' ? e.area === 'real_madrid' : e.area === area),
-    [allEquipo, area, filterLinea],
-  );
 
   const [year, setYear] = useState(new Date().getFullYear());
-  const [filterTipo, setFilterTipo] = useState<GastoTipo | ''>('');
 
   const gastosAnio = useMemo(
-    () => gastos.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
-    [gastos, year, filterTipo],
+    () => gastos.filter((g) => new Date(g.fecha).getFullYear() === year),
+    [gastos, year],
   );
   const gastosEventoAnio = useMemo(
-    () => gastosEvento.filter((g) => new Date(g.fecha).getFullYear() === year && (!filterTipo || g.tipo === filterTipo)),
-    [gastosEvento, year, filterTipo],
+    () => gastosEvento.filter((g) => new Date(g.fecha).getFullYear() === year),
+    [gastosEvento, year],
   );
   const ingresosAnio = useMemo(
     () => ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === year),
@@ -74,30 +61,12 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
 
   // ── Gauge: margen operativo real del año — ingresos y gastos SIN IVA ────────
   const ingresosOperativosAnio = useMemo(() => ingresosAnio.reduce((s, i) => s + i.baseImponible, 0), [ingresosAnio]);
-  const gastosOperativosAnio = useMemo(
-    () => gastosAnio.reduce((s, g) => s + g.baseImponible, 0) + gastosEventoAnio.reduce((s, g) => s + g.importe, 0),
-    [gastosAnio, gastosEventoAnio],
-  );
-  const beneficioOperativoAnio = ingresosOperativosAnio - gastosOperativosAnio;
-  const margenAnio = ingresosOperativosAnio > 0 ? beneficioOperativoAnio / ingresosOperativosAnio : 0;
-
-  // ── Heatmap: actividad y facturación por día real (fechaEvento) ────────────
-  const heatmapDailyCount = useMemo(() => {
-    const map = new Map<string, number>();
-    ingresosAnio.forEach((i) => map.set(i.fechaEvento, (map.get(i.fechaEvento) ?? 0) + 1));
-    return map;
-  }, [ingresosAnio]);
-  const heatmapDailyRevenue = useMemo(() => {
-    const map = new Map<string, number>();
-    ingresosAnio.forEach((i) => map.set(i.fechaEvento, (map.get(i.fechaEvento) ?? 0) + i.total));
-    return map;
-  }, [ingresosAnio]);
 
   const porCategoriaGenerales = useMemo(() => {
     const map = new Map<string, { count: number; total: number }>();
     gastosAnio.forEach((g) => {
       const cur = map.get(g.categoria) ?? { count: 0, total: 0 };
-      map.set(g.categoria, { count: cur.count + 1, total: cur.total + g.total });
+      map.set(g.categoria, { count: cur.count + 1, total: cur.total + g.baseImponible });
     });
     return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [gastosAnio]);
@@ -106,7 +75,7 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
     const map = new Map<string, { count: number; total: number }>();
     gastosEventoAnio.forEach((g) => {
       const cur = map.get(g.categoria) ?? { count: 0, total: 0 };
-      map.set(g.categoria, { count: cur.count + 1, total: cur.total + g.importe });
+      map.set(g.categoria, { count: cur.count + 1, total: cur.total + gastoEventoSinIVA(g) });
     });
     return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [gastosEventoAnio]);
@@ -134,10 +103,10 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
         const d = new Date(i.fechaEvento); return d.getFullYear() === year && d.getMonth() === m;
       });
       const gasMes = gastos.filter((g) => {
-        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m && (!filterTipo || g.tipo === filterTipo);
+        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m;
       });
       const gesEvMes = gastosEvento.filter((g) => {
-        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m && (!filterTipo || g.tipo === filterTipo);
+        const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === m;
       });
 
       const totalIng    = ingMes.reduce((a, i) => a + i.total, 0);
@@ -149,17 +118,8 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
 
       return { mes, totalIng, baseImp, totalGas, costesEv, beneficio, cobrado, numEv: ingMes.length };
     });
-  }, [ingresos, gastos, gastosEvento, year, filterTipo]);
+  }, [ingresos, gastos, gastosEvento, year]);
 
-  const totals = monthly.reduce((acc, m) => ({
-    totalIng:  acc.totalIng  + m.totalIng,
-    baseImp:   acc.baseImp   + m.baseImp,
-    totalGas:  acc.totalGas  + m.totalGas,
-    costesEv:  acc.costesEv  + m.costesEv,
-    beneficio: acc.beneficio + m.beneficio,
-    cobrado:   acc.cobrado   + m.cobrado,
-    numEv:     acc.numEv     + m.numEv,
-  }), { totalIng: 0, baseImp: 0, totalGas: 0, costesEv: 0, beneficio: 0, cobrado: 0, numEv: 0 });
 
   const exportCSV = () => {
     const header = 'Mes;Ingresos;Total sin IVA;Gastos;Costes Evento;Beneficio Real;Cobrado;Nº Eventos';
@@ -176,201 +136,75 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  const exportEquipoCSV = () => {
-    const header = 'Nombre;Categoría;Fecha Compra;Proveedor;Total sin IVA;IVA;Total';
-    const rows = equipo.map((e) =>
-      [e.nombre, e.categoria, e.fechaCompra, e.proveedor ?? '',
-       e.baseImponible.toFixed(2), e.importeIVA.toFixed(2), e.total.toFixed(2)].join(';')
-    );
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const a = Object.assign(document.createElement('a'), {
-      href: URL.createObjectURL(blob),
-      download: `equipo-${area}.csv`,
-    });
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const costeEvento = (ids: Set<string>) => gastosEvento.filter((g) => ids.has(g.ingresoId)).reduce((a, g) => a + gastoEventoSinIVA(g), 0);
+  const idsAnio = new Set(ingresosAnio.map((i) => i.id));
+  const costesEventoAnio = costeEvento(idsAnio);
+  const generalesAnio = gastosAnio.reduce((a, g) => a + g.baseImponible, 0);
+  const beneficioAnio = ingresosOperativosAnio - generalesAnio - costesEventoAnio;
+  const mesesChart = MESES_FULL.map((_, m) => {
+    const ing = ingresosAnio.filter((i) => new Date(i.fechaEvento).getMonth() === m);
+    const base = ing.reduce((a, i) => a + i.baseImponible, 0);
+    const gas = costeEvento(new Set(ing.map((i) => i.id))) + gastosAnio.filter((g) => new Date(g.fecha).getMonth() === m).reduce((a, g) => a + g.baseImponible, 0);
+    const gastoVisible = Math.min(gas, base);
+    return { gastos: gastoVisible, beneficio: Math.max(0, base - gastoVisible) };
+  });
+  const categorias = gastosPorCategoriaChart.slice(0, 7);
+  const maxCat = Math.max(1, ...categorias.map((c) => c.total));
+  const mejores = ingresosAnio
+    .map((i) => ({ i, r: ingresoRentabilidad(i, gastosEvento) }))
+    .sort((x, y) => y.r.beneficio - x.r.beneficio)
+    .slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Informes</h1>
-          
-        </div>
-        <div className="flex items-center gap-3">
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            {yearOpts.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as GastoTipo | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-            <option value="">Todo tipo de gasto</option>
-            <option value="fijo">Fijo</option>
-            <option value="variable">Variable</option>
-          </select>
-          <Button variant="dark" icon={<Download size={14} />} onClick={exportCSV}>Exportar CSV</Button>
-        </div>
-      </div>
+    <div>
+      <PageHeader title="Informes">
+        <YearStepper year={year} years={yearOpts} onChange={setYear} />
+        <Btn variant="secondary" onClick={exportCSV}><Download size={15} />Exportar</Btn>
+      </PageHeader>
 
-      {/* Tabla mensual */}
-      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Mes</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Ingresos</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total sin IVA</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Gastos gen.</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Costes evento</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Beneficio real</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cobrado</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Eventos</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {monthly.map((m) => (
-                <tr key={m.mes} className={`hover:bg-gray-50 ${m.numEv === 0 ? 'opacity-40' : ''}`}>
-                  <td className="px-4 py-3 font-medium text-gray-800">{m.mes}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt(m.totalIng)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.baseImp)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-red-600">{fmt(m.totalGas)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-orange-600">{fmt(m.costesEv)}</td>
-                  <td className={`px-4 py-3 text-right font-mono font-semibold ${m.beneficio >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(m.beneficio)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(m.cobrado)}</td>
-                  <td className="px-4 py-3 text-center text-gray-500">{m.numEv || '—'}</td>
-                </tr>
+      <div className="bento">
+        <Metric label="Ingresos sin IVA" value={ingresosOperativosAnio} />
+        <Metric label="Gastos sin IVA" value={generalesAnio + costesEventoAnio} delay={0.03} />
+        <Metric label="Beneficio" value={beneficioAnio} delay={0.06} tone={beneficioAnio >= 0 ? 'positive' : 'negative'} />
+        <Metric label="Margen" value={ingresosOperativosAnio ? Math.round((beneficioAnio / ingresosOperativosAnio) * 100) : 0} kind="percent" delay={0.09} />
+
+        <Widget className="span-full" title="Cómo se reparte cada mes" delay={0.12}>
+          <MonthlyBars year={year} data={mesesChart} showTotals={false} series={[
+            { key: 'gastos', label: 'Gastos', color: 'color-mix(in srgb, var(--tint-b) 32%, #fff)' },
+            { key: 'beneficio', label: 'Beneficio', color: 'var(--tint-a)' },
+          ]} />
+        </Widget>
+
+        <Widget className="span-2" title="Gastos por categoría" delay={0.15}>
+          {categorias.length === 0 ? <p className="text-ink-3 text-[14px]">Sin gastos en {year}.</p> : (
+            <div className="space-y-3">
+              {categorias.map((c) => (
+                <div key={c.categoria}>
+                  <div className="flex justify-between text-[14px] mb-1.5"><span className="font-medium">{c.categoria}</span><b className="num">{fmt(c.total)}</b></div>
+                  <div className="h-2 rounded-full bg-black/[.05] overflow-hidden">
+                    <motion.div className="h-full rounded-full" style={{ background: categoryColor(c.categoria, categories) }}
+                      initial={{ width: 0 }} animate={{ width: `${(c.total / maxCat) * 100}%` }} transition={{ type: 'spring', bounce: 0, duration: 0.8 }} />
+                  </div>
+                </div>
               ))}
-            </tbody>
-            <tfoot className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-              <tr>
-                <td className="px-4 py-3 text-xs uppercase text-gray-600">Total {year}</td>
-                <td className="px-4 py-3 text-right font-mono text-gray-900">{fmt(totals.totalIng)}</td>
-                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(totals.baseImp)}</td>
-                <td className="px-4 py-3 text-right font-mono text-red-700">{fmt(totals.totalGas)}</td>
-                <td className="px-4 py-3 text-right font-mono text-orange-700">{fmt(totals.costesEv)}</td>
-                <td className={`px-4 py-3 text-right font-mono ${totals.beneficio >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>{fmt(totals.beneficio)}</td>
-                <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(totals.cobrado)}</td>
-                <td className="px-4 py-3 text-center text-gray-700">{totals.numEv}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+            </div>
+          )}
+        </Widget>
 
-      {/* Margen operativo (Gauge real de Bklit) + actividad diaria (Heatmap propio) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <BklitGaugeCard
-          ingresosOperativos={ingresosOperativosAnio}
-          margen={margenAnio}
-        />
-        <div className="lg:col-span-2">
-          <HeatmapErrorBoundary>
-            <ActivityHeatmap
-              title={`Actividad diaria — ${year}`}
-              year={year}
-              dailyCount={heatmapDailyCount}
-              dailyRevenue={heatmapDailyRevenue}
-              levelColors={heatmapColors}
-            />
-          </HeatmapErrorBoundary>
-        </div>
-      </div>
-
-      {/* Gasto por categoría — Bar Chart real de Bklit */}
-      {gastosPorCategoriaChart.length > 0 && (
-        <BklitBarCard
-          title={`Gastos por categoría — ${year}`}
-          description="Gastos generales y de eventos por categoría"
-          data={gastosPorCategoriaChart}
-          xDataKey="categoria"
-          dataKey="total"
-        />
-      )}
-
-      {/* Gasto por categoría */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-800">Gastos generales por categoría — {year}</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Categoría</th>
-                <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500">Nº</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {porCategoriaGenerales.length === 0 ? (
-                <tr><td colSpan={3} className="text-center py-6 text-gray-400 text-sm">Sin gastos en {year}</td></tr>
-              ) : porCategoriaGenerales.map(([cat, data]) => (
-                <tr key={cat} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-medium text-gray-800">{cat}</td>
-                  <td className="px-4 py-2.5 text-center text-gray-500">{data.count}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(data.total)}</td>
-                </tr>
+        <Widget className="span-2" title="Eventos más rentables" delay={0.18}>
+          {mejores.length === 0 ? <p className="text-ink-3 text-[14px]">Sin eventos en {year}.</p> : (
+            <div className="-mx-2">
+              {mejores.map(({ i, r }, idx) => (
+                <div key={i.id} className="flex items-center gap-3 px-2 py-2">
+                  <span className="num w-5 text-center text-[13px] font-semibold text-ink-3">{idx + 1}</span>
+                  <span className="flex-1 min-w-0"><b className="block text-[14.5px] truncate">{i.concepto}</b><small className="text-[12.5px] text-ink-3">{i.fechaEvento}</small></span>
+                  <span className="text-right"><b className="num text-[14.5px] text-[#1f9d55]">{fmt(r.beneficio)}</b><small className="block text-[12px] text-ink-3 num">{r.margen == null ? '' : `${Math.round(r.margen)} %`}</small></span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-800">Gastos de evento por categoría — {year}</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Categoría</th>
-                <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500">Nº</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {porCategoriaEvento.length === 0 ? (
-                <tr><td colSpan={3} className="text-center py-6 text-gray-400 text-sm">Sin gastos en {year}</td></tr>
-              ) : porCategoriaEvento.map(([cat, data]) => (
-                <tr key={cat} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-medium text-gray-800">{cat}</td>
-                  <td className="px-4 py-2.5 text-center text-gray-500">{data.count}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(data.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </Widget>
       </div>
-
-      {/* Inventario equipo */}
-      {equipo.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-800">Inventario de equipo</h2>
-            <Button size="sm" variant="secondary" icon={<Download size={12} />} onClick={exportEquipoCSV}>Exportar</Button>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Nombre</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Categoría</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Fecha compra</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500">Valor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {equipo.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-medium text-gray-800">{e.nombre}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{e.categoria}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{e.fechaCompra}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(e.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 };
