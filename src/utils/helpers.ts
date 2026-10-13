@@ -4,10 +4,10 @@ import { es } from 'date-fns/locale';
 import type { Ingreso, Gasto } from '../types';
 
 export const fmt = (n: number) =>
-  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(n);
+  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, useGrouping: 'always' as never }).format(n);
 
 export const fmtShort = (n: number) =>
-  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0, useGrouping: 'always' as never }).format(n);
 
 // Formateador de CONTEOS enteros para <AnimatedNumber>/<StatCard*> — usar
 // siempre en vez de `format={String}`. Bug encontrado en esta auditoría:

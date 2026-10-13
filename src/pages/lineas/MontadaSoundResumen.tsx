@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Clock, Receipt } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { fmtShort, fmtInt, buildMonthlyTable, getAvailableYears } from '../../utils/helpers';
-import { StatCard2 } from '../../components/ui2/StatCard';
-import { BklitAreaCard, BklitRingCard } from '../../components/charts-app/BklitCharts';
+import { getAvailableYears } from '../../utils/helpers';
+import { cobradoDe, pendienteDe } from '../../lib/contabilidad';
+import { gastoEventoSinIVA } from '../../lib/ingresoRentabilidad';
+import { PageHeader, YearStepper, defaultYear, Widget, Metric, Money, SplitBar, Dot } from '../../components/kit';
+import { MonthlyBars } from '../../components/kit/MonthlyBars';
 
-// Resumen de la línea "La Montada Sound" — Fase C. Reutiliza exactamente los
-// mismos cálculos que el Dashboard global (buildMonthlyTable, IVA, beneficio
-// real por eventos), filtrados a area='montada'.
+const yearOf = (d?: string) => (d ? new Date(d).getFullYear() : NaN);
+const monthOf = (d?: string) => (d ? new Date(d).getMonth() : -1);
+
+// Resumen de La Montada Sound. Mismos criterios que Contabilidad:
+// beneficio operativo = ingresos sin IVA − gastos generales − coste de eventos.
 export const MontadaSoundResumen = () => {
   const allIngresos = useStore((s) => s.ingresos);
   const allGastos = useStore((s) => s.gastos);
@@ -16,77 +19,88 @@ export const MontadaSoundResumen = () => {
   const gastos = useMemo(() => allGastos.filter((g) => g.area === 'montada'), [allGastos]);
   const gastosEvento = useMemo(() => allGastosEvento.filter((g) => g.area === 'montada'), [allGastosEvento]);
 
-  const allYears = useMemo(() => getAvailableYears([...ingresos, ...gastos]), [ingresos, gastos]);
-  const [year, setYear] = useState(allYears[0] ?? new Date().getFullYear());
+  const years = useMemo(() => getAvailableYears([...ingresos, ...gastos]), [ingresos, gastos]);
+  const [year, setYear] = useState(() => defaultYear(years));
 
-  const ingresosAnio = useMemo(() => ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === year), [ingresos, year]);
-  const gastosAnio = useMemo(() => gastos.filter((g) => new Date(g.fecha).getFullYear() === year), [gastos, year]);
+  const m = useMemo(() => {
+    const ing = ingresos.filter((i) => yearOf(i.fechaEvento) === year);
+    const gas = gastos.filter((g) => yearOf(g.fecha) === year);
+    const ids = new Set(ing.map((i) => i.id));
+    const gev = gastosEvento.filter((g) => ids.has(g.ingresoId));
 
-  const totalIngresos = ingresosAnio.reduce((s, i) => s + i.baseImponible, 0);
-  const totalGastos = gastosAnio.reduce((s, g) => s + g.baseImponible, 0);
-  const ingresoIds = new Set(ingresosAnio.map((i) => i.id));
-  const costesEvento = gastosEvento.filter((g) => ingresoIds.has(g.ingresoId)).reduce((s, g) => s + g.importe, 0);
-  const beneficioOperativo = totalIngresos - totalGastos - costesEvento;
-  const ivaRep = ingresosAnio.reduce((s, i) => s + i.importeIVA, 0);
-  const pendienteCobro = ingresosAnio.reduce((s, i) => s + (i.estadoPago === 'pagado' ? 0 : Math.max(0, i.total - i.pagosRecibidos)), 0);
-  const cobrado = ingresosAnio.reduce((s, i) => s + (i.estadoPago === 'pagado' ? i.total : i.pagosRecibidos), 0);
+    const sinIva = ing.reduce((s, i) => s + i.baseImponible, 0);
+    const conIva = ing.reduce((s, i) => s + i.total, 0);
+    const generales = gas.reduce((s, g) => s + g.baseImponible, 0);
+    const costeEventos = gev.reduce((s, g) => s + gastoEventoSinIVA(g), 0);
+    const beneficio = sinIva - generales - costeEventos;
+    const cobrado = ing.reduce((s, i) => s + cobradoDe(i), 0);
+    const pendiente = ing.reduce((s, i) => s + pendienteDe(i), 0);
+    const ivaRecuperado = gas.reduce((s, g) => s + (g.importeIVA ?? 0), 0) + gev.reduce((s, g) => s + (g.importeIVA ?? 0), 0);
 
-  const monthlyData = useMemo(() => buildMonthlyTable(ingresos, gastos, year), [ingresos, gastos, year]);
-  const areaChartData = monthlyData.map((row) => ({ date: new Date(year, row.num - 1, 1), Ingresos: row.ing, Gastos: row.gTotal }));
+    const meses = Array.from({ length: 12 }, () => ({ cobrado: 0, pendiente: 0 }));
+    for (const i of ing) {
+      const mo = monthOf(i.fechaEvento);
+      if (mo < 0) continue;
+      meses[mo].cobrado += cobradoDe(i);
+      meses[mo].pendiente += pendienteDe(i);
+    }
 
-  const cobradoVsPendiente = useMemo(() => {
-    const total = cobrado + pendienteCobro || 1;
-    return [
-      { label: 'Cobrado', value: cobrado, maxValue: total, color: '#15803d' },
-      { label: 'Pendiente', value: pendienteCobro, maxValue: total, color: '#dc2626' },
-    ];
-  }, [cobrado, pendienteCobro]);
+    return {
+      sinIva, conIva, generales, costeEventos, beneficio, cobrado, pendiente, ivaRecuperado, meses,
+      eventos: ing.length,
+      margen: sinIva > 0 ? Math.round((beneficio / sinIva) * 100) : 0,
+      ticket: ing.length ? sinIva / ing.length : 0,
+    };
+  }, [ingresos, gastos, gastosEvento, year]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">La Montada Sound</h1>
-          
-        </div>
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="border border-gray-200 text-gray-700 text-sm rounded-full px-4 py-2 outline-none bg-white">
-          {allYears.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-      </div>
+    <div>
+      <PageHeader title="Resumen">
+        <YearStepper year={year} years={years} onChange={setYear} />
+      </PageHeader>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard2 label="Ingresos (s/IVA)" value={totalIngresos} format={fmtShort} icon={<TrendingUp size={15} />} tone="success" />
-        <StatCard2 label="Gastos (s/IVA)" value={totalGastos + costesEvento} format={fmtShort} icon={<TrendingDown size={15} />} tone="danger" />
-        <StatCard2 label="Beneficio operativo" value={beneficioOperativo} format={fmtShort} icon={<DollarSign size={15} />} tone={beneficioOperativo >= 0 ? 'gold' : 'danger'} />
-        <StatCard2 label="Pendiente de cobro" value={pendienteCobro} format={fmtShort} sub={`Cobrado: ${fmtShort(cobrado)}`} icon={<Clock size={15} />} tone={pendienteCobro > 0 ? 'warning' : 'success'} />
-      </div>
+      <div className="bento">
+        <Widget className="span-2 lg-row-2 hero-card flex flex-col">
+          <p className="text-[13px] font-medium opacity-75">Ingresos sin IVA · {year}</p>
+          <p className="hero-value mt-3"><Money value={m.sinIva} /></p>
+          <p className="mt-2 text-[15px] opacity-80">
+            <Money value={m.conIva} /> con IVA
+          </p>
+          <div className="mt-auto pt-8">
+            <SplitBar parts={[
+              { label: 'Cobrado', value: m.cobrado, color: '#ffffff' },
+              { label: 'Pendiente', value: m.pendiente, color: 'rgb(255 255 255 / .35)' },
+            ]} />
+            <div className="flex justify-between mt-3 text-[13px]">
+              <span className="flex items-center gap-1.5"><Dot color="#fff" />Cobrado <b className="num ml-1"><Money value={m.cobrado} /></b></span>
+              <span className="flex items-center gap-1.5 opacity-80"><Dot color="rgb(255 255 255 / .45)" />Pendiente <b className="num ml-1"><Money value={m.pendiente} /></b></span>
+            </div>
+          </div>
+        </Widget>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard2 label="IVA repercutido" value={ivaRep} format={fmtShort} icon={<Receipt size={15} />} />
-        <StatCard2 label="Eventos del año" value={ingresosAnio.length} format={fmtInt} icon={<TrendingUp size={15} />} />
-        <StatCard2 label="Coste de eventos" value={costesEvento} format={fmtShort} icon={<TrendingDown size={15} />} />
-        <StatCard2 label="Margen" value={totalIngresos > 0 ? Math.round((beneficioOperativo / totalIngresos) * 100) : 0} format={(n) => `${n}%`} icon={<DollarSign size={15} />} tone={beneficioOperativo >= 0 ? 'success' : 'danger'} />
-      </div>
+        <Metric
+          label="Beneficio operativo" value={m.beneficio} delay={0.04}
+          tone={m.beneficio >= 0 ? 'positive' : 'negative'}
+        />
+        <Metric label="Pendiente de cobro" value={m.pendiente} delay={0.06} tone={m.pendiente > 0 ? 'warning' : 'neutral'} />
+        <Metric label="Margen" value={m.margen} kind="percent" delay={0.08} tone={m.margen >= 0 ? 'neutral' : 'negative'} />
+        <Metric label="Eventos" value={m.eventos} kind="count" delay={0.1} foot={m.eventos ? <>Ticket medio <Money value={m.ticket} /></> : null} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <BklitAreaCard
-            title={`Evolución mensual ${year}`}
-            description="Total sin IVA — ingresos y gastos"
-            data={areaChartData}
+        <Metric label="Gastos" value={m.generales + m.costeEventos} delay={0.12} foot={<>Generales <Money value={m.generales} /></>} />
+        <Metric label="Coste de eventos" value={m.costeEventos} delay={0.14} />
+        <Metric label="IVA recuperado" value={m.ivaRecuperado} delay={0.16} />
+        <Metric label="Cobrado" value={m.cobrado} delay={0.18} tone="positive" />
+
+        <Widget className="span-full" title="Evolución de ingresos" delay={0.2}>
+          <MonthlyBars
+            year={year}
+            data={m.meses}
             series={[
-              { key: 'Ingresos', color: '#4f46e5' },
-              { key: 'Gastos', color: '#f87171' },
+              { key: 'cobrado', label: 'Cobrado', color: 'var(--tint-a)' },
+              { key: 'pendiente', label: 'Por cobrar', color: '#c26a00', pattern: true },
             ]}
           />
-        </div>
-        <BklitRingCard
-          title="Cobrado / pendiente"
-          description={`Año ${year}`}
-          data={cobradoVsPendiente}
-          centerLabel="pendiente"
-          centerValue={fmtShort(pendienteCobro)}
-        />
+        </Widget>
       </div>
     </div>
   );

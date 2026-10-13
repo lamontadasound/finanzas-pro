@@ -4,6 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        ink: { DEFAULT: '#1d1d1f', 2: '#48484a', 3: '#86868b', 4: '#aeaeb2' },
         // Identidad: marrón La Montada y crema. Alias gold conservado para compatibilidad.
         accent: {
           50: '#faf7f5',
