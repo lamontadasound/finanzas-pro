@@ -118,7 +118,7 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
     {notice && <p role="status" className="quotes-notice">{notice}</p>}
     {!form ? <>
       <div className="quotes-toolbar"><input aria-label="Buscar presupuestos" placeholder="Buscar cliente, título o referencia" value={search} onChange={e => setSearch(e.target.value)}/><select aria-label="Filtrar por estado" value={filter} onChange={e => setFilter(e.target.value)}><option value="todos">Todos los estados</option>{Object.entries(estados).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><div className="quotes-view-switch" role="group" aria-label="Vista de presupuestos"><button type="button" aria-label="Vista de lista" aria-pressed={view === 'list'} onClick={() => setView('list')}><ListViewIcon isActive={view === 'list'}/></button><button type="button" aria-label="Vista de tarjetas" aria-pressed={view === 'cards'} onClick={() => setView('cards')}><CardsViewIcon isActive={view === 'cards'}/></button></div></div>
-      {items.length > 0 && <details className="quotes-archive"><summary>Archivo por año y mes</summary><FileTree elements={archive} highlightColor="#4b3836"/></details>}
+      {items.length > 0 && <details className="quotes-archive"><summary>Archivo por año y mes</summary><FileTree elements={archive} highlightColor="#3c3c3c"/></details>}
       {loading ? <p role="status">Cargando presupuestos…</p> : <div className={`quotes-list ${view === 'cards' ? 'quotes-list-cards' : ''}`}>
         <AnimatedList items={visibleItems} maxVisible={visibleItems.length} animation="slide" gap={view === 'cards' ? 16 : 0} className={view === 'cards' ? 'quotes-animated-cards' : ''} renderItem={p => {
           const t = totalesPresupuesto(p.contenido);

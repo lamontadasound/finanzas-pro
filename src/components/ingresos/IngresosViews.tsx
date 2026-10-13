@@ -1,20 +1,12 @@
 import { motion } from 'framer-motion';
 import { ChevronRight, Plus } from 'lucide-react';
-import type { GastoEvento, Ingreso, PaymentStatus } from '../../types';
+import type { GastoEvento, Ingreso } from '../../types';
 import { ingresoRentabilidad } from '../../lib/ingresoRentabilidad';
 import { fmt, fmtShort } from '../../utils/helpers';
-import { Pill, type Tone } from '../kit';
+import { Pill } from '../kit';
 import { RowMenu2, type RowMenuAction } from '../ui2/RowMenu';
 
-export const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const MESES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
-export const ESTADO_LABEL: Record<PaymentStatus, string> = {
-  presupuesto: 'Presupuesto', pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Cobrado', cancelado: 'Cancelado',
-};
-export const ESTADO_TONE: Record<PaymentStatus, Tone> = {
-  presupuesto: 'neutral', pendiente: 'negative', parcial: 'warning', pagado: 'positive', cancelado: 'neutral',
-};
+import { MESES_FULL, MESES_CORTO, ESTADO_LABEL, ESTADO_TONE } from './estado';
 
 const spring = { type: 'spring' as const, bounce: 0, duration: 0.5 };
 

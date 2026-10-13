@@ -3,7 +3,8 @@ import { useStore } from '../../store/useStore';
 import { getAvailableYears } from '../../utils/helpers';
 import { cobradoDe, pendienteDe } from '../../lib/contabilidad';
 import { gastoEventoSinIVA } from '../../lib/ingresoRentabilidad';
-import { PageHeader, YearStepper, defaultYear, Widget, Metric, Money, SplitBar, Dot } from '../../components/kit';
+import { PageHeader, YearStepper, Widget, Metric, Money, SplitBar, Dot } from '../../components/kit';
+import { defaultYear } from '../../components/kit/utils';
 import { MonthlyBars } from '../../components/kit/MonthlyBars';
 
 const yearOf = (d?: string) => (d ? new Date(d).getFullYear() : NaN);

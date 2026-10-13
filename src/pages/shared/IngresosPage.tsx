@@ -8,7 +8,8 @@ import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
 import { uid } from '../../utils/helpers';
 import { pendienteDe } from '../../lib/contabilidad';
 import { PageHeader, Metric, Btn, FormGroup, Field, Chips, ToggleCard } from '../../components/kit';
-import { YearGrid, MonthGrid, IngresoRows, MESES_FULL, ESTADO_LABEL } from '../../components/ingresos/IngresosViews';
+import { YearGrid, MonthGrid, IngresoRows } from '../../components/ingresos/IngresosViews';
+import { MESES_FULL, ESTADO_LABEL } from '../../components/ingresos/estado';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
@@ -23,7 +24,6 @@ import { resolveLinea } from '../../config/resolveLinea';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 
-const ESTADOS: PaymentStatus[] = ['presupuesto', 'pendiente', 'parcial', 'pagado', 'cancelado'];
 const PCTS_IVA = [0, 10, 21];
 
 // ── Formulario de ingresos: listas cerradas específicas de este formulario ──
@@ -35,13 +35,6 @@ const METODO_LABEL: Record<string, string> = { transferencia: 'Transferencia', t
 const LINEA_LABEL: Record<string, string> = { montada_sound: 'La Montada Sound', dj: 'DJ', real_madrid: 'Real Madrid', montada_installations: 'Instalaciones' };
 const PAGADORES: PagadoPor[] = ['La Montada', 'Julia', 'Rodrigo', 'Julia y Rodrigo', 'Marco'];
 
-const estadoTone: Record<PaymentStatus, 'neutral' | 'gold' | 'info' | 'success' | 'danger' | 'warning'> = {
-  presupuesto: 'neutral',
-  pendiente:   'danger',
-  parcial:     'warning',
-  pagado:      'success',
-  cancelado:   'danger',
-};
 
 
 const suplidoPendiente = (s: Suplido) => Math.max(0, s.importe - (s.cantidadRecuperada ?? 0));
@@ -166,17 +159,6 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
     });
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
   }, [ingresos]);
-
-  const mesesDelAnio = useMemo(() => {
-    if (selectedYear == null) return [];
-    const map = new Map<number, { count: number; total: number }>();
-    ingresos.filter((i) => new Date(i.fechaEvento).getFullYear() === selectedYear).forEach((i) => {
-      const m = new Date(i.fechaEvento).getMonth();
-      const cur = map.get(m) ?? { count: 0, total: 0 };
-      map.set(m, { count: cur.count + 1, total: cur.total + i.baseImponible });
-    });
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [ingresos, selectedYear]);
 
   const totalAnio = useMemo(() => {
     if (selectedYear == null) return 0;

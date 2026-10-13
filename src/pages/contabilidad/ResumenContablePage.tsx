@@ -24,7 +24,7 @@ const LINEA_COLOR: Record<LineaId, string> = {
   montada_sound: '#4f46e5',
   dj: '#60a5fa',
   real_madrid: '#a78bfa',
-  montada_installations: '#9f7668',
+  montada_installations: '#2fb3a3',
 };
 
 type EstadoFiltro = 'todos' | PaymentStatus;

@@ -1,15 +1,21 @@
 import {ExpenseStatus} from '../../components/ui/ExpenseStatus';
-import {useExpenseCategories,categoryOptions} from '../../lib/expenseCategoryConfig';
+import {useExpenseCategories,categoryColor} from '../../lib/expenseCategoryConfig';
 import { resolveLinea } from '../../config/resolveLinea';
 import { useState, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Folder, ChevronLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { PageHeader, Metric, Btn, Widget, SplitBar, Dot } from '../../components/kit';
+import { GastosSwitch } from '../../components/kit/GastosSwitch';
+import { YearGrid, MonthGrid } from '../../components/ingresos/IngresosViews';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { RowMenu2 } from '../../components/ui2/RowMenu';
+import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Switch } from '../../components/ui/Switch';
-import { Badge } from '../../components/ui/Badge';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import { AdjuntarFacturaModal } from '../../components/facturacion/AdjuntarFacturaModal';
 import { Paperclip } from 'lucide-react';
@@ -65,7 +71,6 @@ const numeroRepeticiones = (periodicidad: Periodicidad): number => {
 export const GastosPage = ({ area, filterLinea }: Props) => {
   const allGastos  = useStore((s) => s.gastos);
   const {categories}=useExpenseCategories();
-  const CATEGORIAS_GASTO=categoryOptions(categories,'general',allGastos.map(g=>g.categoria));
   const gastos     = useMemo(() => allGastos.filter((g) => {
     if (g.area !== area) return false;
     if (filterLinea) return resolveLinea(g) === filterLinea;
@@ -84,11 +89,6 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
   const canDelete  = () => canDeleteLinea(permLinea);
   const showConfirm = useConfirmStore((s) => s.show);
 
-  const [search, setSearch]       = useState('');
-  const [filterCat, setFilterCat] = useState<GastoCategoria | ''>('');
-  const [filterTipo, setFilterTipo] = useState<GastoTipo | ''>('');
-  const [filterPeriodicidad, setFilterPeriodicidad] = useState<string>('');
-  const [filterPagadoPor, setFilterPagadoPor] = useState<PagadoPor | ''>('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]     = useState<Gasto | null>(null);
   const [facturaGasto, setFacturaGasto] = useState<Gasto | null>(null);
@@ -96,7 +96,7 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
   const [periodicidad, setPeriodicidad] = useState<Periodicidad>('Ocasional');
 
   // ── Navegación por Año → Mes (carpetas) ──────────────────────────────────
-  const [selectedYear, setSelectedYear]   = useState<number | null>(null);
+  const [selectedYear, setSelectedYear]   = useState<number | null>(() => new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const anios = useMemo(() => {
@@ -108,17 +108,6 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
     });
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
   }, [gastos]);
-
-  const mesesDelAnio = useMemo(() => {
-    if (selectedYear == null) return [];
-    const map = new Map<number, { count: number; total: number }>();
-    gastos.filter((g) => new Date(g.fecha).getFullYear() === selectedYear).forEach((g) => {
-      const m = new Date(g.fecha).getMonth();
-      const cur = map.get(m) ?? { count: 0, total: 0 };
-      map.set(m, { count: cur.count + 1, total: cur.total + g.baseImponible });
-    });
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [gastos, selectedYear]);
 
   const totalAnio = useMemo(() => {
     if (selectedYear == null) return 0;
@@ -141,18 +130,7 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
     });
   }, [gastos, selectedYear, selectedMonth]);
 
-  const filtered = useMemo(() => {
-    let list = [...enElMes];
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((g) => g.concepto.toLowerCase().includes(q) || (g.proveedor ?? '').toLowerCase().includes(q));
-    }
-    if (filterCat) list = list.filter((g) => g.categoria === filterCat);
-    if (filterTipo) list = list.filter((g) => g.tipo === filterTipo);
-    if (filterPeriodicidad) list = list.filter((g) => (g.periodicidad ?? 'ocasional') === filterPeriodicidad);
-    if (filterPagadoPor) list = list.filter((g) => g.pagadoPor === filterPagadoPor);
-    return list.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [enElMes, search, filterCat, filterTipo, filterPeriodicidad, filterPagadoPor]);
+  const filtered = useMemo(() => [...enElMes].sort((a, b) => b.fecha.localeCompare(a.fecha)), [enElMes]);
 
 
 
@@ -200,161 +178,109 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
     closeModal();
   };
 
+  const resumenAnios = anios.map(([year, d]) => {
+    const months = Array(12).fill(0) as number[];
+    gastos.forEach((g) => { const dt = new Date(g.fecha); if (dt.getFullYear() === year) months[dt.getMonth()] += g.baseImponible; });
+    return { year, count: d.count, total: d.total, months };
+  });
+  const delAnio = gastos.filter((g) => new Date(g.fecha).getFullYear() === selectedYear);
+  const resumenMeses = Array.from({ length: 12 }, (_, m) => {
+    const del = delAnio.filter((g) => new Date(g.fecha).getMonth() === m);
+    return { count: del.length, total: del.reduce((a, g) => a + g.baseImponible, 0), pendiente: del.filter((g) => g.estadoPago === 'pendiente').reduce((a, g) => a + g.total, 0) };
+  });
+  // Categorías del año, para el reparto visual
+  const porCategoria = Object.entries(delAnio.reduce<Record<string, number>>((acc, g) => { acc[g.categoria] = (acc[g.categoria] ?? 0) + g.baseImponible; return acc; }, {}))
+    .sort((x, y) => y[1] - x[1]);
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gastos generales</h1>
-        </div>
-        {canCreate() && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo gasto</Button>
-        )}
-      </div>
+    <div>
+      <PageHeader title={selectedMonth != null && selectedYear != null ? `${MESES_FULL[selectedMonth]} ${selectedYear}` : selectedYear != null ? `Gastos ${selectedYear}` : 'Gastos'}>
+        <GastosSwitch eventosLabel={area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
+        {canCreate() && <Btn variant="primary" onClick={openNew}><Plus size={16} strokeWidth={2.4} />Nuevo gasto</Btn>}
+      </PageHeader>
 
-      {/* Breadcrumb navegación Año → Mes */}
-      <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }} className={`font-medium ${selectedYear == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>Años</button>
-        {selectedYear != null && (
-          <>
-            <span className="text-gray-300">/</span>
-            <button onClick={() => setSelectedMonth(null)} className={`font-medium ${selectedMonth == null ? 'text-gray-900' : 'text-gold-600 hover:text-gold-500'}`}>{selectedYear}</button>
-          </>
-        )}
-        {selectedYear != null && selectedMonth != null && (
-          <>
-            <span className="text-gray-300">/</span>
-            <span className="font-medium text-gray-900">{MESES_FULL[selectedMonth]}</span>
-          </>
-        )}
-      </div>
-
-      {/* Nivel 1: años */}
-      {selectedYear == null && (
-        anios.length === 0 ? (
-          <p className="text-center py-16 text-gray-400 text-sm">Sin gastos registrados todavía</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {anios.map(([y, data]) => (
-              <button key={y} onClick={() => setSelectedYear(y)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
-                <div className="flex items-center gap-2 mb-2">
-                  <Folder size={16} className="text-gold-500" />
-                  <span className="text-lg font-bold text-gray-900">{y}</span>
-                </div>
-                <p className="text-xs text-gray-500">{data.count} gastos</p>
-                <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-              </button>
-            ))}
-          </div>
-        )
+      {selectedYear != null && (
+        <nav className="crumbs" aria-label="Ruta">
+          <button onClick={() => { setSelectedYear(null); setSelectedMonth(null); }}>Años</button>
+          <ChevronRight size={14} />
+          {selectedMonth == null ? <b>{selectedYear}</b> : (
+            <>
+              <button onClick={() => setSelectedMonth(null)}>{selectedYear}</button>
+              <ChevronRight size={14} />
+              <b>{MESES_FULL[selectedMonth]}</b>
+            </>
+          )}
+        </nav>
       )}
 
-      {/* Nivel 2: meses dentro del año */}
+      {selectedYear == null && (
+        anios.length === 0
+          ? <EmptyState icon={<Folder size={22} />} title="Sin gastos registrados todavía" />
+          : <YearGrid years={resumenAnios} onOpen={(y) => { setSelectedYear(y); setSelectedMonth(null); }} unit={['gasto', 'gastos']} />
+      )}
+
       {selectedYear != null && selectedMonth == null && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <button onClick={() => setSelectedYear(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a años</button>
-            <p className="text-sm text-gray-600">Total sin IVA {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalAnio)}</span></p>
+        <>
+          <div className="bento mb-4">
+            <Metric label="Sin IVA" value={totalAnio} />
+            <Metric label="Con IVA" value={delAnio.reduce((a, g) => a + g.total, 0)} delay={0.03} />
+            <Metric label="IVA soportado" value={delAnio.reduce((a, g) => a + (g.importeIVA ?? 0), 0)} delay={0.06} />
+            <Metric label="Sin pagar" value={resumenMeses.reduce((a, m) => a + m.pendiente, 0)} delay={0.09} tone="warning" />
+            {porCategoria.length > 0 && (
+              <Widget className="span-full" title="Por categoría" delay={0.12}>
+                <SplitBar parts={porCategoria.map(([c, v]) => ({ label: c, value: v, color: categoryColor(c, categories) }))} />
+                <div className="flex flex-wrap gap-x-5 gap-y-2 mt-3">
+                  {porCategoria.map(([c, v]) => (
+                    <span key={c} className="flex items-center gap-1.5 text-[13px]"><Dot color={categoryColor(c, categories)} />{c}<b className="num">{fmt(v)}</b></span>
+                  ))}
+                </div>
+              </Widget>
+            )}
           </div>
-          {mesesDelAnio.length === 0 ? (
-            <p className="text-center py-16 text-gray-400 text-sm">Sin gastos en {selectedYear}</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {mesesDelAnio.map(([m, data]) => (
-                <button key={m} onClick={() => setSelectedMonth(m)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Folder size={16} className="text-gold-500" />
-                    <span className="font-bold text-gray-900">{MESES_FULL[m]}</span>
-                  </div>
-                  <p className="text-xs text-gray-500">{data.count} gastos</p>
-                  <p className="text-sm font-semibold text-gray-700 mt-1">Total sin IVA: {fmt(data.total)}</p>
-                </button>
-              ))}
+          <MonthGrid year={selectedYear} months={resumenMeses} onOpen={setSelectedMonth} unit={['gasto', 'gastos']} pendingLabel="sin pagar" emptyLabel="Sin gastos" />
+        </>
+      )}
+
+      {selectedYear != null && selectedMonth != null && (
+        <>
+          <div className="bento mb-4">
+            <Metric label="Sin IVA" value={totalMes} />
+            <Metric label="Con IVA" value={enElMes.reduce((a, g) => a + g.total, 0)} delay={0.03} />
+            <Metric label="Gastos" value={enElMes.length} kind="count" delay={0.06} />
+            <Metric label="Sin pagar" value={enElMes.filter((g) => g.estadoPago === 'pendiente').reduce((a, g) => a + g.total, 0)} delay={0.09} tone="warning" />
+          </div>
+          {filtered.length === 0 ? <EmptyState icon={<Folder size={22} />} title="Sin gastos este mes" /> : (
+            <div className="widget overflow-hidden" style={{ padding: 0 }}>
+              <div className="gx-grid gx-head" aria-hidden>
+                <span /><span>Concepto</span><span>Categoría</span><span>Pagado por</span><span>Fecha</span>
+                <span className="r">Sin IVA</span><span className="r">Con IVA</span><span>Pago</span><span />
+              </div>
+              {filtered.map((g, idx) => {
+                const color = categoryColor(g.categoria, categories);
+                return (
+                  <motion.div key={g.id} className="gx-grid gx-row"
+                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45, delay: idx * 0.025 }}>
+                    <span className="cat-glyph" style={{ background: `${color}1f`, color }}>{g.categoria?.slice(0, 1).toUpperCase() || '·'}</span>
+                    <span className="gx-main"><b>{g.concepto}</b><small>{[g.categoria, g.proveedor, g.fecha].filter(Boolean).join(' · ')}</small></span>
+                    <span className="gx-cat"><span className="cat-tag" style={{ color, background: `${color}14` }}>{g.categoria}</span></span>
+                    <span className="gx-col">{g.pagadoPor ?? '—'}</span>
+                    <span className="gx-col num">{g.fecha}</span>
+                    <span className="r num">{fmt(g.baseImponible)}</span>
+                    <span className="r num gx-strong">{fmt(g.total)}</span>
+                    <span className="gx-pay"><ExpenseStatus status={g.estadoPago} /></span>
+                    <span className="flex justify-end">
+                      <RowMenu2 actions={[
+                        ...(canCreate() ? [{ label: 'Adjuntar factura', icon: <Paperclip size={13} />, onClick: () => setFacturaGasto(g) }] : []),
+                        ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(g) }] : []),
+                        ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este gasto?', () => deleteGasto(g.id)) }] : []),
+                      ]} />
+                    </span>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Nivel 3: tabla del mes seleccionado */}
-      {selectedYear != null && selectedMonth != null && (
-      <>
-      <div className="flex items-center justify-between">
-        <button onClick={() => setSelectedMonth(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a meses</button>
-        <p className="text-sm text-gray-600">Total sin IVA {MESES_FULL[selectedMonth]} {selectedYear}: <span className="font-semibold text-gray-900">{fmt(totalMes)}</span></p>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar concepto o proveedor…" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:border-gold-400" />
-        </div>
-        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value as GastoCategoria | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <option value="">Todas las categorías</option>
-          {CATEGORIAS_GASTO.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-{area !== 'montada' && (        <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as GastoTipo | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <option value="">Todos los tipos</option>
-          {TIPOS_GASTO.map((t) => <option key={t} value={t}>{t === 'fijo' ? 'Fijo' : 'Variable'}</option>)}
-        </select>)}
-        <select value={filterPeriodicidad} onChange={(e) => setFilterPeriodicidad(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <option value="">Toda periodicidad</option>
-          <option value="ocasional">Ocasional</option>
-          <option value="mensual">Mensual</option>
-          <option value="trimestral">Trimestral</option>
-          <option value="anual">Anual</option>
-        </select>
-        <select value={filterPagadoPor} onChange={(e) => setFilterPagadoPor(e.target.value as PagadoPor | '')} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <option value="">Todos los pagadores</option>
-          {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
-                {area !== 'montada' && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>}
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado por</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total sin IVA</th><th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total con IVA</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
-                <tr><td colSpan={area==='montada'?8:9} className="text-center py-12 text-gray-400 text-sm">Sin gastos registrados</td></tr>
-              ) : filtered.map((g) => (
-                <tr key={g.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{g.fecha}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{g.concepto}</p>
-                    {g.proveedor && <p className="text-xs text-gray-400">{g.proveedor}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{g.categoria}</td>
-{area !== 'montada' && (                  <td className="px-4 py-3">
-                    <Badge tone={g.tipo === 'fijo' ? 'info' : 'neutral'}>{g.tipo}</Badge>
-                  </td>)}
-                  <td className="px-4 py-3 text-gray-600">{g.pagadoPor ?? '—'}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(g.baseImponible)}</td><td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(g.total)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <ExpenseStatus status={g.estadoPago}/>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      {canCreate() && <button onClick={() => setFacturaGasto(g)} title="Adjuntar factura" className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Paperclip size={13} /></button>}
-                      {canEdit() && <button onClick={() => openEdit(g)} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Edit2 size={13} /></button>}
-                      {canDelete() && <button onClick={() => showConfirm('¿Eliminar este gasto?', () => deleteGasto(g.id))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </>
+        </>
       )}
 
       <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar gasto' : 'Nuevo gasto'} size="lg">
@@ -374,9 +300,7 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
             </div>
             <div>
               <label className="label-form">Categoría</label>
-              <select value={form.categoria ?? ''} onChange={(e) => setField('categoria', e.target.value as GastoCategoria)} className="input-form">
-                {CATEGORIAS_GASTO.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <EventCategoryField scope="general" value={form.categoria ?? ''} onChange={(v) => setField('categoria', v as GastoCategoria)} />
             </div>
 {area !== 'montada' && (            <div>
               <label className="label-form">Tipo de gasto</label>

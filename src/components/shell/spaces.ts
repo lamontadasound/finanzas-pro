@@ -39,7 +39,7 @@ const inst = '/lineas/installations';
 export const SPACES: Space[] = [
   {
     id: 'home', label: 'Mi espacio', icon: House,
-    tint: { from: '#3a3a3c', to: '#636366', glow: '#8e8e93' },
+    tint: { from: '#0060df', to: '#40a9ff', glow: '#5ac8fa' },
     home: '/', prefixes: ['/contabilidad/informes', '/contabilidad/pagos'],
     items: [
       { to: '/', label: 'Resumen', icon: LayoutGrid, end: true },
@@ -49,7 +49,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'montada', label: 'La Montada', icon: AudioLines, linea: 'montada_sound',
-    tint: { from: '#5b3f35', to: '#b0805f', glow: '#c99a74' },
+    tint: { from: '#1c1c1e', to: '#4a4a4f', glow: '#a1a1aa' },
     home: `${montada}/resumen`, prefixes: [montada, '/montada/'],
     items: [
       { to: `${montada}/resumen`, label: 'Resumen', icon: LayoutGrid },
@@ -110,7 +110,7 @@ export const SPACES: Space[] = [
   },
   {
     id: 'conta', label: 'Contabilidad', icon: Calculator, modulo: 'contabilidad',
-    tint: { from: '#1d4e89', to: '#4f8fd6', glow: '#7fb0e8' },
+    tint: { from: '#1b7f3b', to: '#34c759', glow: '#7ee2a0' },
     home: '/contabilidad/resumen', prefixes: ['/contabilidad'],
     items: [
       { to: '/contabilidad/resumen', label: 'Resumen', icon: LayoutGrid },

@@ -149,7 +149,7 @@ const ResumenTab = ({
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="ingresos" name="Ingresos" fill="#a78bfa" radius={[4, 4, 0, 0]} />
             <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="benef. real" name="Benef. real" fill="#8d675a" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="benef. real" name="Benef. real" fill="#6e6e6e" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -32,16 +32,16 @@ const switchSizes = {
 
 const switchTones = {
   neutral: {
-    off: "color-mix(in srgb, #ded8d5 82%, transparent)",
-    on: "#4b3836",
+    off: "color-mix(in srgb, #d9d9d9 82%, transparent)",
+    on: "#3c3c3c",
     thumb: "#ffffff",
-    glow: "color-mix(in srgb, #4b3836 32%, transparent)",
+    glow: "color-mix(in srgb, #3c3c3c 32%, transparent)",
   },
   accent: {
-    off: "color-mix(in srgb, #ded8d5 82%, transparent)",
-    on: "#4b3836",
+    off: "color-mix(in srgb, #d9d9d9 82%, transparent)",
+    on: "#3c3c3c",
     thumb: "#ffffff",
-    glow: "color-mix(in srgb, #4b3836 42%, transparent)",
+    glow: "color-mix(in srgb, #3c3c3c 42%, transparent)",
   },
 } as const;
 

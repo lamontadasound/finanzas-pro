@@ -3,7 +3,6 @@ import {ingresoRentabilidad,gastoEventoSinIVA,gastoEventoConIVA} from '../../lib
 import {ExpenseStatus} from '../../components/ui/ExpenseStatus';
 import {EventExpenseVatFields} from '../../components/forms/EventExpenseVatFields';
 import { EventExpensePaymentFields } from '../../components/forms/EventExpensePaymentFields';
-import {eventCategoryOptions} from '../../lib/eventCategories';
 import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
@@ -57,7 +56,7 @@ const EMPTY_SUPLIDO = (ingresoId: string, area: Area): Partial<Suplido> => ({
 
 const suplidoPendiente = (s: Suplido) => Math.max(0, s.importe - (s.cantidadRecuperada ?? 0));
 
-export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOverride }: Props) => {
+export const GastosEventoPage = ({ area, filterLinea, singularOverride }: Props) => {
   const allIngresos     = useStore((s) => s.ingresos);
   const allGastosEvento = useStore((s) => s.gastosEvento);
   const addGastoEvento    = useStore((s) => s.addGastoEvento);
@@ -78,8 +77,6 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
   const showConfirm = useConfirmStore((s) => s.show);
   const { categories } = useExpenseCategories();
 
-  const titulo = tituloOverride ?? (area === 'montada' ? 'Gastos de eventos' : 'Gastos de actuación');
-  const lineaLabel = tituloOverride ? (filterLinea === 'real_madrid' ? 'Real Madrid' : 'DJs') : (area === 'montada' ? 'La Montada Sound' : 'DJs');
   const singular = singularOverride ?? (area === 'montada' ? 'evento' : 'actuación');
 
   const ingresos = useMemo(
@@ -94,13 +91,13 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
 
   const ingresoDe = useCallback((id: string) => ingresos.find((x) => x.id === id), [ingresos]);
 
-  const [search, setSearch] = useState('');
+  const [search] = useState('');
   const [searchParams]=useSearchParams();
   const [selectedIngresoId, setSelectedIngresoId] = useState<string | null>(()=>searchParams.get('ingreso'));
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<GastoEvento | null>(null);
   const [form, setForm] = useState<Partial<GastoEvento>>({});
-  const [filterCategoria, setFilterCategoria] = useState<GastoEventoCategoria | ''>('');
+  const [filterCategoria] = useState<GastoEventoCategoria | ''>('');
 
   const gastosFiltrados = useMemo(
     () => gastos.filter((g) => (!filterCategoria || g.categoria === filterCategoria)),
@@ -133,17 +130,6 @@ export const GastosEventoPage = ({ area, filterLinea, tituloOverride, singularOv
     });
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
   }, [todasLasCarpetas]);
-
-  const mesesDelAnio = useMemo(() => {
-    if (selectedYear == null) return [];
-    const map = new Map<number, { count: number; total: number }>();
-    todasLasCarpetas.filter((c) => new Date(c.ingreso.fechaEvento).getFullYear() === selectedYear).forEach((c) => {
-      const m = new Date(c.ingreso.fechaEvento).getMonth();
-      const cur = map.get(m) ?? { count: 0, total: 0 };
-      map.set(m, { count: cur.count + 1, total: cur.total + c.total });
-    });
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [todasLasCarpetas, selectedYear]);
 
   const totalAnio = useMemo(() => {
     if (selectedYear == null) return 0;

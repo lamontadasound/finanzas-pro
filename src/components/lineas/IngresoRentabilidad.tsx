@@ -6,7 +6,7 @@ import { resolveLinea } from '../../config/resolveLinea';
 import { Modal } from '../ui/Modal';
 import { ExpenseStatus } from '../ui/ExpenseStatus';
 import { Pill, SplitBar, Btn } from '../kit';
-import { ESTADO_LABEL, ESTADO_TONE } from '../ingresos/IngresosViews';
+import { ESTADO_LABEL, ESTADO_TONE } from '../ingresos/estado';
 import { fmt } from '../../utils/helpers';
 
 const paths = {
