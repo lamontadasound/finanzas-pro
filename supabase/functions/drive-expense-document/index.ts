@@ -10,9 +10,9 @@ serve(async req=>{
  if(admin!==true)return json({error:'Solo un administrador puede leer los importes.'},403);
  const {fileId}=await req.json();
  if(typeof fileId!=='string'||! /^[\w-]+$/.test(fileId))return json({error:'Documento no válido.'},400);
- // Only catalogued expense documents, never arbitrary Drive IDs supplied by the browser.
- const {data:file}=await caller.from('drive_invoice_files').select('id,mime_type,actualizado_en').eq('id',fileId).eq('tipo','recibida').maybeSingle();
- if(!file)return json({error:'El documento no pertenece al archivo de gastos.'},404);
+ // Only catalogued invoice documents, never arbitrary Drive IDs supplied by the browser.
+ const {data:file}=await caller.from('drive_invoice_files').select('id,mime_type,actualizado_en').eq('id',fileId).in('tipo',['recibida','emitida']).maybeSingle();
+ if(!file)return json({error:'El documento no pertenece al archivo de facturas.'},404);
  if(!['application/pdf','image/png','image/jpeg','image/webp'].includes(file.mime_type))return json({error:'Formato no compatible con la lectura automática.'},422);
  const refresh=Deno.env.get('GOOGLE_REFRESH_TOKEN'),sa=Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
  if(!refresh&&!sa)return json({error:'Falta conectar Google Drive al servidor.'},503);

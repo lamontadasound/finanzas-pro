@@ -22,3 +22,14 @@ describe('Resumen exclusivo del archivo Drive',()=>{
   expect(accountingTotals(driveAccounting([file],[],[invoice,{...invoice,id:'other'}])).pending).toBe(1);
  });
 });
+
+it('suma ingresos leídos del PDF aunque no estén enlazados a una factura de la app',()=>{
+ const extracted={file_id:file.id,source_modified_at:null,estado:'leido' as const,proveedor:'',numero_factura:'',fecha_factura:null,base:200,iva:42,total:242,retencion:0,nota:''};
+ expect(accountingTotals(driveAccounting([file],[],[],[extracted]))).toMatchObject({income:200,outputVat:42,incomeTotal:242,pending:0});
+ expect(accountingTotals(driveAccounting([file],[],[invoice],[extracted]))).toMatchObject({income:200,outputVat:42,pending:0});
+});
+it('no suma una lectura obsoleta ni cifras incompletas de ingresos',()=>{
+ const extracted={file_id:file.id,source_modified_at:'2026-01-01',estado:'leido' as const,proveedor:'',numero_factura:'',fecha_factura:null,base:200,iva:42,total:242,retencion:0,nota:''};
+ expect(accountingTotals(driveAccounting([file],[],[],[extracted]))).toMatchObject({income:0,pending:1});
+ expect(accountingTotals(driveAccounting([file],[],[],[{...extracted,source_modified_at:null,iva:null}]))).toMatchObject({income:0,pending:1});
+});

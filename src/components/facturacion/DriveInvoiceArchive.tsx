@@ -18,6 +18,7 @@ function IncomeDriveArchive({tipo}:{tipo:'emitida'|'recibida'}){
  const refresh=async()=>{setRefreshing(true);setError('');try{
   const {data,error:err}=await supabase.functions.invoke('drive-invoice-archive');
   if(err||!data?.ok){let message=data?.error;if(err&&'context' in err&&err.context instanceof Response){message=(await err.context.json().catch(()=>null))?.error??message;}throw new Error(message||'No se pudo actualizar Drive. Se conserva el último archivo importado.');}
+  await (await import('../../lib/readDriveExpenseDocuments')).readDriveExpenseDocuments(()=>{},'emitida');
   const [a,b]=await Promise.all([supabase.from('drive_invoice_files').select('*').eq('tipo',tipo),supabase.from('drive_invoice_folders').select('*').eq('tipo',tipo)]);
   if(a.error||b.error)throw new Error('Archivo actualizado; recarga la página para verlo.');setFiles(a.data??[]);setFolders(b.data??[]);
  }catch(e){setError(e instanceof Error?e.message:'No se pudo actualizar Drive.');}finally{setRefreshing(false);}};

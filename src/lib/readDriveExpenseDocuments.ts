@@ -3,16 +3,17 @@ import {joinDriveExpenses,type DriveExpenseFile,type DriveExpenseAmount} from '.
 import {readInvoiceAmounts} from './invoiceAmountReader';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import ocrWorkerUrl from 'tesseract.js/dist/worker.min.js?url';
-let running:Promise<void>|null=null;
+const running=new Map<string,Promise<void>>();
 const VERSION='Lectura automática v1\n';
-export function readDriveExpenseDocuments(onProgress:(message:string)=>void):Promise<void>{
- if(running)return running;
- running=readDocuments(onProgress).finally(()=>{running=null;});return running;
+export function readDriveExpenseDocuments(onProgress:(message:string)=>void,tipo:'emitida'|'recibida'='recibida'):Promise<void>{
+ const active=running.get(tipo);if(active)return active;
+ const task=readDocuments(onProgress,tipo).finally(()=>running.delete(tipo));running.set(tipo,task);return task;
 }
-async function readDocuments(onProgress:(message:string)=>void){
+async function readDocuments(onProgress:(message:string)=>void,tipo:'emitida'|'recibida'){
+ const table=tipo==='emitida'?'drive_income_amounts':'drive_expense_amounts';
  const [{data:files,error:fe},{data:amounts,error:ae},{data:{user}}]=await Promise.all([
-  supabase.from('drive_invoice_files').select('*').eq('tipo','recibida'),
-  supabase.from('drive_expense_amounts').select('*'),supabase.auth.getUser()]);
+  supabase.from('drive_invoice_files').select('*').eq('tipo',tipo),
+  supabase.from(table).select('*'),supabase.auth.getUser()]);
  if(fe||ae||!user)throw new Error('No se pudo cargar el archivo para leer los importes.');
  const rows=joinDriveExpenses(files as DriveExpenseFile[],amounts as DriveExpenseAmount[]);
  const pending=rows.filter(r=>r.estado==='pendiente'&&(!r.amount?.evidencia?.startsWith(VERSION)||r.amount.source_modified_at!==r.actualizado_en));
@@ -56,7 +57,7 @@ async function readDocuments(onProgress:(message:string)=>void){
    const parsed=readInvoiceAmounts(text);
    const result={file_id:row.id,source_modified_at:row.actualizado_en,proveedor:row.amount?.proveedor??'',numero_factura:row.amount?.numero_factura??'',fecha_factura:row.amount?.fecha_factura??null,...parsed,evidencia:VERSION+parsed.evidencia};
    // Optimistic write: never overwrite a review saved while OCR was running.
-   const query=row.amount?supabase.from('drive_expense_amounts').update(result).eq('file_id',row.id).eq('actualizado_en',(row.amount as DriveExpenseAmount&{actualizado_en:string}).actualizado_en):supabase.from('drive_expense_amounts').insert(result);
+   const query=row.amount?supabase.from(table).update(result).eq('file_id',row.id).eq('actualizado_en',(row.amount as DriveExpenseAmount&{actualizado_en:string}).actualizado_en):supabase.from(table).insert(result);
    const {error:saveError}=await query;if(saveError)throw saveError;
   }catch{failed++;}
  }
