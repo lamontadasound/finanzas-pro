@@ -57,12 +57,12 @@ export const ResumenContablePage = () => {
           <StatCard2 label="IVA de los gastos" value={totals.inputVat} format={expenseFormat} icon={<Receipt size={18}/>}/>
           <StatCard2 label="Gastos con IVA" value={totals.expenseTotal} format={expenseFormat} icon={<TrendingDown size={18}/>} tone="danger"/>
         </div>
+        <h2 className="text-lg font-semibold">Previsión</h2>
         <section className="grid sm:grid-cols-2 gap-3" aria-label="Previsión">
           <StatCard2 label="Resultado antes de impuestos" value={totals.result} format={resultFormat} sub="Facturado sin IVA − gastos sin IVA" icon={<Scale size={18}/>} tone={totals.result >= 0 ? 'success' : 'danger'}/>
           <StatCard2 label="Saldo de IVA estimado" value={totals.vat} format={resultFormat} sub="IVA facturado − IVA de gastos documentado" icon={<Scale size={18}/>}/>
         </section>
         <p className="text-xs text-gray-500">Agrupado por el mes de la carpeta de Drive. Solo importes identificados; el IVA deducible y los ajustes fiscales deben revisarse. No incluye gastos manuales ni facturas que no estén en Drive.</p>
-        <div className="overflow-x-auto rounded-2xl border"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-left">{['Documento','Tipo','Sin IVA','IVA','Con IVA'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{selected.map(r => <tr key={r.id} className="border-t"><td className="p-3"><a className="text-blue-700 underline" href={r.url} target="_blank" rel="noreferrer">{r.nombre}</a><p className="text-xs text-gray-500">{months[r.mes-1]} {r.anio}{r.estado !== 'leido' ? ` · ${r.estado === 'excluido' ? 'Excluido / duplicado' : 'Pendiente de importe'}` : ''}</p></td><td className="p-3">{r.tipo === 'emitida' ? 'Ingreso' : 'Gasto'}</td>{[r.base,r.iva,r.base === null || r.iva === null ? null : r.base+r.iva].map((v,i) => <td className="p-3 whitespace-nowrap tabular-nums" key={i}>{v === null ? '—' : fmt(v)}</td>)}</tr>)}</tbody></table></div>
       </>}
     </>}
   </div>;
