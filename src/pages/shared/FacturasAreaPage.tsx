@@ -3,8 +3,7 @@ import {EliminarFacturaButton} from '../../components/facturacion/EliminarFactur
 import {Link} from 'react-router-dom';
 import { DriveInvoiceArchive } from '../../components/facturacion/DriveInvoiceArchive';
 import { useState, useMemo } from 'react';
-import { Edit2, Trash2, Search, Upload, AlertTriangle, Ban } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Edit2, Trash2, Search, Upload, AlertTriangle, Ban, Folder, ArrowLeft, FileText } from 'lucide-react';
 import { uid } from '../../utils/helpers';
 import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -16,7 +15,6 @@ import { MotionTabs } from '../../components/ui/MotionTabs';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { YearQuarterMonthNav } from '../../components/ui/YearQuarterMonthNav';
 import { matchesYQM, type YQMValue } from '../../components/ui/yqm';
 import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLines';
 import { lineaDeFactura } from '../../lib/contabilidad';
@@ -97,7 +95,8 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
     return list;
   }, [facturas, tab, filterLinea]);
 
-  const navItems = useMemo(() => delTab.map((f) => ({ fecha: f.fecha, total: f.baseImponible })), [delTab]);
+  const [appMonth, setAppMonth] = useState<string | null>(null);
+  const monthLabel = (key: string) => /^\d{4}-\d{2}$/.test(key) ? new Date(Number(key.slice(0,4)), Number(key.slice(5,7))-1, 1).toLocaleDateString('es-ES', {month:'long', year:'numeric'}) : 'Sin fecha';
 
   type SortKey = 'fecha' | 'numero' | 'cliente' | 'total';
   const [sortKey, setSortKey] = useState<SortKey>('fecha');
@@ -118,6 +117,10 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
       return a[sortKey].localeCompare(b[sortKey]) * dir;
     });
   }, [delTab, nav, search, sortKey, sortDir, filterEstado, filterSync]);
+
+  const monthGroups = [...new Set(filtered.map(f => f.fecha?.slice(0,7) || 'sin-fecha'))].sort().reverse();
+  const visibleInvoices = appMonth ? filtered.filter(f => (f.fecha?.slice(0,7) || 'sin-fecha') === appMonth) : filtered;
+  const showFolders = !appMonth && !search;
 
   const totalEmitidas   = facturas.filter((f) => f.tipo === 'emitida' && f.estado !== 'anulada' && f.estado !== 'borrador').reduce((a, f) => a + f.total, 0);
   const totalRecibidas  = facturas.filter((f) => f.tipo === 'recibida').reduce((a, f) => a + f.total, 0);
@@ -179,12 +182,12 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
       </div>
 
       </>}
-      {tab==='emitida'&&origen==='app'&&<div className="rounded-2xl bg-blue-50 p-4 flex flex-wrap justify-between gap-3"><strong>Creadas en la app</strong><span>{delTab.filter(f=>f.numeroSecuencial&&!f.driveFileId&&f.estado!=='anulada').length} pendientes de subir a Drive</span><button className="text-blue-700 font-medium" onClick={()=>{setFilterSync('pendientes');setNav({year:null,trimestre:null,month:null});}}>Ver pendientes</button></div>}
+      {tab==='emitida'&&origen==='app'&&<div className="rounded-2xl bg-blue-50 p-4 flex flex-wrap justify-between gap-3"><strong>Creadas en la app</strong><span>{delTab.filter(f=>f.numeroSecuencial&&!f.driveFileId&&f.estado!=='anulada').length} pendientes de subir a Drive</span><button className="text-blue-700 font-medium" onClick={()=>{setAppMonth(null);setFilterSync('pendientes');setNav({year:null,trimestre:null,month:null});}}>Ver pendientes</button></div>}
       {/* Tabs Ingresos/Gastos */}
       <MotionTabs
         layoutId="facturas-tab"
         value={tab}
-        onChange={(v) => { setTab(v); setNav({ year: null, trimestre: null, month: null }); }}
+        onChange={(v) => { setAppMonth(null); setTab(v); setNav({ year: null, trimestre: null, month: null }); }}
         items={[
           { value: 'emitida', label: 'Ingresos' },
           { value: 'recibida', label: 'Gastos' },
@@ -221,11 +224,14 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
         </select>
       </div>
 
-      <YearQuarterMonthNav items={navItems} value={nav} onChange={setNav} />
+      {appMonth && <button onClick={() => setAppMonth(null)} className="flex items-center gap-2 text-sm"><ArrowLeft size={15}/>Todos los meses</button>}
+      {appMonth && <h2 className="font-semibold capitalize">{monthLabel(appMonth)}</h2>}
+      {showFolders && <div className="grid grid-cols-2 lg:grid-cols-3 gap-3" aria-label="Meses de facturas creadas en la app">{monthGroups.map(key => <button key={key} onClick={() => setAppMonth(key)} className="text-left rounded-2xl border border-gray-200 p-5 hover:bg-gray-50"><Folder className="text-amber-700 mb-3" size={25}/><strong className="block capitalize">{monthLabel(key)}</strong><span className="text-sm text-gray-500">{filtered.filter(f => (f.fecha?.slice(0,7) || 'sin-fecha') === key).length} documentos</span></button>)}</div>}
+      {showFolders && !monthGroups.length && <p className="text-sm text-gray-500">No hay facturas en esta selección.</p>}
 
-      {(
+      {!showFolders && (
       <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-        {filtered.length === 0 ? (
+        {visibleInvoices.length === 0 ? (
           <EmptyState icon={<Search size={22} />} title="Sin facturas" description="Prueba a cambiar la búsqueda, la línea o el periodo." />
         ) : (
         <div className="divide-y divide-gray-100">
@@ -236,7 +242,9 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
             </select>
             <Button onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?'Descendente':'Ascendente'}</Button>
           </div>
-          {filtered.map((f, idx) => <motion.article key={f.id} initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} transition={{duration:.15,delay:Math.min(idx,12)*.015}} className="p-5 sm:p-6 space-y-4">
+          {visibleInvoices.map(f => <details key={f.id} className="group p-4">
+            <summary className="cursor-pointer flex items-center gap-3 list-none"><FileText size={19} className="shrink-0 text-blue-700"/><span className="min-w-0 flex-1"><span className="block text-sm font-medium break-words">{f.numero ? `Factura ${f.numero}` : 'Borrador'} · {f.cliente}</span><span className="text-xs text-gray-500">{f.fecha}</span></span><span className="text-sm tabular-nums whitespace-nowrap">{fmt(f.total)}</span></summary>
+            <div className="space-y-4 pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 space-y-1">
                 <p className="text-xs text-gray-500">{f.numero ? `Factura ${f.numero}` : 'Borrador'} · {f.fecha}</p>
@@ -264,7 +272,7 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
               {canDeleteFactura(f) && f.tipo==='emitida' && f.numeroSecuencial!=null && <EliminarFacturaButton factura={f}/>}
               {canDeleteFactura(f) && f.numeroSecuencial==null && <Button variant="danger" icon={<Trash2 size={14}/>} onClick={()=>showConfirm('¿Eliminar este registro? Esta acción no elimina archivos de Drive.',()=>deleteFactura(f.id))}>Eliminar</Button>}
             </div>
-          </motion.article>)}
+          </div></details>)}
         </div>
         )}
       </div>
