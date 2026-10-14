@@ -2,7 +2,7 @@ import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
 import {cleanup,render,screen,fireEvent} from '@testing-library/react';
 import {DriveExpenseSummary} from './DriveExpenseSummary';
 const state=vi.hoisted(()=>({admin:false,pending:true,refresh:vi.fn()}));
-vi.mock('../../hooks/useDriveExpenses',()=>({useDriveExpenses:()=>({admin:state.admin,loading:false,refreshing:false,error:'',refresh:state.refresh,reload:vi.fn(),rows:[{id:'one',nombre:'Factura proveedor',anio:2026,mes:9,url:'https://drive.google.com/file/d/one/view',estado:'leido',sincronizado_en:'2026-09-20T00:00:00Z',amount:{base:100,iva:21,total:121,retencion:0}},...(state.pending?[{id:'two',nombre:'Escaneo pendiente',anio:2026,mes:8,url:'https://drive.google.com/file/d/two/view',estado:'pendiente',sincronizado_en:'2026-09-20T00:00:00Z'}]:[])]})}));
+vi.mock('../../hooks/useDriveExpenses',()=>({useDriveExpenses:()=>({admin:state.admin,loading:false,refreshing:false,error:'',refresh:state.refresh,reload:vi.fn(),rows:[{id:'one',nombre:'Factura proveedor',anio:2026,mes:9,url:'https://drive.google.com/file/d/one/view',estado:'leido',sincronizado_en:'2026-09-20T00:00:00Z',amount:{base:100,iva:21,total:121,retencion:0}},...(state.pending?[{id:'two',nombre:'Escaneo pendiente',anio:2026,mes:8,url:'https://drive.google.com/file/d/two/view',estado:'pendiente',sincronizado_en:'2026-09-20T00:00:00Z',amount:{base:null,iva:null,total:242,retencion:0}}]:[])]})}));
 vi.mock('../ui/Modal',()=>({Modal:()=>null}));
 vi.mock('../../lib/supabase',()=>({supabase:{}}));
 afterEach(cleanup);beforeEach(()=>{state.admin=false;state.pending=true;});
@@ -13,3 +13,5 @@ describe('Resumen de gastos documentados',()=>{
 });
 it('octubre: gastos por mes y aviso abre pendientes',()=>{render(<DriveExpenseSummary archive/>);fireEvent.click(screen.getByRole('button',{name:/Septiembre 2026/}));expect(screen.queryByText('Escaneo pendiente')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Todos los meses'}));fireEvent.click(screen.getByRole('button',{name:'Ver pendientes de revisar'}));expect(screen.getByText('Escaneo pendiente')).toBeTruthy();expect(screen.queryByText('Factura proveedor')).toBeNull();});
 it('octubre: resultados separa gastos y marca estimación incompleta',()=>{render(<DriveExpenseSummary statement income={1000}/>);expect(screen.getByRole('region',{name:'Estado de resultados'})).toBeTruthy();expect(screen.getByText('900,00 €')).toBeTruthy();expect(screen.getByText(/Resultado parcial:/)).toBeTruthy();expect(screen.getByLabelText('Mes de Drive')).toHaveProperty('disabled',true);});
+
+it('muestra el total legible aunque falte el desglose del IVA',()=>{render(<DriveExpenseSummary archive/>);expect(screen.getByText('242,00 €')).toBeTruthy();expect(screen.getByText('Total a pagar · desglose pendiente')).toBeTruthy();});

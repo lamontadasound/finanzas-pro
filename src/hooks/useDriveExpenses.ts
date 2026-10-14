@@ -5,6 +5,7 @@ import {joinDriveExpenses,type DriveExpenseFile,type DriveExpenseAmount,type Dri
 export function useDriveExpenses(){
  const admin=useAuthStore(s=>s.isAdmin());const profileId=useAuthStore(s=>s.profile?.id);
  const [snapshot,setSnapshot]=useState<{owner:string|undefined;rows:DriveExpense[]}>({owner:undefined,rows:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
+ const [reading,setReading]=useState('');
  const mounted=useRef(false),busy=useRef(false),generation=useRef(0);
  const load=useCallback(async()=>{
   const current=generation.current;
@@ -16,7 +17,7 @@ export function useDriveExpenses(){
   if(!admin||busy.current)return;busy.current=true;if(mounted.current){setRefreshing(true);setError('');}
   try{const {data,error:err}=await supabase.functions.invoke('drive-invoice-archive');
    if(err||!data?.ok){let message=data?.error;if(err&&'context' in err&&err.context instanceof Response)message=(await err.context.json().catch(()=>null))?.error??message;throw new Error(message||'No se pudo actualizar desde Drive. Se muestra la última importación.');}
-   await load();
+   try{await (await import('../lib/readDriveExpenseDocuments')).readDriveExpenseDocuments(message=>{if(mounted.current)setReading(message);});}finally{await load();}
   }catch(e){if(mounted.current)setError(e instanceof Error?e.message:'No se pudo actualizar Drive.');}finally{busy.current=false;if(mounted.current)setRefreshing(false);}
  },[admin,load]);
  useEffect(()=>{mounted.current=true;const current=++generation.current;
@@ -25,5 +26,5 @@ export function useDriveExpenses(){
   void refresh();const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},300000);
   return()=>{mounted.current=false;generation.current=current+1;window.clearInterval(timer);};
  },[load,refresh,profileId]);
- return {rows:snapshot.owner===profileId?snapshot.rows:[],error,loading,refreshing,refresh,reload:load,admin};
+ return {rows:snapshot.owner===profileId?snapshot.rows:[],error,loading,refreshing,reading,refresh,reload:load,admin};
 }
