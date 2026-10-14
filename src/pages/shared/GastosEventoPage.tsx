@@ -490,6 +490,10 @@ export const GastosEventoPage = ({ area, filterLinea, singularOverride }: Props)
                 {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
+            <div>
+              <label className="label-form">Nº de factura <span className="text-ink-4 font-normal">(si la hay)</span></label>
+              <input value={form.numeroFactura ?? ''} onChange={(e) => setForm((f) => ({ ...f, numeroFactura: e.target.value || undefined }))} className="input-form" />
+            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" onClick={closeModal} className="flex-1">Cancelar</Button>

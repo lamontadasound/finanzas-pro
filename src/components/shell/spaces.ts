@@ -1,4 +1,5 @@
 import {
+  TrendingUp,
   AudioLines, Disc3, Crown, Cable, House, Calculator, Settings2,
   LayoutGrid, ArrowDownLeft, Receipt, Contact, FileText, Signature,
   ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users, SlidersHorizontal,
@@ -115,6 +116,7 @@ export const SPACES: Space[] = [
       { to: '/contabilidad/resumen', label: 'Resumen', icon: LayoutGrid },
       { to: '/contabilidad/facturas', label: 'Facturas', icon: ReceiptText },
       { to: '/contabilidad/impuestos', label: 'Impuestos', icon: Landmark },
+      { to: '/contabilidad/prevision', label: 'Previsión', icon: TrendingUp },
     ],
   },
   {

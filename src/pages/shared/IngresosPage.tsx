@@ -107,7 +107,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   const [showSuplidoFormModal, setShowSuplidoFormModal] = useState(false);
   const [editingSuplidoForm, setEditingSuplidoForm] = useState<Suplido | null>(null);
   const [suplidoFormData, setSuplidoFormData] = useState<Partial<Suplido>>({});
-  const [gastoForm, setGastoForm] = useState<{ concepto: string; categoria: GastoEventoCategoria; estadoPago?: GastoEvento['estadoPago']; metodoPago?: GastoEvento['metodoPago']; pagadoPor: PagadoPor; importe: number; fecha: string }>({ concepto: '', categoria: 'DJ', estadoPago: 'pendiente', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
+  const [gastoForm, setGastoForm] = useState<{ concepto: string; categoria: GastoEventoCategoria; estadoPago?: GastoEvento['estadoPago']; metodoPago?: GastoEvento['metodoPago']; pagadoPor: PagadoPor; importe: number; fecha: string; numeroFactura?: string; baseImponible?: number; porcentajeIVA?: number; importeIVA?: number; totalConIva?: number }>({ concepto: '', categoria: 'DJ', estadoPago: 'pendiente', pagadoPor: 'La Montada', importe: 0, fecha: new Date().toISOString().slice(0, 10) });
   const showConfirm = useConfirmStore((s) => s.show);
 
   // ── Suplidos por cobrar (solo DJs) ────────────────────────────────────────
@@ -326,6 +326,11 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
       metodoPago: gastoForm.metodoPago,
       pagadoPor: gastoForm.pagadoPor,
       importe: gastoForm.importe,
+      numeroFactura: gastoForm.numeroFactura,
+      baseImponible: gastoForm.baseImponible,
+      porcentajeIVA: gastoForm.porcentajeIVA,
+      importeIVA: gastoForm.importeIVA,
+      totalConIva: gastoForm.totalConIva,
       createdAt: new Date().toISOString(),
     } as GastoEvento)) return;
     closeGasto();
@@ -605,7 +610,11 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
                 <label className="label-form">Fecha</label>
                 <input type="date" value={gastoForm.fecha} onChange={(e) => setGastoForm((f) => ({ ...f, fecha: e.target.value }))} className="input-form" />
               </div>
-              <div className="col-span-2">
+              <div>
+                <label className="label-form">Nº de factura <span className="text-ink-4 font-normal">(si la hay)</span></label>
+                <input value={gastoForm.numeroFactura ?? ''} onChange={(e) => setGastoForm((f) => ({ ...f, numeroFactura: e.target.value || undefined }))} className="input-form" />
+              </div>
+              <div>
                 <label className="label-form">Pagado por</label>
                 <select value={gastoForm.pagadoPor} onChange={(e) => setGastoForm((f) => ({ ...f, pagadoPor: e.target.value as PagadoPor }))} className="input-form">
                   {PAGADORES.map((p) => <option key={p} value={p}>{p}</option>)}

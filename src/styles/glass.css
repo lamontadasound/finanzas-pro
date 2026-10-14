@@ -528,3 +528,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .icon-btn { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--ink-3); transition: background-color .15s; }
 .icon-btn:hover { background: rgb(0 0 0 / .05); color: var(--ink); }
 .crm-avatar { width: 38px !important; height: 38px !important; font-size: 12.5px !important; }
+
+/* ── Cuadro trimestral de impuestos ──────────────────────────────────────── */
+.qgrid { display: grid; grid-template-columns: minmax(110px, 1.3fr) repeat(4, minmax(0, 1fr)); align-items: center; row-gap: 2px; }
+.qhead { padding: 6px 0; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ink-3); text-align: right; padding-right: 10px; }
+.qhead[data-on="true"] { color: var(--ink); }
+.qlabel { font-size: 13.5px; color: var(--ink-2); padding: 10px 0; border-top: .5px solid var(--hair-strong); }
+.qcell { text-align: right; padding: 10px 10px 10px 0; font-size: 14px; border-top: .5px solid var(--hair-strong); white-space: nowrap; }
+.qcell[data-on="true"] { background: color-mix(in srgb, var(--tint-b) 12%, transparent); }
+@media (max-width: 560px) { .qgrid { grid-template-columns: 92px repeat(4, minmax(0, 1fr)); } .qcell { font-size: 12px; padding-right: 4px; } .qlabel { font-size: 12px; } }

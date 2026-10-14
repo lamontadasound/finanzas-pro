@@ -27,6 +27,7 @@ const InversionesPage = lazy(() => import('./pages/shared/InversionesPage').then
 const InformesPage    = lazy(() => import('./pages/shared/InformesPage').then((m) => ({ default: m.InformesPage })));
 const RepartoSociosPage = lazy(() => import('./pages/shared/RepartoSociosPage').then((m) => ({ default: m.RepartoSociosPage })));
 const InformesContablesPage = lazy(() => import('./pages/contabilidad/InformesContablesPage').then((m) => ({ default: m.InformesContablesPage })));
+const PrevisionFiscal = lazy(() => import('./components/impuestos/PrevisionFiscal').then((m) => ({ default: m.PrevisionFiscal })));
 const ImpuestosPage   = lazy(() => import('./pages/contabilidad/ImpuestosPage').then((m) => ({ default: m.ImpuestosPage })));
 const ResumenContablePage = lazy(() => import('./pages/contabilidad/ResumenContablePage').then((m) => ({ default: m.ResumenContablePage })));
 const AdminUsuarios   = lazy(() => import('./pages/admin/Usuarios').then((m) => ({ default: m.AdminUsuarios })));
@@ -251,6 +252,7 @@ export default function App() {
                       <Route path="contabilidad/clientes"    element={<Navigate to="/contabilidad/resumen" replace />} />
                       <Route path="contabilidad/informes"    element={<RequireModulo modulo="informes"><InformesContablesPage /></RequireModulo>} />
                       <Route path="contabilidad/impuestos"   element={<RequireModulo modulo="impuestos"><ImpuestosPage /></RequireModulo>} />
+                      <Route path="contabilidad/prevision"   element={<RequireModulo modulo="impuestos"><PrevisionFiscal /></RequireModulo>} />
                       {/* "Inversiones" ya no vive en Contabilidad — redirige a
                           la línea principal que las tiene, para no romper
                           bookmarks/enlaces antiguos. */}

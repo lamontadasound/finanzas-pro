@@ -15,7 +15,6 @@ import { useStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-import { Switch } from '../../components/ui/Switch';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import { AdjuntarFacturaModal } from '../../components/facturacion/AdjuntarFacturaModal';
 import { Paperclip } from 'lucide-react';
@@ -358,9 +357,9 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
               </select>
               {editing && <p className="text-[11px] text-gray-400 mt-1">La periodicidad solo se define al crear el gasto.</p>}
             </div>
-            <div className="col-span-2 flex items-center gap-8">
-              <Switch checked={!!form.facturaRecibida} onChange={(v) => setField('facturaRecibida', v)} label="Factura recibida" />
-              <Switch checked={!!form.deducible} onChange={(v) => setField('deducible', v)} label="Gasto deducible" />
+            <div className="col-span-2">
+              <label className="label-form">Nº de factura <span className="text-ink-4 font-normal">(si la hay)</span></label>
+              <input value={form.numeroFactura ?? ''} onChange={(e) => setField('numeroFactura', e.target.value || undefined)} className="input-form" />
             </div>
           </div>
           {!editing && periodicidad !== 'Ocasional' && (
