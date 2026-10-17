@@ -13,7 +13,7 @@ export interface RowMenuAction {
 
 // Menú de tres puntos por fila, estilo Motoko — portal para no quedar
 // recortado por overflow-x-auto de las tablas.
-export const RowMenu2 = ({ actions }: { actions: RowMenuAction[] }) => {
+export const RowMenu2 = ({ actions, label = 'Más opciones' }: { actions: RowMenuAction[]; label?: string }) => {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -37,6 +37,7 @@ export const RowMenu2 = ({ actions }: { actions: RowMenuAction[] }) => {
   return (
     <>
       <button
+        aria-label={label}
         ref={btnRef}
         onClick={(e) => { e.stopPropagation(); toggle(); }}
         className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"

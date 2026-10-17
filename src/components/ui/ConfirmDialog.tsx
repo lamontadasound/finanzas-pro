@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useConfirmStore } from '../../store/useConfirmStore';
 
 export const ConfirmDialog = () => {
-  const { open, message, confirm, cancel } = useConfirmStore();
+  const { open, message, confirm, cancel, title, confirmLabel } = useConfirmStore();
   return (
     <AnimatePresence>
       {open && (
@@ -25,7 +25,7 @@ export const ConfirmDialog = () => {
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle size={20} className="text-red-500" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Confirmar eliminación</h3>
+              <h3 className="text-base font-semibold text-gray-900">{title}</h3>
             </div>
             <p className="text-sm text-gray-600 mb-6">{message}</p>
             <div className="flex justify-end gap-3">
@@ -39,7 +39,7 @@ export const ConfirmDialog = () => {
                 onClick={confirm}
                 className="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition-colors"
               >
-                Eliminar
+                {confirmLabel}
               </button>
             </div>
           </motion.div>

@@ -53,9 +53,9 @@ for (const [id,items] of Object.entries(LINEA_NAV_ITEMS)) {
  const base = id==='montada_sound'?'/lineas/montada-sound':id==='montada_installations'?'/lineas/installations':id==='real_madrid'?'/lineas/real-madrid':'/lineas/dj';
  if(id==='montada_sound'||id==='montada_installations') items.push({to:base+'/presupuestos',label:'Presupuestos',icon:FileText});
  if(id==='montada_sound')items.push({to:base+'/contratos',label:'Contratos',icon:FileText});
- items.push({to:base+'/generar-facturas',label:'Generar facturas',icon:FileText});
+ items.push({to:base+'/generar-facturas',label:'Facturas',icon:FileText});
  items.push({to:base+'/pagos',label:'Pagos',icon:CreditCard});
- const order=['Resumen','Ingresos','Gastos de eventos','Gastos de actuación','Gastos de instalación','Gastos generales','CRM','Presupuestos','Contratos','Generar facturas','Clientes','Inversiones','Reparto socios','Pagos','Informes'];
+ const order=['Resumen','Ingresos','Gastos de eventos','Gastos de actuación','Gastos de instalación','Gastos generales','CRM','Presupuestos','Contratos','Facturas','Clientes','Inversiones','Reparto socios','Pagos','Informes'];
  const rank=(label:string)=>order.indexOf(label) < 0 ? 99 : order.indexOf(label);
  items.sort((a,b)=>rank(a.label)-rank(b.label));
 }
