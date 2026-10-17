@@ -1,3 +1,5 @@
+import {LimitedList} from '../../components/kit/LimitedList';
+import {PageHeader,Widget,Segmented,Pill,Metric} from '../../components/kit';
 import {EditarNumeroFactura} from '../../components/facturacion/EditarNumeroFactura';
 import {EliminarFacturaButton} from '../../components/facturacion/EliminarFacturaButton';
 import {Link} from 'react-router-dom';
@@ -10,8 +12,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Switch } from '../../components/ui/Switch';
-import { StatCard } from '../../components/ui/StatCard';
-import { MotionTabs } from '../../components/ui/MotionTabs';
+
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useConfirmStore } from '../../store/useConfirmStore';
@@ -163,38 +164,31 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Facturas</h1>
-          <p className="text-sm text-gray-500">Registradas en la app · Emitidas: {fmt(totalEmitidas)} · Recibidas: {fmt(totalRecibidas)}</p>
-        </div>
-
-      </div>
-
+      <PageHeader title="Facturas"/><div className="grid sm:grid-cols-2 gap-3"><Widget title="Ingresos registrados">{fmt(totalEmitidas)}</Widget><Widget title="Gastos registrados">{fmt(totalRecibidas)}</Widget></div>
       {tab==='emitida'&&puedeEmitir&&linea&&<div><Link className="inline-flex rounded-xl bg-gold-500 text-white px-4 py-2" to={linea?`${BUSINESS_LINES[linea].routeBase}/generar-facturas`:'/contabilidad/facturas'}>Generar factura</Link></div>}
       {/* KPIs de facturas registradas */}
       {tab === 'emitida' && origen === 'app' && <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="IVA repercutido" value={ivaRepercutido} format={fmt} />
-        <StatCard label="IVA soportado" value={ivaSoportado} format={fmt} />
-        <StatCard label="Diferencia IVA" value={ivaRepercutido - ivaSoportado} format={fmt} tone={ivaRepercutido - ivaSoportado >= 0 ? 'default' : 'danger'} />
-        <StatCard label="Pendientes / Pagadas" value={pendientes} format={() => `${pendientes} / ${cobradasPagadas}`} />
+        <Metric label="IVA repercutido" value={ivaRepercutido} />
+        <Metric label="IVA soportado" value={ivaSoportado} />
+        <Metric label="Diferencia IVA" value={ivaRepercutido - ivaSoportado} />
+        <Widget><div className="metric-label">Pendientes / Pagadas</div><strong>{pendientes} / {cobradasPagadas}</strong></Widget>
       </div>
 
       </>}
       {tab==='emitida'&&origen==='app'&&<div className="rounded-2xl bg-blue-50 p-4 flex flex-wrap justify-between gap-3"><strong>Creadas en la app</strong><span>{delTab.filter(f=>f.numeroSecuencial&&!f.driveFileId&&f.estado!=='anulada').length} pendientes de subir a Drive</span><button className="text-blue-700 font-medium" onClick={()=>{setAppMonth(null);setFilterSync('pendientes');setNav({year:null,trimestre:null,month:null});}}>Ver pendientes</button></div>}
       {/* Tabs Ingresos/Gastos */}
-      <MotionTabs
-        layoutId="facturas-tab"
+      <Segmented
+        id="facturas-tab"
         value={tab}
         onChange={(v) => { setAppMonth(null); setTab(v); setNav({ year: null, trimestre: null, month: null }); }}
-        items={[
+        options={[
           { value: 'emitida', label: 'Ingresos' },
           { value: 'recibida', label: 'Gastos' },
         ]}
       />
 
-      {tab === 'emitida' && area === 'todos' && !linea && <MotionTabs layoutId="facturas-origen" value={origen} onChange={setOrigen} items={[{value:'drive',label:'Archivo Drive'},{value:'app',label:'Creadas en la app'}]}/>}
+      {tab === 'emitida' && area === 'todos' && !linea && <Segmented id="facturas-origen" value={origen} onChange={setOrigen} options={[{value:'drive',label:'Archivo Drive'},{value:'app',label:'Creadas en la app'}]}/>}
       {tab === 'recibida' || origen === 'drive' ? <DriveInvoiceArchive key={tab} tipo={tab}/> : <>
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
@@ -226,11 +220,11 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
 
       {appMonth && <button onClick={() => setAppMonth(null)} className="flex items-center gap-2 text-sm"><ArrowLeft size={15}/>Todos los meses</button>}
       {appMonth && <h2 className="font-semibold capitalize">{monthLabel(appMonth)}</h2>}
-      {showFolders && <div className="grid grid-cols-2 lg:grid-cols-3 gap-3" aria-label="Meses de facturas creadas en la app">{monthGroups.map(key => <button key={key} onClick={() => setAppMonth(key)} className="text-left rounded-2xl border border-gray-200 p-5 hover:bg-gray-50"><Folder className="text-amber-700 mb-3" size={25}/><strong className="block capitalize">{monthLabel(key)}</strong><span className="text-sm text-gray-500">{filtered.filter(f => (f.fecha?.slice(0,7) || 'sin-fecha') === key).length} documentos</span></button>)}</div>}
+      {showFolders && <div className="grid grid-cols-2 lg:grid-cols-3 gap-3" aria-label="Meses de facturas creadas en la app">{monthGroups.map(key => <button key={key} onClick={() => setAppMonth(key)} className="widget tile p-5 text-left"><Folder className="text-[var(--tint-a)] mb-3" size={25}/><strong className="block capitalize">{monthLabel(key)}</strong><span className="text-sm text-gray-500">{filtered.filter(f => (f.fecha?.slice(0,7) || 'sin-fecha') === key).length} documentos</span></button>)}</div>}
       {showFolders && !monthGroups.length && <p className="text-sm text-gray-500">No hay facturas en esta selección.</p>}
 
       {!showFolders && (
-      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
+      <div className="widget overflow-hidden">
         {visibleInvoices.length === 0 ? (
           <EmptyState icon={<Search size={22} />} title="Sin facturas" description="Prueba a cambiar la búsqueda, la línea o el periodo." />
         ) : (
@@ -242,8 +236,8 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
             </select>
             <Button onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}>{sortDir==='desc'?'Descendente':'Ascendente'}</Button>
           </div>
-          {visibleInvoices.map(f => <details key={f.id} className="group p-4">
-            <summary className="cursor-pointer flex items-center gap-3 list-none"><FileText size={19} className="shrink-0 text-blue-700"/><span className="min-w-0 flex-1"><span className="block text-sm font-medium break-words">{f.numero ? `Factura ${f.numero}` : 'Borrador'} · {f.cliente}</span><span className="text-xs text-gray-500">{f.fecha}</span></span><span className="text-sm tabular-nums whitespace-nowrap">{fmt(f.total)}</span></summary>
+          <LimitedList>{visibleInvoices.map(f => <details key={f.id} className="group px-4">
+            <summary className="list-row cursor-pointer list-none !px-0"><FileText size={19} className="shrink-0 text-[var(--tint-a)]"/><span className="min-w-0 flex-1"><span className="block text-sm font-medium break-words">{f.numero ? `Factura ${f.numero}` : 'Borrador'} · {f.cliente}</span><span className="text-xs text-gray-500">{f.fecha} <Pill>App</Pill>{f.driveFileId&&<Pill tone="positive">Drive</Pill>}</span></span><span className="text-sm tabular-nums whitespace-nowrap">{fmt(f.total)}</span></summary>
             <div className="space-y-4 pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 space-y-1">
@@ -272,7 +266,7 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
               {canDeleteFactura(f) && f.tipo==='emitida' && f.numeroSecuencial!=null && <EliminarFacturaButton factura={f}/>}
               {canDeleteFactura(f) && f.numeroSecuencial==null && <Button variant="danger" icon={<Trash2 size={14}/>} onClick={()=>showConfirm('¿Eliminar este registro? Esta acción no elimina archivos de Drive.',()=>deleteFactura(f.id))}>Eliminar</Button>}
             </div>
-          </div></details>)}
+          </div></details>)}</LimitedList>
         </div>
         )}
       </div>

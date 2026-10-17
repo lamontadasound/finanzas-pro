@@ -246,7 +246,7 @@ export const GastosEventoPage = ({ area, filterLinea, singularOverride }: Props)
 
   const header = (
     <PageHeader title={carpetaActual ? carpetaActual.concepto : 'Gastos'}>
-      <GastosSwitch eventosLabel={area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
+      <GastosSwitch eventosLabel={filterLinea === 'montada_installations' ? 'Por instalación' : area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
       {canCreate() && ingresos.length > 0 && (
         <Btn variant="primary" onClick={() => openNew(selectedIngresoId ?? undefined)}><Plus size={16} strokeWidth={2.4} />Nuevo gasto</Btn>
       )}

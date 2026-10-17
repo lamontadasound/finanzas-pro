@@ -13,7 +13,7 @@ export const ClientesSwitch = () => {
       id="clientes-switch"
       value={value}
       onChange={(v) => navigate(`${BASE}/${v}`)}
-      options={[{ value: 'clientes', label: 'Clientes' }, { value: 'crm', label: 'Captación' }]}
+      options={[{ value: 'clientes', label: 'Cerrados' }, { value: 'crm', label: 'CRM' }]}
     />
   );
 };

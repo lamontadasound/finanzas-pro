@@ -1,7 +1,10 @@
+import {LimitedList} from '../../components/kit/LimitedList';
+import {PageHeader,Metric} from '../../components/kit';
+import {Speaker,Lightbulb,Boxes,Car,SlidersHorizontal} from 'lucide-react';
 import { resolveLinea } from '../../config/resolveLinea';
 import { useState, useMemo, useRef, useCallback } from 'react';
 import {
-  Plus, Edit2, Trash2, Search, Upload, Folder, ChevronLeft,
+  Plus, Edit2, Trash2, Search, Upload, ChevronLeft,
   FileText, Download, RefreshCw, BarChart3, List, CheckCircle2,
 } from 'lucide-react';
 import { uid, fmtInt } from '../../utils/helpers';
@@ -20,15 +23,12 @@ import type { LineaId } from '../../config/businessLines';
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
 const pctFmt = (n: number) => `${n.toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`;
 
+const categoryIcon=(name:string)=>/sonido|micr/i.test(name)?Speaker:/luz|ilumin/i.test(name)?Lightbulb:/veh|coche/i.test(name)?Car:/mesa|cabina/i.test(name)?SlidersHorizontal:Boxes;
 const CATEGORIAS_EQUIPO = ['Sonido', 'Iluminación', 'Estructuras', 'Pantallas', 'Decoración', 'Mesas de Mezclas', 'Mesas Sonido', 'Dispositivos', 'Cabinas', 'Micrófonos', 'Flightcase'];
 const METODOS: PaymentMethod[] = ['efectivo', 'transferencia', 'tarjeta', 'cheque', 'bizum', 'otro'];
 const PCTS_IVA = [0, 10, 21];
 
-const AREA_LABEL: Record<InversionArea, string> = {
-  montada: 'La Montada Sound',
-  dj: 'DJs',
-  real_madrid: 'DJ Personal (Real Madrid)',
-};
+
 
 interface Props { area: InversionArea | 'todos' }
 
@@ -228,16 +228,7 @@ export const InversionesPage = ({ area }: Props) => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inversiones y equipos</h1>
-          <p className="text-sm text-gray-500">{enCategoria.length} items · Invertido: {fmt(totalInvertido)} · Amortizado: {fmt(totalAmortizado)}</p>
-        </div>
-        {canCreate() && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Añadir equipo</Button>
-        )}
-      </div>
-
+      <PageHeader title="Inversiones">{canCreate()&&<Button variant="primary" icon={<Plus size={16}/>} onClick={openNew}>Añadir equipo</Button>}</PageHeader><div className="grid sm:grid-cols-2 gap-3"><Metric label="Invertido" value={totalInvertido}/><Metric label="Amortizado" value={totalAmortizado}/></div>
       {area === 'todos' && (
         <div className="flex gap-2 border-b border-gray-200">
           <button onClick={() => setVista('equipo')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'equipo' ? 'border-gold-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
@@ -292,9 +283,9 @@ export const InversionesPage = ({ area }: Props) => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {carpetasCategoria.map(([cat, data]) => (
-              <button key={cat} onClick={() => setSelectedCategoria(cat)} className="bg-white border border-gray-200 rounded-card p-5 text-left hover:border-gold-400 hover:shadow-raised transition-all duration-220 ease-smooth">
+              <button key={cat} onClick={() => setSelectedCategoria(cat)} className="widget tile p-5 text-left">
                 <div className="flex items-center gap-2 mb-2">
-                  <Folder size={16} className="text-gold-500" />
+                  {(() => {const Icon=categoryIcon(cat);return <Icon size={22} style={{color:'var(--tint-a)'}}/>;})()}
                   <span className="font-bold text-gray-900">{cat}</span>
                 </div>
                 <p className="text-xs text-gray-500">{data.count} unidades</p>
@@ -306,58 +297,7 @@ export const InversionesPage = ({ area }: Props) => {
       ) : (
       <>
       <button onClick={() => setSelectedCategoria(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"><ChevronLeft size={14} /> Volver a categorías</button>
-      <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Nombre</th>
-                {area === 'todos' && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Área</th>}
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fecha compra</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cantidad</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total con IVA</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amortizado</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Valor pendiente</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Garantía</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {enCategoria.length === 0 ? (
-                <tr><td colSpan={area === 'todos' ? 9 : 8} className="text-center py-12 text-gray-400 text-sm">Sin equipos registrados</td></tr>
-              ) : enCategoria.map((e) => {
-                const gar = garantiaEstado(e);
-                return (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{e.nombre}</p>
-                    {(e.marca || e.numeroSerie) && <p className="text-xs text-gray-400">{[e.marca, e.numeroSerie && `S/N: ${e.numeroSerie}`].filter(Boolean).join(' · ')}</p>}
-                  </td>
-                  {area === 'todos' && <td className="px-4 py-3 text-gray-500 text-xs">{AREA_LABEL[e.area]}</td>}
-                  <td className="px-4 py-3 text-gray-500">{e.fechaCompra}</td>
-                  <td className="px-4 py-3 text-center text-gray-600">{cantidadDe(e)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{fmt(costeTotalConIva(e))}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(valorAmortizadoContable(e))}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-600">{fmt(valorContablePendiente(e))}</td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge tone={gar.tone}>{gar.label}</Badge>
-                    {gar.detalle && <p className="text-[10px] text-gray-400 mt-0.5">{gar.detalle}</p>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 justify-end">
-                      {canEdit() && <button onClick={() => openEdit(e)} className="p-1.5 text-gray-400 hover:text-gold-500 hover:bg-gold-50 rounded-lg"><Edit2 size={13} /></button>}
-                      {canDelete() && <button onClick={() => showConfirm('¿Eliminar este equipo?', async () => {
-                        const result = await deleteEquipo(e.id);
-                        if (!result.success) alert(`No se pudo eliminar: ${result.message}`);
-                      })} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
-                    </div>
-                  </td>
-                </tr>
-              );})}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <div className="widget"><LimitedList>{enCategoria.map(e=>{const gar=garantiaEstado(e);return <div key={e.id} className="list-row flex-wrap"><div className="list-main"><b>{e.nombre}</b><small>{e.fechaCompra} · {cantidadDe(e)} unidades · {e.marca}</small><small>Amortizado {fmt(valorAmortizadoContable(e))} · Pendiente {fmt(valorContablePendiente(e))}</small></div><div className="text-right"><strong>{fmt(costeTotalConIva(e))}</strong><div><Badge tone={gar.tone}>{gar.label}</Badge></div></div><div className="flex gap-2">{canEdit()&&<button className="icon-btn" aria-label={`Editar ${e.nombre}`} onClick={()=>openEdit(e)}><Edit2 size={16}/></button>}{canDelete()&&<button className="icon-btn" aria-label={`Eliminar ${e.nombre}`} onClick={()=>showConfirm('¿Eliminar este equipo?',async()=>{const result=await deleteEquipo(e.id);if(!result.success)alert(`No se pudo eliminar: ${result.message}`);})}><Trash2 size={16}/></button>}</div></div>;})}</LimitedList></div>
       </>
       )}
       </>
@@ -732,38 +672,7 @@ const RentabilidadGlobal = ({ equipo, ingresos, gastos, gastosEvento }: Rentabil
       {filtroVista === 'conjunta' && (
         <div className="bg-white border border-gray-200 rounded-card shadow-card overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100"><h3 className="text-sm font-semibold text-gray-800">Desglose individual por área</h3></div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
-                <tr>
-                  <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Área</th>
-                  <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Invertido s/IVA</th>
-                  <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Amortizado</th>
-                  <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Beneficio operativo</th>
-                  <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Pendiente recuperar</th>
-                  <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">% recuperado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                <tr>
-                  <td className="px-4 py-2.5 font-medium text-gray-800">La Montada Sound</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.totalInvertidoSinIVA)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.totalAmortizado)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${statsMontada.beneficioOperativo >= 0 ? 'text-accent-700' : 'text-red-600'}`}>{fmt(statsMontada.beneficioOperativo)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsMontada.pendienteRecuperar)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{pctFmt(statsMontada.pctRecuperado)}</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 font-medium text-gray-800">DJ Personal (Real Madrid)</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.totalInvertidoSinIVA)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.totalAmortizado)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono ${statsRealMadrid.beneficioOperativo >= 0 ? 'text-accent-700' : 'text-red-600'}`}>{fmt(statsRealMadrid.beneficioOperativo)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{fmt(statsRealMadrid.pendienteRecuperar)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono">{pctFmt(statsRealMadrid.pctRecuperado)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {[['La Montada Sound',statsMontada],['DJ Personal (Real Madrid)',statsRealMadrid]].map(([name,stats])=>{const v=stats as typeof statsMontada;return <div className="list-row flex-wrap" key={String(name)}><strong>{String(name)}</strong><dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">{[['Invertido sin IVA',fmt(v.totalInvertidoSinIVA)],['Amortizado',fmt(v.totalAmortizado)],['Beneficio operativo',fmt(v.beneficioOperativo)],['Pendiente recuperar',fmt(v.pendienteRecuperar)],['Recuperado',pctFmt(v.pctRecuperado)]].map(([label,value])=><div key={label}><dt className="text-xs text-muted">{label}</dt><dd className="font-semibold">{value}</dd></div>)}</dl></div>;})}
         </div>
       )}
 

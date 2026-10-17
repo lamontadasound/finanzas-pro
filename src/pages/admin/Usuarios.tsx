@@ -1,3 +1,5 @@
+import {LimitedList} from '../../components/kit/LimitedList';
+import {PageHeader,FormGroup,Field} from '../../components/kit';
 import { useMemo, useState } from 'react';
 import { Plus, Edit2, ShieldOff, ShieldCheck, Search, Shield, User, ChevronDown, Mail, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -48,19 +50,19 @@ const MatrixRow = ({ label, perm, onChange, disabled }: {
   const allOn = perm.ver && perm.crear && perm.editar && perm.eliminar;
   const set = (k: keyof PermisoCRUD, v: boolean) => onChange({ ...perm, [k]: v, ...(k === 'ver' && !v ? { crear: false, editar: false, eliminar: false } : {}) });
   return (
-    <div className="grid grid-cols-[1fr_repeat(4,44px)] items-center gap-2 py-2.5 border-b border-gray-100 last:border-0">
+    <div className="flex flex-wrap items-center gap-3 py-4 border-b border-gray-100 last:border-0">
       <button
         type="button"
         onClick={() => onChange(allOn ? { ...NO_PERM_CRUD } : { ver: true, crear: true, editar: true, eliminar: true })}
         disabled={disabled}
-        className="text-left text-sm font-medium text-gray-800 hover:text-gold-600 transition-colors truncate disabled:opacity-50 disabled:hover:text-gray-800"
+        className="w-full text-left text-sm font-medium disabled:opacity-50"
       >
         {label}
       </button>
-      <div className="flex justify-center"><Switch checked={perm.ver} onChange={(v) => set('ver', v)} disabled={disabled} /></div>
-      <div className="flex justify-center"><Switch checked={perm.crear} onChange={(v) => set('crear', v)} disabled={disabled || !perm.ver} /></div>
-      <div className="flex justify-center"><Switch checked={perm.editar} onChange={(v) => set('editar', v)} disabled={disabled || !perm.ver} /></div>
-      <div className="flex justify-center"><Switch checked={perm.eliminar} onChange={(v) => set('eliminar', v)} disabled={disabled || !perm.ver} /></div>
+      <div className="flex justify-center"><Switch label="Ver" checked={perm.ver} onChange={(v) => set('ver', v)} disabled={disabled} /></div>
+      <div className="flex justify-center"><Switch label="Crear" checked={perm.crear} onChange={(v) => set('crear', v)} disabled={disabled || !perm.ver} /></div>
+      <div className="flex justify-center"><Switch label="Editar" checked={perm.editar} onChange={(v) => set('editar', v)} disabled={disabled || !perm.ver} /></div>
+      <div className="flex justify-center"><Switch label="Eliminar" checked={perm.eliminar} onChange={(v) => set('eliminar', v)} disabled={disabled || !perm.ver} /></div>
     </div>
   );
 };
@@ -220,14 +222,7 @@ export const AdminUsuarios = () => {
     <div className="space-y-5">
       {deleteError && <p role="alert" className="rounded-xl bg-red-50 text-red-700 p-4 text-sm">{deleteError}</p>}
       {deleteNotice && <p role="status" className="rounded-xl bg-emerald-50 text-emerald-800 p-4 text-sm">{deleteNotice}</p>}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Usuarios y permisos</h1>
-          <p className="text-sm text-gray-500">{usuarios.length} usuario(s) — {numAdminsActivos} administrador(es) activo(s)</p>
-        </div>
-        <Button variant="primary" icon={<Plus size={16} />} onClick={openNew}>Nuevo usuario</Button>
-      </div>
-
+      <PageHeader title="Usuarios y permisos"><Button variant="primary" icon={<Plus size={16}/>} onClick={openNew}>Nuevo usuario</Button></PageHeader>
       {/* Buscador y filtros */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
@@ -253,8 +248,8 @@ export const AdminUsuarios = () => {
         <EmptyState icon={<User size={22} />} title="Sin usuarios" description={search || filterRol !== 'todos' || filterEstado !== 'todos' ? 'Prueba a cambiar la búsqueda o los filtros.' : 'Crea el primero con el botón «Nuevo usuario».'} />
       ) : (
         <div className="grid gap-3">
-          {filtered.map((u) => (
-            <div key={u.id} className="bg-white border border-gray-200 rounded-card shadow-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <LimitedList>{filtered.map((u) => (
+            <div key={u.id} className="widget list-row flex-wrap">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${u.rol === 'admin' ? 'bg-gold-100' : 'bg-gray-100'}`}>
                 {u.rol === 'admin' ? <Shield size={18} className="text-gold-600" /> : <User size={18} className="text-gray-500" />}
               </div>
@@ -301,24 +296,22 @@ export const AdminUsuarios = () => {
                 </button>
               </div>
             </div>
-          ))}
+          ))}</LimitedList>
         </div>
       )}
 
       {/* Modal crear/editar + matriz de permisos */}
       <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar usuario' : 'Nuevo usuario'} size="lg">
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label-form">Nombre *</label>
+          <FormGroup title="Datos del usuario"><div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Nombre *">
               <input value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} className="input-form" />
-            </div>
-            <div>
-              <label className="label-form">Email *</label>
+            </Field>
+            <Field label="Email *">
               <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="input-form" />
-            </div>
+            </Field>
             {!editing && (
-              <div className="col-span-2 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+              <div className="sm:col-span-2 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
                 <Mail size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-800">Se enviará una invitación por correo para que la persona establezca su propia contraseña. Nunca se introduce aquí.</p>
               </div>
@@ -346,7 +339,7 @@ export const AdminUsuarios = () => {
                 disabled={!!editing && esUltimoAdmin(editing) && form.activo}
               />
             </div>
-          </div>
+          </div></FormGroup>
 
           {form.rol === 'usuario' && (
             <div>
@@ -375,14 +368,6 @@ export const AdminUsuarios = () => {
                         {s === 'lineas' ? 'Líneas de negocio' : 'Módulos'}
                       </button>
                     ))}
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_repeat(4,44px)] gap-2 pb-1.5 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase">
-                    <span />
-                    <span className="text-center">Ver</span>
-                    <span className="text-center">Crear</span>
-                    <span className="text-center">Editar</span>
-                    <span className="text-center">Eliminar</span>
                   </div>
 
                   {permSection === 'lineas' ? (

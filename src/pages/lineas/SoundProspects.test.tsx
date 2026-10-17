@@ -1,3 +1,4 @@
+vi.mock('@number-flow/react',()=>({default:({value,locales,format}:{value:number;locales?:string;format?:Intl.NumberFormatOptions})=><span>{new Intl.NumberFormat(locales,format).format(value)}</span>}));
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';

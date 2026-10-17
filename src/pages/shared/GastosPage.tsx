@@ -194,7 +194,7 @@ export const GastosPage = ({ area, filterLinea }: Props) => {
   return (
     <div>
       <PageHeader title={selectedMonth != null && selectedYear != null ? `${MESES_FULL[selectedMonth]} ${selectedYear}` : selectedYear != null ? `Gastos ${selectedYear}` : 'Gastos'}>
-        <GastosSwitch eventosLabel={area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
+        <GastosSwitch eventosLabel={filterLinea === 'montada_installations' ? 'Por instalación' : area === 'montada' ? 'Por eventos' : filterLinea === 'real_madrid' ? 'Por partido' : 'Por actuación'} />
         {canCreate() && <Btn variant="primary" onClick={openNew}><Plus size={16} strokeWidth={2.4} />Nuevo gasto</Btn>}
       </PageHeader>
 

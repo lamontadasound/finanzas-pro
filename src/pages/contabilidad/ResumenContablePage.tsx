@@ -4,7 +4,9 @@ import { Receipt, TrendingUp, TrendingDown, Scale } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePermittedFinancialData } from '../../hooks/usePermittedFinancialData';
-import { StatCard2 } from '../../components/ui2/StatCard';
+import {PageHeader,Widget,Segmented} from '../../components/kit';
+import type {ReactNode} from 'react';
+const StatCard2=({label,value,format,sub}:{label:string;value:number;format:(n:number)=>string;sub?:string;icon?:ReactNode;tone?:string})=><Widget title={label}><p className="text-3xl font-semibold num break-words">{format(value)}</p>{sub&&<p className="text-xs text-ink-3 mt-2">{sub}</p>}</Widget>;
 import { driveAccounting, accountingTotals, type AccountingFile } from '../../lib/driveAccounting';
 import type { DriveExpenseAmount } from '../../lib/driveExpenses';
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -20,6 +22,7 @@ export const ResumenContablePage = () => {
   const busy=useRef(false);
   const generation=useRef(0);
   const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [tab,setTab]=useState('emitida');
   const [quarter, setQuarter] = useState('todos');
   const [month, setMonth] = useState('todos');
   const load=useCallback(async(current:number)=>{
@@ -40,11 +43,11 @@ export const ResumenContablePage = () => {
     finally{busy.current=false;if(current===generation.current){setRefreshing(false);setReading('');}}
   },[admin,load]);
   useEffect(()=>{
-    const current=++generation.current;setData(null);setError('');
+    const current=++generation.current;
     void load(current).then(()=>{if(current===generation.current)void refresh(false);}).catch(()=>{if(current===generation.current)setError('No se pudo cargar el archivo de facturas.');});
-    return()=>{generation.current++;};
+    return()=>{generation.current=current+1;};
   },[load,refresh]);
-  const files = data?.owner === owner ? data?.files ?? [] : [];
+  const files = useMemo(()=>data?.owner === owner ? data?.files ?? [] : [],[data,owner]);
   const rows = useMemo(() => driveAccounting(files, data?.amounts ?? [], facturas, data?.incomeAmounts ?? []), [files, data, facturas]);
   const selected = rows.filter(r => (year === 'todos' || r.anio === Number(year)) && (quarter === 'todos' || Math.ceil(r.mes/3) === Number(quarter)) && (month === 'todos' || r.mes === Number(month)));
   const totals = accountingTotals(selected);
@@ -56,7 +59,7 @@ export const ResumenContablePage = () => {
   const years = [...new Set([new Date().getFullYear(), ...files.map(f => f.anio)])].sort((a,b) => b-a);
   const last = files.reduce((s,f) => f.sincronizado_en > s ? f.sincronizado_en : s, '');
   return <div className="space-y-6">
-    <div className="flex flex-wrap justify-between gap-3"><h1 className="text-2xl font-bold">Resumen contable</h1><Link className="text-blue-700 underline" to="/contabilidad/facturas">Ver facturas de Drive</Link></div>
+    <PageHeader title="Resumen contable"><Link className="btn btn-secondary" to="/contabilidad/facturas">Ver facturas de Drive</Link></PageHeader>
     {admin&&<button disabled={refreshing} onClick={()=>void refresh()} className="border rounded-xl px-4 py-2 text-sm">{refreshing?'Leyendo facturas…':'Actualizar importes desde Drive'}</button>}
     {reading&&<p role="status" className="text-sm text-blue-700">{reading}</p>}
     <p className="text-sm text-gray-500">Previsión del archivo Drive importado{last ? ` · ${new Date(last).toLocaleString('es-ES')}` : ''}</p>
@@ -69,14 +72,14 @@ export const ResumenContablePage = () => {
     {!data || data.owner !== owner ? <p role="status">Cargando facturas…</p> : <>
       {!selected.length ? <p>No hay facturas de Drive en este periodo.</p> : <>
         {totals.pending > 0 && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Previsión parcial: {totals.pending} documentos sin importes confirmados. No se cuentan como 0 € ni se estiman a partir de los ingresos de eventos.</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <Segmented id="accounting-kind" value={tab} onChange={setTab} options={[{value:'emitida',label:'Ingresos'},{value:'recibida',label:'Gastos'}]}/><div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">{tab==='emitida'?<>
           <StatCard2 label="Facturado sin IVA" value={totals.income} format={incomeFormat} icon={<TrendingUp size={18}/>} tone="success"/>
           <StatCard2 label="IVA facturado" value={totals.outputVat} format={incomeFormat} icon={<Receipt size={18}/>}/>
           <StatCard2 label="Facturado con IVA" value={totals.incomeTotal} format={incomeFormat} icon={<TrendingUp size={18}/>} tone="success"/>
-          <StatCard2 label="Gastos sin IVA" value={totals.expenses} format={expenseFormat} icon={<TrendingDown size={18}/>} tone="danger"/>
+          </>:<><StatCard2 label="Gastos sin IVA" value={totals.expenses} format={expenseFormat} icon={<TrendingDown size={18}/>} tone="danger"/>
           <StatCard2 label="IVA de los gastos" value={totals.inputVat} format={expenseFormat} icon={<Receipt size={18}/>}/>
           <StatCard2 label="Gastos con IVA" value={totals.expenseTotal} format={expenseFormat} icon={<TrendingDown size={18}/>} tone="danger"/>
-        </div>
+        </>}</div>
         <h2 className="text-lg font-semibold">Previsión</h2>
         <section className="grid sm:grid-cols-2 gap-3" aria-label="Previsión">
           <StatCard2 label="Resultado antes de impuestos" value={totals.result} format={resultFormat} sub="Facturado sin IVA − gastos sin IVA" icon={<Scale size={18}/>} tone={totals.result >= 0 ? 'success' : 'danger'}/>

@@ -1,13 +1,16 @@
+import {PageHeader,Pill} from '../../components/kit';
+import {DocumentArchive} from '../../components/kit/DocumentArchive';
+import {Modal} from '../../components/ui/Modal';
 import {useLocalDraft} from '../../hooks/useLocalDraft';
 import { FinancialDigits } from '../../components/ui/FinancialDigits';
-import { AnimatedList } from '../../components/unlumen-ui/animated-list';
-import { FileTree, type FileTreeElement } from '../../components/unlumen-ui/file-tree';
+
+
 import { AppleSwitch } from '../../components/unlumen-ui/apple-switch';
-import { motion, useReducedMotion } from 'framer-motion';
-import { CardsViewIcon } from '../../components/unlumen-ui/cards-view-icon';
-import { ListViewIcon } from '../../components/unlumen-ui/list-view-icon';
+
+
+
 import { useEffect, useState, useRef } from 'react';
-import { Plus, ArrowLeft, Download, Trash2 } from 'lucide-react';
+import { Plus, Download, Trash2 } from 'lucide-react';
 import { BUSINESS_LINES, type LineaId } from '../../config/businessLines';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useConfirmStore } from '../../store/useConfirmStore';
@@ -22,7 +25,7 @@ export function PresupuestosPage({ linea }: { linea: LineaId }) {
   return <PresupuestosEditor key={`${userId}:${linea}`} linea={linea}/>;
 }
 function PresupuestosEditor({ linea }: { linea: LineaId }) {
-  const reduceMotion = useReducedMotion();
+
   const canCreate = useAuthStore(s => s.canCreateLinea(linea));
   const canEdit = useAuthStore(s => s.canEditLinea(linea));
   const canDelete = useAuthStore(s => s.canDeleteLinea(linea));
@@ -32,9 +35,9 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
   const [reload, setReload] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [search, setSearch] = useState('');
-  const [view, setView] = useState<'list' | 'cards'>('list');
-  const [filter, setFilter] = useState('todos');
+
+
+
   const userId=useAuthStore(s=>s.user?.id);
   const [draft,setDraft,draftError]=useLocalDraft<{form:PresupuestoContenido|null;editing:Presupuesto|null;dirty:boolean}>(`mi-espacio:presupuesto:${userId}:${linea}`,()=>({form:null,editing:null,dirty:false}));
   const {form,editing,dirty}=draft;
@@ -103,31 +106,15 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
     const apply = () => change({ conceptos: conceptosDesdeTexto(form.solicitud), titulo: form.titulo || `Servicios · ${BUSINESS_LINES[linea].shortLabel}` });
     if (form.conceptos.length) showConfirm('¿Sustituir los conceptos actuales por los de la descripción?', apply); else apply();
   };
-  const visibleItems = items.filter(p => (filter === 'todos' || p.contenido.estado === filter) && `${p.contenido.titulo} ${p.contenido.cliente} ${referenciaPresupuesto(p)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-  const years = [...new Set(items.map(p => p.contenido.fecha.slice(0,4)))].sort().reverse();
-  const archive: FileTreeElement[] = years.map(year => ({ id:year, name:year, type:'folder', defaultOpen:years.length === 1, children:[...new Set(items.filter(p => p.contenido.fecha.startsWith(year)).map(p => p.contenido.fecha.slice(0,7)))].sort().reverse().map(month => ({ id:month, name:new Date(`${month}-15T12:00:00`).toLocaleDateString('es-ES',{month:'long'}), type:'folder', children:items.filter(p => p.contenido.fecha.startsWith(month)).map(p => ({id:p.id,name:`${referenciaPresupuesto(p)} · ${p.contenido.cliente || p.contenido.titulo}`,onSelect:()=>open(p)})) })) }));
   const totals = form ? totalesPresupuesto(form) : null;
   return <div className="quotes-page">
-    <header className="quotes-heading">
-      <div><p className="quotes-eyebrow">{BUSINESS_LINES[linea].label}</p><h1>Presupuestos</h1></div>
-      {!form && canCreate && <Button2 variant="primary" icon={<Plus size={16}/>} onClick={() => open(null)}>Nuevo presupuesto</Button2>}
-      {form && <Button2 disabled={busy || photoBusy} icon={<ArrowLeft size={16}/>} onClick={close}>Volver a presupuestos</Button2>}
-    </header>
+    <PageHeader title="Presupuestos">{canCreate&&<Button2 variant="primary" icon={<Plus size={16}/>} onClick={()=>open(null)}>Crear presupuesto</Button2>}</PageHeader>
     {draftError&&<p role="alert" className="quotes-error">{draftError}</p>}
-    {error && <div role="alert" className="quotes-error">{error}{!form && <button onClick={() => { setError(''); setLoading(true); setReload(n => n + 1); }}>Reintentar</button>}</div>}
-    {notice && <p role="status" className="quotes-notice">{notice}</p>}
-    {!form ? <>
-      <div className="quotes-toolbar"><input aria-label="Buscar presupuestos" placeholder="Buscar cliente, título o referencia" value={search} onChange={e => setSearch(e.target.value)}/><select aria-label="Filtrar por estado" value={filter} onChange={e => setFilter(e.target.value)}><option value="todos">Todos los estados</option>{Object.entries(estados).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><div className="quotes-view-switch" role="group" aria-label="Vista de presupuestos"><button type="button" aria-label="Vista de lista" aria-pressed={view === 'list'} onClick={() => setView('list')}><ListViewIcon isActive={view === 'list'}/></button><button type="button" aria-label="Vista de tarjetas" aria-pressed={view === 'cards'} onClick={() => setView('cards')}><CardsViewIcon isActive={view === 'cards'}/></button></div></div>
-      {items.length > 0 && <details className="quotes-archive"><summary>Archivo por año y mes</summary><FileTree elements={archive} highlightColor="#3c3c3c"/></details>}
-      {loading ? <p role="status">Cargando presupuestos…</p> : <div className={`quotes-list ${view === 'cards' ? 'quotes-list-cards' : ''}`}>
-        <AnimatedList items={visibleItems} maxVisible={visibleItems.length} animation="slide" gap={view === 'cards' ? 16 : 0} className={view === 'cards' ? 'quotes-animated-cards' : ''} renderItem={p => {
-          const t = totalesPresupuesto(p.contenido);
-          return <motion.button layout={!reduceMotion} transition={{ type: 'spring', bounce: 0, duration: .45 }} key={p.id} className="quotes-row" onClick={() => open(p)}><span><small>{referenciaPresupuesto(p)} · {p.contenido.fecha}</small><strong>{p.contenido.titulo}</strong><span>{p.contenido.cliente || 'Cliente pendiente'}</span></span><span className="quotes-row-total"><small>{estados[p.contenido.estado]}</small><strong>{t.pendientes ? 'Por completar' : <FinancialDigits value={dinero(t.base)}/>}</strong><small>Total sin IVA</small></span></motion.button>;
-        }}/>
-        {items.length === 0 && !error && <div className="quotes-empty"><h2>Tu próxima propuesta empieza aquí.</h2><p>Describe los servicios, revisa los importes y descarga un presupuesto con el estilo de tu negocio.</p></div>}
-        {items.length > 0 && !items.some(p => (filter === 'todos' || p.contenido.estado === filter) && `${p.contenido.titulo} ${p.contenido.cliente} ${referenciaPresupuesto(p)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className="quotes-empty">No hay presupuestos con estos filtros.</p>}
-      </div>}
-    </> : <div className="quotes-workspace">
+    {error && !form && <div role="alert" className="quotes-error">{error}{!form && <button onClick={() => { setError(''); setLoading(true); setReload(n => n + 1); }}>Reintentar</button>}</div>}
+    {notice && !form && <p role="status" className="quotes-notice">{notice}</p>}
+    {loading?<p role="status">Cargando presupuestos…</p>:<DocumentArchive items={items} date={p=>p.contenido.fecha} total={p=>totalesPresupuesto(p.contenido).base} unit={['presupuesto','presupuestos']} render={p=><button key={p.id} className="list-row w-full text-left" onClick={()=>open(p)}><span className="list-main"><b>{p.contenido.cliente||p.contenido.titulo}</b><small>{referenciaPresupuesto(p)} · {p.contenido.fecha}</small></span><span className="text-right"><Pill>{estados[p.contenido.estado]}</Pill><strong className="block mt-1">{dinero(totalesPresupuesto(p.contenido).base)}</strong></span></button>}/>}
+    <Modal isOpen={!!form} onClose={close} title={editing?'Editar presupuesto':'Crear presupuesto'} size="xl">{form&&<div className="quotes-page quotes-workspace">
+    {error&&<p role="alert" className="quotes-error">{error}</p>}{notice&&<p role="status">{notice}</p>}
       <div className="quotes-editor">
         <section className="quotes-panel"><div className="quotes-section-title"><span>01</span><h2>Cuéntame qué necesitas</h2></div>
           <label htmlFor="quote-description">Servicios que quieres presupuestar</label>
@@ -168,6 +155,6 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
           {form.fotoMontaje && <figure className="quote-montaje"><img src={form.fotoMontaje.dataUrl} alt="Foto del montaje incluida en el presupuesto"/><figcaption>{form.fotoMontaje.nombre}</figcaption>{writable && <Button2 disabled={busy || photoBusy} variant="ghost" onClick={() => change({fotoMontaje:undefined})}>Quitar foto</Button2>}</figure>}
           <p className="quotes-help">La foto se guarda al pulsar «Guardar presupuesto».</p>
         </section><aside className="quotes-panel quotes-summary" aria-label="Resumen del presupuesto"><p className="quotes-eyebrow">{editing ? referenciaPresupuesto(editing) : 'Nuevo presupuesto'}</p><h2>{form.titulo || 'Tu propuesta'}</h2><p>{form.cliente || 'Cliente pendiente'}</p><div className="quote-summary-rule"/><span>Total sin IVA{totals!.pendientes > 0 ? ' · parcial' : ''}</span><strong className="quote-total"><FinancialDigits value={dinero(totals!.base)}/></strong><dl><div><dt>IVA ({form.iva}%)</dt><dd>{dinero(totals!.iva)}</dd></div><div><dt>Total con IVA</dt><dd>{dinero(totals!.total)}</dd></div></dl>{totals!.pendientes > 0 && <p className="quotes-help">{totals!.pendientes} concepto(s) con precio pendiente.</p>}<div className="quotes-actions">{writable && <Button2 loading={busy || photoBusy} variant="primary" onClick={() => void save()}>Guardar presupuesto</Button2>}<Button2 disabled={busy || photoBusy} icon={<Download size={16}/>} onClick={() => void pdf()}>Descargar PDF</Button2>{editing && canDelete && <Button2 disabled={busy || photoBusy} variant="ghost" onClick={() => remove(editing)}>Eliminar presupuesto</Button2>}</div><p className="quotes-help">Numeración automática y única. Borrador recuperable en este navegador. Guardar lo guarda en la app; el PDF queda archivado al descargarlo.</p></aside></div>
-    </div>}
+    </div>}</Modal>
   </div>;
 }

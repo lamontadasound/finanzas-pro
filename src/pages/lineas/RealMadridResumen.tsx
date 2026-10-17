@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Clock, Receipt, Package } from 'lucide-react';
+
 import { useStore } from '../../store/useStore';
-import { fmtShort, getAvailableYears } from '../../utils/helpers';
+import { getAvailableYears } from '../../utils/helpers';
 import { resolveLinea, isAmbiguousRealMadrid } from '../../config/resolveLinea';
 import { useLineaFinance } from '../../hooks/useLineaFinance';
 import { LineaResumenView } from '../../components/lineas/LineaResumenView';
-import type { StatCardSpec } from '../../components/lineas/LineaResumenView';
-import { ContentCard2 } from '../../components/ui2/ContentCard';
+
+import {Widget as ContentCard2,Metric} from '../../components/kit';
 import { AlertTriangle } from 'lucide-react';
 
 // Resumen de la línea "Real Madrid" — misma arquitectura reutilizable que
@@ -28,7 +28,7 @@ export const RealMadridResumen = () => {
   const ambiguos = useMemo(() => allIngresos.filter((i) => isAmbiguousRealMadrid(i)), [allIngresos]);
 
   const allYears = useMemo(() => getAvailableYears([...rmIngresosTotal, ...rmGastosTotal]), [rmIngresosTotal, rmGastosTotal]);
-  const [year, setYear] = useState(allYears[0] ?? new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear());
 
   const ingresosAnio = useMemo(() => rmIngresosTotal.filter((i) => new Date(i.fechaEvento).getFullYear() === year), [rmIngresosTotal, year]);
   const gastosAnio = useMemo(() => rmGastosTotal.filter((g) => new Date(g.fecha).getFullYear() === year), [rmGastosTotal, year]);
@@ -38,53 +38,15 @@ export const RealMadridResumen = () => {
 
   const calc = useLineaFinance(ingresosAnio, gastosAnio, gastosEventoAnio, equipoAnio);
 
-  const monthlyData = useMemo(() => {
-    return Array.from({ length: 12 }, (_, m) => {
-      const ingMes = ingresosAnio.filter((i) => new Date(i.fechaEvento).getMonth() === m);
-      const idsMes = new Set(ingMes.map((i) => i.id));
-      const gastosEvMes = gastosEventoAnio.filter((g) => idsMes.has(g.ingresoId)).reduce((s, g) => s + g.importe, 0);
-      const gastosGenMes = gastosAnio.filter((g) => new Date(g.fecha).getMonth() === m).reduce((s, g) => s + g.baseImponible, 0);
-      const ing = ingMes.reduce((s, i) => s + i.baseImponible, 0);
-      return {
-        date: new Date(year, m, 1),
-        Ingresos: ing,
-        Gastos: gastosEvMes + gastosGenMes,
-        Beneficio: ing - gastosEvMes - gastosGenMes,
-      };
-    });
-  }, [ingresosAnio, gastosEventoAnio, gastosAnio, year]);
-
-  const stats: StatCardSpec[] = [
-    { label: 'Ingresos (s/IVA)', value: calc.ingresosOperativos, format: fmtShort, icon: <TrendingUp size={15} />, tone: 'success' },
-    { label: 'Gastos (s/IVA)', value: calc.gastosOperativos, format: fmtShort, icon: <TrendingDown size={15} />, tone: 'danger' },
-    { label: 'Beneficio operativo', value: calc.beneficioOperativo, format: fmtShort, icon: <DollarSign size={15} />, tone: calc.beneficioOperativo >= 0 ? 'gold' : 'danger' },
-    { label: 'Pendiente de cobro', value: calc.pendiente, format: fmtShort, sub: `Cobrado: ${fmtShort(calc.cobrado)}`, icon: <Clock size={15} />, tone: calc.pendiente > 0 ? 'warning' : 'success' },
-    { label: 'Inversión del año', value: calc.inversiones, format: fmtShort, icon: <Package size={15} /> },
-    { label: 'Flujo tras inversión', value: calc.flujoCajaTrasInversiones, format: fmtShort, icon: <DollarSign size={15} />, tone: calc.flujoCajaTrasInversiones >= 0 ? 'success' : 'danger' },
-    { label: 'IVA repercutido', value: calc.ivaRepercutido, format: fmtShort, icon: <Receipt size={15} /> },
-    { label: 'Partidos/servicios', value: calc.numEventos, format: String, icon: <TrendingUp size={15} /> },
-  ];
-
-  const ringData = [
-    { label: 'Cobrado', value: calc.cobrado, maxValue: calc.cobrado + calc.pendiente || 1, color: '#15803d' },
-    { label: 'Pendiente', value: calc.pendiente, maxValue: calc.cobrado + calc.pendiente || 1, color: '#dc2626' },
-  ];
-
+  const monthlyData=Array.from({length:12},(_,month)=>{const rows=ingresosAnio.filter(i=>new Date(i.fechaEvento).getMonth()===month);return {cobrado:rows.reduce((n,i)=>n+(i.estadoPago==='pagado'?i.total:i.pagosRecibidos),0),pendiente:rows.reduce((n,i)=>n+(i.estadoPago==='pagado'?0:Math.max(0,i.total-i.pagosRecibidos)),0)};});
+  const ivaRecuperado=gastosAnio.reduce((n,g)=>n+(g.importeIVA??0),0)+gastosEventoAnio.reduce((n,g)=>n+(g.importeIVA??0),0);
   return (
     <LineaResumenView
-      title="Real Madrid"
-      year={year}
-      allYears={allYears}
-      onYearChange={setYear}
-      stats={stats}
-      areaChartData={monthlyData}
-      areaSeries={[{ key: 'Ingresos', color: '#6d28d9' }, { key: 'Gastos', color: '#f87171' }]}
-      ringData={ringData}
-      ringCenterLabel="pendiente"
-      ringCenterValue={fmtShort(calc.pendiente)}
+      year={year} allYears={[...allYears,new Date().getFullYear()]} onYearChange={setYear} finance={calc} months={monthlyData} ivaRecuperado={ivaRecuperado} eventLabel="Partidos / servicios"
     >
+<div className="grid sm:grid-cols-2 gap-3 mt-4"><Metric label="Inversión del año" value={calc.inversiones}/><Metric label="Flujo tras inversión" value={calc.flujoCajaTrasInversiones}/></div>
       {ambiguos.length > 0 && (
-        <ContentCard2 title="Casos a revisar" description="Cliente contiene 'Real Madrid' pero el tipo de evento no lo confirma — no se han reclasificado automáticamente">
+        <ContentCard2 title="Casos a revisar">
           <div className="flex items-start gap-3 mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-2xl p-3">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
             <p>Revisa estos registros y confírmame si pertenecen a Real Madrid.</p>

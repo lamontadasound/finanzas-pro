@@ -1,3 +1,5 @@
+import {LimitedList} from '../../components/kit/LimitedList';
+import {fechaEventoCliente,ordenEventoCliente,fechaEventoCorta} from '../../lib/clientEventDate';
 import {ClientAvatar} from '../../components/studio/SoundCRMTable';
 import {useEffect,useState} from 'react';
 import {Link,useNavigate,useParams} from 'react-router-dom';
@@ -26,13 +28,14 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
  const [deleting,setDeleting]=useState<FichaCRM|null>(null);
  const allClients=useStore(s=>s.clientes),facturas=useStore(s=>s.facturas),ingresos=useStore(s=>s.ingresos),documentos=useStore(s=>s.documentos);
  const [fichas,setFichas]=useState<FichaCRM[]>([]),[quotes,setQuotes]=useState<Presupuesto[]>([]),[archivos,setArchivos]=useState<ArchivoCRM[]>([]);
+ const [leads,setLeads]=useState<{nombre:string;fecha_evento?:string|null}[]>([]);
  const [drive,setDrive]=useState<{id:string;nombre:string;url:string}[]>([]);
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(false),[reload,setReload]=useState(0);
  const [newOpen,setNewOpen]=useState(false),[name,setName]=useState('');
  const [serviceFilter,setServiceFilter]=useState('');
  const [yearFilter,setYearFilter]=useState<number|'todos'>('todos');
  const [categoria,setCategoria]=useState<CategoriaCRM>('informacion'),[edit,setEdit]=useState<FichaCRM|null>(null);
- useEffect(()=>{let active=true;Promise.all([cargarCRM(),listarPresupuestos('montada_sound'),supabase.from('drive_invoice_files').select('id,nombre,url').eq('tipo','emitida')]).then(([c,p,d])=>{if(active){setFichas(c);setQuotes(p);setDrive(d.data??[]);}}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[reload]);
+ useEffect(()=>{let active=true;Promise.all([cargarCRM(),listarPresupuestos('montada_sound'),supabase.from('drive_invoice_files').select('id,nombre,url').eq('tipo','emitida'),supabase.from('sound_leads').select('nombre,fecha_evento').eq('eliminado',false)]).then(([c,p,d,l])=>{if(active){setFichas(c);setQuotes(p);setDrive(d.data??[]);setLeads(l.data??[]);}}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[reload]);
  useEffect(()=>{let active=true;if(clienteId)listarArchivosCRM(clienteId).then(d=>{if(active)setArchivos(d);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[clienteId,reload]);
  const selected=fichas.find(c=>c.cliente_id===clienteId);
  const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(e){setError(e instanceof Error?e.message:'No se pudo completar la acción.');}finally{setBusy(false);}};
@@ -47,10 +50,13 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
  const incomeIds=new Set(ingresos.filter(i=>lineaDeIngreso(i)==='montada_sound'&&match(i.cliente)).map(i=>i.id));
  const relatedDocs=documentos.filter(d=>(d.entityType==='ingreso'&&incomeIds.has(d.entityId))||(d.entityType==='factura'&&relatedInvoices.some(f=>f.id===d.entityId)));
  const downloadRow=(label:string,onClick:()=>void)=><button disabled={busy} onClick={onClick} className="doc-row"><span className="flex gap-3 items-center min-w-0"><FileText size={18} className="text-[var(--blue)] shrink-0"/><span className="truncate">{label}</span></span><Download size={16} className="shrink-0 text-ink-3"/></button>;
- const yearOf=(c:FichaCRM)=>Number((c.cliente.createdAt||'').slice(0,4))||new Date().getFullYear();
+ const today=new Date().toLocaleDateString('en-CA');
+ const clientPool=[...allClients.filter(c=>!fichas.some(f=>f.cliente_id===c.id)),...fichas.map(f=>f.cliente)];
+ const dates=new Map(fichas.map(c=>[c.cliente_id,fechaEventoCliente(c.cliente,clientPool,ingresos,leads,today)]));
+ const yearOf=(c:FichaCRM)=>Number((dates.get(c.cliente_id)||c.cliente.createdAt||'').slice(0,4))||new Date().getFullYear();
  const years=[...new Set(fichas.map(yearOf))].sort((x,y)=>y-x);
  const inYear=fichas.filter(c=>yearFilter==='todos'||yearOf(c)===yearFilter);
- const shown=inYear.filter(c=>!serviceFilter||c.tipo_servicio===serviceFilter).sort((x,y)=>x.cliente.nombre.localeCompare(y.cliente.nombre,'es'));
+ const shown=inYear.filter(c=>!serviceFilter||c.tipo_servicio===serviceFilter).sort((x,y)=>ordenEventoCliente(dates.get(x.cliente_id),dates.get(y.cliente_id),today)||x.cliente.nombre.localeCompare(y.cliente.nombre,'es'));
  const docCount=(k:CategoriaCRM)=>archivos.filter(a=>a.cliente_id===clienteId&&a.categoria===k).length+relatedDocs.filter(d=>(d.tipo==='contrato'?'contrato':d.tipo==='presupuesto'?'presupuesto':d.tipo==='factura'?'factura':'informacion')===k).length+(k==='presupuesto'?relatedQuotes.length:0)+(k==='factura'?relatedInvoices.length:0);
  const FOLDER_ICON={informacion:Info,contrato:Signature,presupuesto:FileText,factura:ReceiptText} as const;
  return <div className="studio-crm">
@@ -99,10 +105,10 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
    <p className="text-[13px] text-ink-3">{label}</p><p className="num text-[24px] font-semibold tracking-[-0.03em] mt-1">{n}</p>
   </button>;})}</div>
   {!shown.length?<div className="widget p-8 text-center"><Users className="mx-auto mb-3 text-ink-4"/><p className="text-ink-3">Sin clientes en esta selección.</p></div>:
-  <div className="widget" style={{padding:0}}>{shown.map((c,i)=><motion.div key={c.cliente_id} className="list-row" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{type:'spring',bounce:0,duration:.45,delay:Math.min(i,14)*.02}}>
-   <Link to={`${BASE}/clientes/${encodeURIComponent(c.cliente_id)}`} className="flex items-center gap-3 flex-1 min-w-0"><ClientAvatar name={c.cliente.nombre}/><span className="list-main"><b>{c.cliente.nombre}</b><small>{[SERVICIOS_CRM[c.tipo_servicio],c.cliente.telefono,c.cliente.email].filter(Boolean).join(' · ')}</small></span></Link>
+  <div className="widget" style={{padding:0}}><LimitedList>{shown.map((c,i)=><motion.div key={c.cliente_id} className="list-row" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{type:'spring',bounce:0,duration:.45,delay:Math.min(i,14)*.02}}>
+   <Link to={`${BASE}/clientes/${encodeURIComponent(c.cliente_id)}`} className="flex items-center gap-3 flex-1 min-w-0"><ClientAvatar name={c.cliente.nombre}/><span className="list-main"><b>{c.cliente.nombre}</b><small>{[SERVICIOS_CRM[c.tipo_servicio],fechaEventoCorta(dates.get(c.cliente_id))].join(' · ')}</small></span></Link>
    <span className="flex items-center gap-1">{canEdit&&<button className="icon-btn" disabled={busy} aria-label={`Editar ${c.cliente.nombre}`} onClick={()=>{setError('');setEdit({...c,cliente:{...c.cliente}});}}><Pencil size={15}/></button>}{canDelete&&<button className="icon-btn text-[#d70015]" disabled={busy} aria-label={`Borrar ${c.cliente.nombre}`} onClick={()=>{setError('');setDeleting(c);}}><Trash2 size={15}/></button>}<ChevronRight size={18} className="text-ink-4"/></span>
-  </motion.div>)}</div>}
+  </motion.div>)}</LimitedList></div>}
  </>}
 
  <Modal isOpen={!!deleting} onClose={()=>!busy&&setDeleting(null)} title="Borrar cliente" size="md">{deleting&&<div className="space-y-4"><p>¿Borrar a <strong>{deleting.cliente.nombre}</strong> de Clientes? Su contacto del CRM no se modificará.</p><p className="text-sm text-gray-500">Se conservarán sus facturas, presupuestos y documentos vinculados en el historial.</p><div className="flex gap-3"><Button2 disabled={busy} onClick={()=>setDeleting(null)}>Cancelar</Button2><Button2 variant="danger" loading={busy} onClick={remove}>Confirmar borrado</Button2></div>{error&&<p role="alert" className="text-red-700">{error}</p>}</div>}</Modal>

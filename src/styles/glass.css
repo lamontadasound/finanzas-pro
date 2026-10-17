@@ -537,3 +537,16 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .qcell { text-align: right; padding: 10px 10px 10px 0; font-size: 14px; border-top: .5px solid var(--hair-strong); white-space: nowrap; }
 .qcell[data-on="true"] { background: color-mix(in srgb, var(--tint-b) 12%, transparent); }
 @media (max-width: 560px) { .qgrid { grid-template-columns: 92px repeat(4, minmax(0, 1fr)); } .qcell { font-size: 12px; padding-right: 4px; } .qlabel { font-size: 12px; } }
+
+/* Shared archives and summaries: keep controls within narrow mobile sheets. */
+.finance-modal .quotes-workspace { grid-template-columns: minmax(0, 1fr); }
+.finance-modal .quotes-side-column, .finance-modal .quotes-editor { min-width: 0; }
+.segmented { max-width: 100%; flex-wrap: wrap; }
+.list-main { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .hero-value { font-size: clamp(28px, 9vw, 40px); overflow-wrap: anywhere; }
+  .list-row { gap: 10px; }
+  .fgroup-body { min-width: 0; }
+  .quotes-workspace .quotes-fields, .quotes-workspace .quote-concept { grid-template-columns: minmax(0, 1fr); }
+  .quotes-workspace .quotes-full, .quotes-workspace .quote-concept-name { grid-column: 1; }
+}

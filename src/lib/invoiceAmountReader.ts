@@ -4,7 +4,7 @@ export function parseMoney(raw:string):number|null{
  let s=raw.replace(/[€\s]/g,'');
  if(!/^-?\d[\d.,]*$/.test(s))return null;
  if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
- else if(/[,\.]\d{2}$/.test(s))s=s.replace(',','.');
+ else if(/[,.]\d{2}$/.test(s))s=s.replace(',','.');
  else if(/[,.]/.test(s))return null; // Ambiguous grouping is not a decimal amount.
  const n=Number(s);return Number.isFinite(n)&&Math.abs(n)<1e10?round(n):null;
 }

@@ -1,3 +1,4 @@
+vi.mock('@number-flow/react',()=>({default:({value,locales,format}:{value:number;locales?:string;format?:Intl.NumberFormatOptions})=><span>{new Intl.NumberFormat(locales,format).format(value)}</span>}));
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -19,16 +20,16 @@ describe('Resumen personal por mes', () => {
     render(<MemoryRouter><Dashboard /></MemoryRouter>);
     const annual = screen.getByRole('region', { name: 'Resumen anual' });
     expect(annual.querySelector('.premium-annual')?.textContent).toBe('300,00 €');
-    fireEvent.click(screen.getByRole('button', { name: /febrero/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /febrero/i }));
     const detail = screen.getByRole('region', { name: 'Detalle del mes' });
     expect(detail.querySelector('.premium-month-total')?.textContent).toContain('200,00');
-    expect(screen.getByRole('button', { name: /febrero/i }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('tab', { name: /febrero/i }).getAttribute('aria-selected')).toBe('true');
     expect(annual.querySelector('.premium-annual')?.textContent).toBe('300,00 €');
   });
   it('el selector móvil y el cambio de año actualizan el mismo detalle', () => {
     render(<MemoryRouter><Dashboard /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Mes del resumen'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Año del resumen'), { target: { value: String(year - 1) } });
+    fireEvent.click(screen.getByRole('tab',{name:'febrero'}));
+    fireEvent.click(screen.getByRole('button',{name:'Año anterior'}));
     const detail = screen.getByRole('region', { name: 'Detalle del mes' });
     expect(detail.querySelector('.premium-month-total')?.textContent).toContain('50,00');
     expect(screen.getByRole('link', { name: /Gestionar pagos/ }).getAttribute('href')).toBe('/contabilidad/pagos');
