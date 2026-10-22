@@ -266,7 +266,7 @@ export interface FacturaHistorialEntry {
   fecha: string;       // ISO
   usuarioId: string;
   usuarioNombre: string;
-  accion: 'creada' | 'editada' | 'factura_editada' | 'emitida' | 'anulada' | 'cobro_registrado' | 'reintento_sync';
+  accion: 'creada' | 'editada' | 'factura_editada' | 'factura_restaurada' | 'emitida' | 'anulada' | 'cobro_registrado' | 'reintento_sync';
   detalle?: string;
 }
 

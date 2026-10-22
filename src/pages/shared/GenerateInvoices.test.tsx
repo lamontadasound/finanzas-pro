@@ -65,3 +65,15 @@ it('no altera la factura local si el servidor rechaza el cambio',async()=>{
  const invoice=issuedInvoice();useStore.setState({facturas:[invoice]});mocks.rpc.mockResolvedValue({error:{message:'Número ocupado'}});
  render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:/Abrir factura 90/}));fireEvent.click(screen.getByRole('button',{name:'Guardar cambios'}));await act(async()=>{await useConfirmStore.getState().onConfirm?.();});expect(screen.getByRole('alert')).toHaveProperty('textContent','Número ocupado');expect(useStore.getState().facturas[0]).toEqual(invoice);
 });
+
+it('mantiene archivadas en el listado y restaura la misma factura antes de editar',async()=>{
+ const invoice={...issuedInvoice(),ocultaEn:'2026-10-16T10:00:00Z'};useStore.setState({facturas:[invoice]});mocks.rpc.mockResolvedValue({error:null});mocks.get.mockResolvedValue({...invoice,ocultaEn:undefined});
+ render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);
+ expect(screen.getByText('Archivada')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:/Abrir factura 90/}));expect(mocks.rpc).not.toHaveBeenCalled();
+ await act(async()=>{await useConfirmStore.getState().onConfirm?.();});
+ expect(mocks.rpc).toHaveBeenCalledWith('restaurar_factura_generada',{p_id:'issued'});expect(screen.getByLabelText('Número de factura')).toHaveProperty('value','90');expect(useStore.getState().facturas).toHaveLength(1);expect(useStore.getState().facturas[0].ocultaEn).toBeUndefined();
+});
+it('si falla la restauración conserva la factura archivada y muestra el error',async()=>{
+ const invoice={...issuedInvoice(),ocultaEn:'2026-10-16T10:00:00Z'};useStore.setState({facturas:[invoice]});mocks.rpc.mockResolvedValue({error:{message:'Sin permiso para restaurar'}});
+ render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:/Abrir factura 90/}));await act(async()=>{await useConfirmStore.getState().onConfirm?.();});expect(screen.getByRole('alert').textContent).toBe('Sin permiso para restaurar');expect(screen.queryByLabelText('Número de factura')).toBeNull();expect(useStore.getState().facturas[0]).toEqual(invoice);
+});

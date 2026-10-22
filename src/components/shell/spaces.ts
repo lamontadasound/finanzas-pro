@@ -1,5 +1,5 @@
 import {
-  TrendingUp,
+  TrendingUp, CalendarDays,
   AudioLines, Disc3, Crown, Cable, House, Calculator, Settings2,
   LayoutGrid, ArrowDownLeft, Receipt, Contact, FileText, Signature,
   ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users, SlidersHorizontal,
@@ -54,6 +54,7 @@ export const SPACES: Space[] = [
     home: `${montada}/resumen`, prefixes: [montada, '/montada/'],
     items: [
       { to: `${montada}/resumen`, label: 'Resumen', icon: LayoutGrid },
+      { to: `${montada}/calendario`, label: 'Calendario', icon: CalendarDays },
       { to: `${montada}/ingresos`, label: 'Ingresos', icon: ArrowDownLeft },
       { to: `${montada}/gastos-eventos`, label: 'Gastos', icon: Receipt, alsoActive: [`${montada}/gastos`] },
       { to: `${montada}/clientes`, label: 'Clientes', icon: Contact, alsoActive: [`${montada}/crm`] },

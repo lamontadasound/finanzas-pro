@@ -36,3 +36,4 @@ describe('Resumen personal por mes', () => {
   });
 });
 it('octubre: resumen limpio con año sin accesos de documentos',()=>{render(<MemoryRouter><Dashboard/></MemoryRouter>);expect(screen.getByRole('heading',{name:`Tu Resumen Julia: ${year}`})).toBeTruthy();expect(screen.queryByRole('navigation',{name:'Accesos rápidos'})).toBeNull();expect(screen.queryByText('Mi espacio / Personal')).toBeNull();});
+it('muestra cada línea por separado sin tarjetas agrupadas',()=>{render(<MemoryRouter><Dashboard/></MemoryRouter>);expect(screen.queryByText('DJ y Real Madrid')).toBeNull();expect(screen.queryByText('Sound e Instalaciones')).toBeNull();for(const name of ['La Montada','DJ','Real Madrid','Instalaciones'])expect(screen.getByRole('link',{name:new RegExp(name)})).toBeTruthy();});

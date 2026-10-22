@@ -11,6 +11,7 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RequireLinea, RequireModulo, RequireAdminStrict } from './components/guards/RouteGuards';
 
+const SoundCalendar = lazy(() => import('./pages/lineas/SoundCalendar').then(m => ({default:m.SoundCalendar})));
 const DevPreviewLazy = lazy(() => import('./dev/DevPreview').then((m) => ({ default: m.DevPreview })));
 
 // ── Lazy pages ────────────────────────────────────────────────────────────────
@@ -173,6 +174,7 @@ export default function App() {
                       <Route path="lineas/montada-sound/clientes" element={<RequireLinea linea="montada_sound"><SoundCRM /></RequireLinea>} />
                       <Route path="lineas/montada-sound/clientes/:clienteId" element={<RequireLinea linea="montada_sound"><SoundCRM /></RequireLinea>} />
                       <Route path="lineas/montada-sound/resumen"        element={<RequireLinea linea="montada_sound"><MontadaSoundResumen /></RequireLinea>} />
+                      <Route path="lineas/montada-sound/calendario" element={<RequireLinea linea="montada_sound"><SoundCalendar/></RequireLinea>} />
                       <Route path="lineas/montada-sound/ingresos"       element={<RequireLinea linea="montada_sound"><IngresosPage area="montada" /></RequireLinea>} />
                       <Route path="lineas/montada-sound/gastos-eventos" element={<RequireLinea linea="montada_sound"><GastosEventoPage area="montada" /></RequireLinea>} />
                       <Route path="lineas/montada-sound/gastos"         element={<RequireLinea linea="montada_sound"><GastosPage area="montada" /></RequireLinea>} />
