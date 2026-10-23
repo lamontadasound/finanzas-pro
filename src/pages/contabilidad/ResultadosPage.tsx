@@ -18,7 +18,7 @@ export function ResultadosPage({soundOnly=false}:{soundOnly?:boolean}){
  const rows=driveAccounting(files,drive?.expenses??[],facturas,drive?.incomes??[]).filter(r=>year==='todos'||String(r.anio)===year);
  const sound=soundResults(ingresos,gastos,gastosEvento,year),totals=source==='drive'?accountingTotals(rows):sound;
  const years=[...new Set([new Date().getFullYear(),...files.map(f=>f.anio),...ingresos.map(i=>Number(i.fechaEvento?.slice(0,4))),...gastos.map(g=>Number(g.fecha.slice(0,4)))])].filter(Boolean).sort((a,b)=>b-a);
- const card=(label:string,value:number,tone?:string)=><Widget title={label}><div className={tone??''}><Money value={value}/></div></Widget>;
+ const card=(label:string,value:number,tone?:string)=><Widget title={label}><div className={tone??''}><Money value={value} cents className="text-2xl font-semibold"/></div></Widget>;
  return <div className="space-y-5"><PageHeader title="Resultados"><Link className="btn btn-secondary" to="/contabilidad/facturas">Ver facturas</Link></PageHeader>
  <div className="flex flex-wrap gap-3">{!soundOnly&&<Segmented id="results-source" value={source} onChange={setSource} options={[{value:'drive',label:'Facturas de Drive'},...(lineasVisibles.includes('montada_sound')?[{value:'sound',label:'La Montada'}]:[])]}/>} <select aria-label="Año" className="input-form max-w-40" value={year} onChange={e=>setYear(e.target.value)}><option value="todos">Todos los años</option>{years.map(y=><option key={y}>{y}</option>)}</select></div>
  <Segmented id="results-view" value={view} onChange={setView} options={[{value:'resultados',label:'Estado de resultados'},{value:'balance',label:'Balance'}]}/>
