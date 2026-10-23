@@ -323,9 +323,7 @@ export const InversionesPage = ({ area }: Props) => {
             </div>
             <div>
               <label className="label-form">Categoría</label>
-              <select value={form.categoria} onChange={(e) => setField('categoria', e.target.value)} className="input-form">
-                {CATEGORIAS_EQUIPO.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <input aria-label="Categoría de inversión" list="investment-categories" value={form.categoria} maxLength={80} onChange={e=>setField('categoria',e.target.value)} className="input-form" placeholder="Elige o escribe una categoría"/><datalist id="investment-categories">{[...new Set([...CATEGORIAS_EQUIPO,...equipo.map(e=>e.categoria)])].map(c=><option key={c} value={c}/>)}</datalist>
             </div>
             <div>
               <label className="label-form">Cantidad</label>

@@ -6,6 +6,7 @@ vi.mock('../../store/useStore',()=>({useStore:(selector:(s:unknown)=>unknown)=>s
 afterEach(()=>{cleanup();vi.useRealTimers();});
 it('navega meses y abre el detalle del evento seleccionado',()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,22,12));render(<SoundCalendar/>);
+ expect(screen.getByRole('button',{name:/jueves, 22 de octubre.*1 eventos/}).className).toContain('bg-[#fff0a8]');
  expect(screen.getByRole('heading',{name:'Calendario'})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:/Boda prueba.*Cliente prueba/}));expect(screen.getByRole('dialog')).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'Cerrar'}));fireEvent.click(screen.getByRole('button',{name:'Mes siguiente'}));expect(screen.getByText('noviembre de 2026')).toBeTruthy();

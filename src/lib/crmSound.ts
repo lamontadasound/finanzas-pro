@@ -5,7 +5,7 @@ export const SERVICIOS_CRM={sin_clasificar:'Sin clasificar',alquiler:'Alquiler',
 export const ORIGENES_CRM=['Instagram','Web','WhatsApp','Recomendación','Email','Llamada','Cliente recurrente','Otro'];
 export const CATEGORIAS = {informacion:'Información y listados',contrato:'Contratos',presupuesto:'Presupuestos',factura:'Facturas'} as const;
 export type CategoriaCRM = keyof typeof CATEGORIAS;
-export interface FichaCRM {cliente_id:string;etapa:keyof typeof ETAPAS;proxima_accion:string;fecha_seguimiento:string|null;notas:string;cliente:Cliente;origen:string;contacto_nombre:string;tipo_servicio:keyof typeof SERVICIOS_CRM;motivo_perdida:string;fecha_cierre:string|null}
+export interface FichaCRM {fecha_evento?:string|null;ubicacion_evento?:string|null;cliente_id:string;etapa:keyof typeof ETAPAS;proxima_accion:string;fecha_seguimiento:string|null;notas:string;cliente:Cliente;origen:string;contacto_nombre:string;tipo_servicio:keyof typeof SERVICIOS_CRM;motivo_perdida:string;fecha_cierre:string|null}
 export interface ArchivoCRM {id:string;cliente_id:string;categoria:CategoriaCRM;nombre:string;storage_path:string;created_at:string}
 export const normalizarCliente=(nombre:string)=>nombre.trim().toLocaleLowerCase('es');
 export function clienteCoincide(nombre:string,cliente:Cliente,clientes:Cliente[]){const key=normalizarCliente(nombre);return key!==''&&key===normalizarCliente(cliente.nombre)&&clientes.filter(c=>normalizarCliente(c.nombre)===key).length===1;}

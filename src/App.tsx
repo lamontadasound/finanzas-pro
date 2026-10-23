@@ -9,7 +9,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { useStore } from './store/useStore';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { RequireLinea, RequireModulo, RequireAdminStrict } from './components/guards/RouteGuards';
+import { RequireLinea, RequireModulo } from './components/guards/RouteGuards';
 
 const SoundCalendar = lazy(() => import('./pages/lineas/SoundCalendar').then(m => ({default:m.SoundCalendar})));
 const DevPreviewLazy = lazy(() => import('./dev/DevPreview').then((m) => ({ default: m.DevPreview })));
@@ -30,9 +30,9 @@ const RepartoSociosPage = lazy(() => import('./pages/shared/RepartoSociosPage').
 const InformesContablesPage = lazy(() => import('./pages/contabilidad/InformesContablesPage').then((m) => ({ default: m.InformesContablesPage })));
 const PrevisionFiscal = lazy(() => import('./components/impuestos/PrevisionFiscal').then((m) => ({ default: m.PrevisionFiscal })));
 const ImpuestosPage   = lazy(() => import('./pages/contabilidad/ImpuestosPage').then((m) => ({ default: m.ImpuestosPage })));
-const ResumenContablePage = lazy(() => import('./pages/contabilidad/ResumenContablePage').then((m) => ({ default: m.ResumenContablePage })));
+const ResultadosPage = lazy(() => import('./pages/contabilidad/ResultadosPage').then(m=>({default:m.ResultadosPage})));
 const AdminUsuarios   = lazy(() => import('./pages/admin/Usuarios').then((m) => ({ default: m.AdminUsuarios })));
-const AdminAjustes    = lazy(() => import('./pages/admin/Ajustes').then((m) => ({ default: m.AdminAjustes })));
+
 const SoundProspects=lazy(()=>import('./pages/lineas/SoundProspects').then(m=>({default:m.SoundProspects})));
 const SoundContracts=lazy(()=>import('./pages/lineas/SoundContracts').then(m=>({default:m.SoundContracts})));
 const GenerateInvoices=lazy(()=>import('./pages/shared/GenerateInvoices').then(m=>({default:m.GenerateInvoices})));
@@ -174,6 +174,7 @@ export default function App() {
                       <Route path="lineas/montada-sound/clientes" element={<RequireLinea linea="montada_sound"><SoundCRM /></RequireLinea>} />
                       <Route path="lineas/montada-sound/clientes/:clienteId" element={<RequireLinea linea="montada_sound"><SoundCRM /></RequireLinea>} />
                       <Route path="lineas/montada-sound/resumen"        element={<RequireLinea linea="montada_sound"><MontadaSoundResumen /></RequireLinea>} />
+                      <Route path="lineas/montada-sound/resultados" element={<RequireLinea linea="montada_sound"><ResultadosPage soundOnly /></RequireLinea>} />
                       <Route path="lineas/montada-sound/calendario" element={<RequireLinea linea="montada_sound"><SoundCalendar/></RequireLinea>} />
                       <Route path="lineas/montada-sound/ingresos"       element={<RequireLinea linea="montada_sound"><IngresosPage area="montada" /></RequireLinea>} />
                       <Route path="lineas/montada-sound/gastos-eventos" element={<RequireLinea linea="montada_sound"><GastosEventoPage area="montada" /></RequireLinea>} />
@@ -246,13 +247,14 @@ export default function App() {
                           permiso aparte, independiente de qué líneas vea el usuario.
                           "Inversiones" NO vive aquí — se mantiene solo dentro de
                           cada línea que las tenga. */}
-                      <Route path="contabilidad" element={<Navigate to="/contabilidad/resumen" replace />} />
-                      <Route path="contabilidad/resumen"          element={<RequireModulo modulo="contabilidad"><ResumenContablePage /></RequireModulo>} />
+                      <Route path="contabilidad" element={<Navigate to="/contabilidad/facturas" replace />} />
+                      <Route path="contabilidad/resumen"          element={<Navigate to="/contabilidad/prevision" replace />} />
                       <Route path="contabilidad/pagos"            element={<RequireModulo modulo="contabilidad"><PagosPage area="todos" defaultTab="porcobrar" /></RequireModulo>} />
                       <Route path="contabilidad/pagos-pendientes" element={<RequireModulo modulo="contabilidad"><PagosPage area="todos" defaultTab="porcobrar" /></RequireModulo>} />
                       <Route path="contabilidad/facturas"    element={<RequireModulo modulo="contabilidad"><FacturasAreaPage area="todos" /></RequireModulo>} />
-                      <Route path="contabilidad/clientes"    element={<Navigate to="/contabilidad/resumen" replace />} />
+                      <Route path="contabilidad/clientes"    element={<Navigate to="/contabilidad/facturas" replace />} />
                       <Route path="contabilidad/informes"    element={<RequireModulo modulo="informes"><InformesContablesPage /></RequireModulo>} />
+                      <Route path="contabilidad/resultados" element={<RequireModulo modulo="contabilidad"><ResultadosPage /></RequireModulo>} />
                       <Route path="contabilidad/impuestos"   element={<RequireModulo modulo="impuestos"><ImpuestosPage /></RequireModulo>} />
                       <Route path="contabilidad/prevision"   element={<RequireModulo modulo="impuestos"><PrevisionFiscal /></RequireModulo>} />
                       {/* "Inversiones" ya no vive en Contabilidad — redirige a
@@ -266,7 +268,7 @@ export default function App() {
                           tocar los propios permisos) se bloquean dentro de la
                           propia página, no solo aquí. */}
                       <Route path="admin/usuarios" element={<RequireModulo modulo="administracion"><AdminUsuarios /></RequireModulo>} />
-                      <Route path="admin/ajustes"  element={<RequireAdminStrict><AdminAjustes /></RequireAdminStrict>} />
+                      <Route path="admin/ajustes"  element={<Navigate to="/admin/usuarios" replace />} />
                       <Route path="admin/datos-fiscales" element={<Navigate to="/contabilidad/facturas" replace />} />
 
                       <Route path="lineas/montada-sound/facturas" element={<Navigate to="/contabilidad/facturas" replace />} />

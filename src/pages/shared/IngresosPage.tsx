@@ -485,6 +485,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
             <Field label="Cantidad pagada">
               <input type="number" inputMode="decimal" step="0.01" value={form.reserva ?? 0} onChange={(e) => setField('reserva', parseFloat(e.target.value) || 0)} className="input-form num" />
             </Field>
+<Field label="IVA de la reserva"><select className="input-form" value={form.reservaIncluyeIva==null?'':String(form.reservaIncluyeIva)} onChange={e=>setField('reservaIncluyeIva',e.target.value===''?undefined:e.target.value==='true')}><option value="">Sin indicar</option><option value="true">Con IVA</option><option value="false">Sin IVA</option></select></Field>
             <Field label="Fecha del cobro">
               <input type="date" value={form.fechaCobroReserva ?? ''} onChange={(e) => setField('fechaCobroReserva', e.target.value)} className="input-form" />
             </Field>
@@ -498,10 +499,12 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
               <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.reserva ?? 0)))}</div>
             </Field>
           </ToggleCard>
+<Field label="IVA del pago restante"><select className="input-form" value={form.restanteIncluyeIva==null?'':String(form.restanteIncluyeIva)} onChange={e=>setField('restanteIncluyeIva',e.target.value===''?undefined:e.target.value==='true')}><option value="">Sin indicar</option><option value="true">Con IVA</option><option value="false">Sin IVA</option></select></Field>
+          <p className="field-hint field-wide">Indica cómo se acordó cada cobro. La cantidad pagada es el importe recibido; esta etiqueta no cambia el IVA de la factura.</p>
           <Field label="Fecha del pago">
             <input type="date" value={form.fechaPago ?? ''} onChange={(e) => setField('fechaPago', e.target.value)} className="input-form" />
           </Field>
-          <Field label="Método de pago">
+          <Field label="Método del pago restante">
             <select value={form.metodoPago} onChange={(e) => setField('metodoPago', e.target.value)} className="input-form">
               {(METODOS_FORM.includes(form.metodoPago as PaymentMethod) ? METODOS_FORM : [form.metodoPago as PaymentMethod, ...METODOS_FORM]).map((m) => <option key={m} value={m}>{METODO_LABEL[m] ?? m}</option>)}
             </select>

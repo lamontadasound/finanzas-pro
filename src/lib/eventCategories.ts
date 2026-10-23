@@ -1,4 +1,4 @@
-export const EVENT_CATEGORIES = ['DJ','Técnico','Montador','Gasolina','Furgoneta','Alquiler','Decoración','Almacén'];
+export const EVENT_CATEGORIES = ['Técnico','Montador','DJ','Furgoneta','Gasolina','Cámara','Decoración','Personal','Hora Loca','Comida','Alquiler Material','Compra Material'];
 export function normalizeEventCategory(value: string): string {
  const category=value.trim().replace(/\s+/g,' ');
  if(!category||category.length>80)throw new Error('Escribe una categoría de entre 1 y 80 caracteres.');

@@ -170,6 +170,8 @@ export interface Ingreso {
   tieneReserva?: boolean;
   fechaCobroReserva?: string;
   metodoPagoReserva?: PaymentMethod;
+  reservaIncluyeIva?: boolean;
+  restanteIncluyeIva?: boolean;
   sinFactura?: boolean;
   // Línea de negocio — distinta de "Tipo de evento"
   lineaNegocio?: 'La Montada Sound' | 'DJs' | 'Real Madrid' | 'La Montada Installations' | 'montada_sound' | 'dj' | 'real_madrid' | 'montada_installations';

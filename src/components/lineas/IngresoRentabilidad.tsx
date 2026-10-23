@@ -61,6 +61,10 @@ export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense }: 
         </div>
       </div>
 
+      <div className="grid sm:grid-cols-2 gap-3 mt-4 text-sm">
+       {ingreso.tieneReserva&&<div className="widget"><b>Reserva · {fmt(ingreso.reserva??0)}</b><p>{ingreso.reservaIncluyeIva==null?'IVA sin indicar':ingreso.reservaIncluyeIva?'Con IVA':'Sin IVA'} · {ingreso.metodoPagoReserva||'Método sin indicar'}</p></div>}
+       <div className="widget"><b>Restante pendiente · {fmt(r.pendiente)}</b><p>{ingreso.restanteIncluyeIva==null?'IVA sin indicar':ingreso.restanteIncluyeIva?'Con IVA':'Sin IVA'} · {ingreso.metodoPago||'Método sin indicar'}</p></div>
+      </div>
       <div className="flex items-center justify-between mt-6 mb-2">
         <h3 className="widget-title">Gastos <span className="text-ink-3 font-normal">{r.gastos.length}</span></h3>
         {onAddExpense && <Btn variant="secondary" onClick={onAddExpense}><Plus size={15} strokeWidth={2.4} />Añadir gasto</Btn>}

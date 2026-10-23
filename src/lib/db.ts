@@ -27,6 +27,7 @@ type RawIngreso = {
   numero_factura: string | null; notas: string | null; created_at: string;
   reserva: number | null; sin_factura: boolean | null; linea_negocio: string | null;
   tiene_reserva: boolean | null; fecha_cobro_reserva: string | null;
+  reserva_incluye_iva: boolean | null; restante_incluye_iva: boolean | null;
   metodo_pago_reserva: string | null; dj_relacionado: string | null;
 };
 
@@ -202,6 +203,8 @@ const mapIngreso = (r: RawIngreso): Ingreso => ({
   sinFactura: r.sin_factura ?? undefined,
   lineaNegocio: (r.linea_negocio ?? undefined) as Ingreso['lineaNegocio'],
   tieneReserva: r.tiene_reserva ?? undefined,
+  reservaIncluyeIva: r.reserva_incluye_iva ?? undefined,
+  restanteIncluyeIva: r.restante_incluye_iva ?? undefined,
   fechaCobroReserva: r.fecha_cobro_reserva ?? undefined,
   metodoPagoReserva: (r.metodo_pago_reserva ?? undefined) as Ingreso['metodoPagoReserva'],
   djRelacionado: r.dj_relacionado ?? undefined,
@@ -424,6 +427,8 @@ const toDbIngreso = (i: Ingreso): RawIngreso => ({
   reserva: i.reserva ?? null, sin_factura: i.sinFactura ?? null,
   linea_negocio: i.lineaNegocio ?? null,
   tiene_reserva: i.tieneReserva ?? null,
+  reserva_incluye_iva: i.reservaIncluyeIva ?? null,
+  restante_incluye_iva: i.restanteIncluyeIva ?? null,
   fecha_cobro_reserva: i.fechaCobroReserva ?? null,
   metodo_pago_reserva: i.metodoPagoReserva ?? null,
   dj_relacionado: i.djRelacionado ?? null,

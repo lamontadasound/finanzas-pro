@@ -2,7 +2,7 @@ import {
   TrendingUp, CalendarDays,
   AudioLines, Disc3, Crown, Cable, House, Calculator, Settings2,
   LayoutGrid, ArrowDownLeft, Receipt, Contact, FileText, Signature,
-  ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users, SlidersHorizontal,
+  ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users,
 } from 'lucide-react';
 import type { LineaId } from '../../config/businessLines';
 import type { ModuloId } from '../../types';
@@ -64,6 +64,7 @@ export const SPACES: Space[] = [
       { to: `${montada}/inversiones`, label: 'Inversiones', icon: Boxes },
       { to: `${montada}/reparto-socios`, label: 'Reparto', icon: Split },
       { to: `${montada}/pagos`, label: 'Pagos', icon: CreditCard },
+      { to: `${montada}/resultados`, label: 'Resultados', icon: ChartNoAxesColumn },
       { to: `${montada}/informes`, label: 'Informes', icon: ChartNoAxesColumn },
     ],
   },
@@ -112,11 +113,11 @@ export const SPACES: Space[] = [
   {
     id: 'conta', label: 'Contabilidad', icon: Calculator, modulo: 'contabilidad',
     tint: { from: '#1b7f3b', to: '#34c759', glow: '#7ee2a0' },
-    home: '/contabilidad/resumen', prefixes: ['/contabilidad'],
+    home: '/contabilidad/facturas', prefixes: ['/contabilidad'],
     items: [
-      { to: '/contabilidad/resumen', label: 'Resumen', icon: LayoutGrid },
       { to: '/contabilidad/facturas', label: 'Facturas', icon: ReceiptText },
       { to: '/contabilidad/impuestos', label: 'Impuestos', icon: Landmark },
+      { to: '/contabilidad/resultados', label: 'Resultados', icon: ChartNoAxesColumn },
       { to: '/contabilidad/prevision', label: 'Previsión', icon: TrendingUp },
     ],
   },
@@ -126,7 +127,6 @@ export const SPACES: Space[] = [
     home: '/admin/usuarios', prefixes: ['/admin'],
     items: [
       { to: '/admin/usuarios', label: 'Usuarios y permisos', icon: Users },
-      { to: '/admin/ajustes', label: 'Configuración', icon: SlidersHorizontal },
     ],
   },
 ];

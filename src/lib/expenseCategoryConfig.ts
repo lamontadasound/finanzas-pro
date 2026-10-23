@@ -4,7 +4,7 @@ import {supabase,supabaseConfigured} from './supabase';
 import {EVENT_CATEGORIES} from './eventCategories';
 export type ExpenseScope='general'|'evento';
 export interface ExpenseCategory {nombre:string;color:string;general:boolean;evento:boolean}
-export const GENERAL_CATEGORIES=['Impuestos','Gestoría','Marketing','RRSS','Software','Personal','Material','Equipo','Almacén'];
+export const GENERAL_CATEGORIES=['Almacén','RRSS','Marketing','Bodas.net','Personal','Impuestos','Material','Decoración'];
 const PALETTE=['#2563eb','#7c3aed','#db2777','#d97706','#0d9488','#4f46e5','#dc2626','#059669','#9333ea','#0284c7','#c2410c','#475569'];
 export const categoryKey=(name:string)=>name.trim().replace(/\s+/g,' ').toLocaleLowerCase('es');
 export function categoryColor(name:string,categories:ExpenseCategory[]=[]){
