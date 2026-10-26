@@ -93,7 +93,7 @@ it('conserva referencia y descripción al cerrar, reabrir y emitir',async()=>{
 it('prepara Real Madrid con referencia fija y descripción editable del partido',()=>{
  useStore.setState({proyectoEmisorMap:{real_madrid:'default'}});
  render(<MemoryRouter><GenerateInvoices linea="real_madrid"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'Crear factura'}));
- expect(screen.getByLabelText('Referencia del cliente / nº de pedido (opcional)')).toHaveProperty('value','2526SER4531032474');
+ expect(screen.getByLabelText('Referencia del cliente / nº de pedido (opcional)')).toHaveProperty('value','2627SER4531032474');
  expect(screen.getByLabelText(/Numeración solicitada/)).toHaveProperty('value','');
  fireEvent.change(screen.getByLabelText('Fecha del evento'),{target:{value:'2026-08-30'}});
  fireEvent.change(screen.getByLabelText('Partido'),{target:{value:'Real Madrid vs Málaga'}});
@@ -116,7 +116,7 @@ it('desde ingresos de Real Madrid precarga partido, fecha, importes y plantilla 
  fireEvent.change(screen.getByLabelText('Concepto 1'),{target:{value:'Servicio editado'}});
  fireEvent.click(screen.getByRole('button',{name:'Añadir concepto'}));
  fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
- await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_ingreso_id:'match-1',p_fecha_evento:'2026-08-30',p_base_imponible:3000,p_total:3630,p_concepto:expect.stringContaining('Servicio editado'),p_datos_cliente:expect.objectContaining({referenciaFactura:'2526SER4531032474'})})));
+ await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_ingreso_id:'match-1',p_fecha_evento:'2026-08-30',p_base_imponible:3000,p_total:3630,p_concepto:expect.stringContaining('Servicio editado'),p_datos_cliente:expect.objectContaining({referenciaFactura:'2627SER4531032474'})})));
  expect(mocks.rpc.mock.calls[0][1].p_concepto.match(/total /g)).toHaveLength(1);
 });
 it('desde el mismo ingreso abre la factura emitida existente',()=>{
