@@ -59,7 +59,7 @@ function InvoiceWorkspace({linea,requested,sourceIncome}:{linea:LineaId;requeste
  const showPdf=(f:Factura,download=false)=>{setError('');try{
   const emisor=f.numeroSecuencial!=null?f.emisorSnapshot:resolverEmisorParaLinea(emisores,map,linea);
   if(!emisor)throw Error('Esta factura no tiene datos fiscales del emisor para generar el PDF.');
-  const doc=generarFacturaPdf({factura:f,configuracionFiscal:emisor,cliente:{...emptyClient(),...(f.clienteSnapshot??f.clienteBorrador),nombre:f.cliente}});
+  const doc=generarFacturaPdf({partidoEvento:linea==='real_madrid'?useStore.getState().ingresos.find(i=>i.id===f.ingresoId)?.concepto:undefined,factura:f,configuracionFiscal:emisor,cliente:{...emptyClient(),...(f.clienteSnapshot??f.clienteBorrador),nombre:f.cliente}});
   if(download)doc.save(`Factura-${f.numero||'borrador'}.pdf`);else setPdf(URL.createObjectURL(doc.output('blob')));
  }catch(e){setError(e instanceof Error?e.message:'No se pudo generar el PDF.');}};
  return <>
@@ -115,7 +115,7 @@ function InvoiceForm({linea,requested,sourceIncome,onClose}:{linea:LineaId;reque
   const result=await db.facturas.getById(id);if(!result.numeroSecuencial)throw Error('No se pudo confirmar el número. Reintenta el mismo intento.');store(result);setDraft(fromInvoice(result));localStorage.removeItem(pendingKey);
   try{store(await syncInvoice(result));setNotice(`Factura ${result.numero} emitida y subida a Drive.`);}catch{setNotice(`Factura ${result.numero} emitida. La subida a Drive queda pendiente; puedes reintentar desde Facturas sin emitir otra.`);}
  }catch(e){setError(e instanceof Error?e.message:'No se pudo emitir. Conservamos el intento para reintentarlo.');}finally{setBusy(false);working.current=false;}};
- const showPreview=()=>{setError('');try{validate();setPreview(URL.createObjectURL(generarFacturaPdf({factura:{...build(),numero:numeroSolicitado?`${numeroSolicitado} · VISTA PREVIA`:'BORRADOR · SIN EMITIR'},configuracionFiscal:emisor,cliente}).output('blob')));}catch(e){setError(e instanceof Error?e.message:'Revisa los campos');}};
+ const showPreview=()=>{setError('');try{validate();setPreview(URL.createObjectURL(generarFacturaPdf({partidoEvento:linea==='real_madrid'?(ingresos.find(i=>i.id===draft.ingresoOrigen)?.concepto||draft.partido):undefined,factura:{...build(),numero:numeroSolicitado?`${numeroSolicitado} · VISTA PREVIA`:'BORRADOR · SIN EMITIR'},configuracionFiscal:emisor,cliente}).output('blob')));}catch(e){setError(e instanceof Error?e.message:'Revisa los campos');}};
  const close=()=>{if(busy)return;if(issued&&!requested){try{localStorage.removeItem(`mi-espacio:factura-editor:${user?.id}:${linea}:nuevo`);}catch{/* no persistent draft available */}}onClose();};
  const saveIssued=()=>{
   setError('');try{if(!allowed||!canEdit||!issued)throw Error('Sin permiso para editar esta factura.');validate();}catch(e){setError(e instanceof Error?e.message:'Revisa los campos.');return;}

@@ -6,6 +6,7 @@ import type { ConfiguracionFiscal, Cliente, Factura } from '../types';
 export interface FacturaPdfInput {
  factura: Pick<Factura,'numero'|'fecha'|'concepto'|'baseImponible'|'importeIVA'|'porcentajeIVA'|'retencion'|'total'|'porcentajeFacturado'|'notas'|'fechaEvento'|'lineaNegocio'>;
  fechaEvento?: string;
+ partidoEvento?: string;
  configuracionFiscal: Partial<ConfiguracionFiscal> | null;
  cliente: Partial<Cliente> & {nombre:string};
 }
@@ -16,14 +17,15 @@ export function generarFacturaPdf(input:FacturaPdfInput):jsPDF {
  const concepts=parseConcepts(f.concepto);
  const eventLine=/^FECHA EVENTO: (.+)$/m;
  const storedEvent=realMadrid?(concepts?.map(c=>c.detalle?.match(eventLine)?.[1]).find(Boolean)??''):'';
- const matchName=storedEvent.match(/^\d+ \S+ \d{4} (.+)$/)?.[1];
+ const sourceMatch=realMadrid?input.partidoEvento?.trim():undefined;
+ const matchName=sourceMatch?(/real madrid/i.test(sourceMatch)?sourceMatch:`Real Madrid vs ${sourceMatch}`):storedEvent.match(/^\d+ \S+ \d{4} (.+)$/)?.[1];
  const eventText=matchName&&fechaEvento?matchInvoiceDescription(fechaEvento,matchName).replace('FECHA EVENTO: ',''):storedEvent;
  const montada=cf?.nifCif?.replace(/\s/g,'').toUpperCase()==='B21642913';
  const iban=cf?.iban||(montada?'ES82 0182 1941 7302 0172 1518':'');
  const web=cf?.web||(montada?'www.lamontada.es':'');
  const doc=new jsPDF();const brown=[75,56,54] as const;let y=20;
  doc.setCreationDate(new Date(f.fecha+'T12:00:00Z'));
- let hash=2166136261;for(const c of JSON.stringify({numero:f.numero,fecha:f.fecha,concepto:f.concepto,base:f.baseImponible,iva:f.importeIVA,pctIVA:f.porcentajeIVA,retencion:f.retencion,total:f.total,porcentaje:f.porcentajeFacturado,notas:f.notas,configuracionFiscal:cf,cliente,fechaEvento}))hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
+ let hash=2166136261;for(const c of JSON.stringify({numero:f.numero,fecha:f.fecha,concepto:f.concepto,base:f.baseImponible,iva:f.importeIVA,pctIVA:f.porcentajeIVA,retencion:f.retencion,total:f.total,porcentaje:f.porcentajeFacturado,notas:f.notas,configuracionFiscal:cf,cliente,fechaEvento,partidoEvento:input.partidoEvento}))hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
  doc.setFileId(hash.toString(16).padStart(8,'0').repeat(4));
  const money=(n:number)=>n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
  const font=(size=9,bold=false)=>{doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(...brown);};

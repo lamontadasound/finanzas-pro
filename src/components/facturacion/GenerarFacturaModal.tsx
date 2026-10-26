@@ -134,6 +134,7 @@ export function GenerarFacturaModal({ ingreso, onClose }: { ingreso: Ingreso; on
     const url = facturaPdfBlobUrl({
       factura: { numero: '(vista previa)', fecha: new Date().toISOString().slice(0, 10), concepto, ...calculo, porcentajeIVA: ingreso.porcentajeIVA, porcentajeFacturado: pctEfectivo },
       fechaEvento: ingreso.fechaEvento,
+      partidoEvento:lineaId==='real_madrid'?ingreso.concepto:undefined,
       configuracionFiscal: emisor,
       cliente: clienteFiscal,
     });

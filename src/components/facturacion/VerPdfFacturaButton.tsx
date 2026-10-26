@@ -1,3 +1,4 @@
+import {useStore} from '../../store/useStore';
 import {Modal} from '../ui/Modal';
 // ── "Ver PDF" de una factura YA EMITIDA — usa SIEMPRE sus snapshots ────────
 // CORRECCIÓN: al volver a descargar/previsualizar el PDF de una factura ya
@@ -22,7 +23,9 @@ export function VerPdfFacturaButton({ factura }: { factura: Factura }) {
     setGenerando(true);
     try {
       const nuevaUrl = facturaPdfBlobUrl({
+        partidoEvento:useStore.getState().ingresos.find(i=>i.id===factura.ingresoId)?.concepto,
         factura: {
+          lineaNegocio:factura.lineaNegocio,
           numero: factura.numero, fecha: factura.fecha, concepto: factura.concepto,
           baseImponible: factura.baseImponible, importeIVA: factura.importeIVA,
           porcentajeIVA: factura.porcentajeIVA, retencion: factura.retencion,

@@ -19,3 +19,9 @@ it('Real Madrid: partido en cabecera, referencia tras dirección y concepto en u
  expect(pdf.indexOf(REAL_MADRID_REFERENCE)).toBeGreaterThan(pdf.indexOf('AVENIDA DE CONCHA ESPINA'));
  expect(pdf).toContain('L.ESTE \\(AFFINITY\\) + DJ JULIA CENTENO Y L.OESTE + DJ CARLOS');
 });
+
+
+it('toma el rival del ingreso aunque la descripción ya no tenga la fecha ni el partido',()=>{
+ const pdf=generarFacturaPdf({...input,partidoEvento:'Málaga',cliente:{...REAL_MADRID_BILLING},factura:{...input.factura,lineaNegocio:'real_madrid',fechaEvento:'2026-08-30',concepto:serializeConcepts([{id:'1',descripcion:'Servicio',detalle:'Material y técnicos',cantidad:1,precio:1000,descuento:0}])}}).output();
+ expect(pdf).toContain('30 Agosto 2026 Real Madrid vs');expect(pdf).toContain('Málaga');expect(pdf).not.toContain('FECHA EVENTO:');
+});
