@@ -89,3 +89,16 @@ it('conserva referencia y descripción al cerrar, reabrir y emitir',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
  await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_numero_solicitado:null,p_datos_cliente:expect.objectContaining({referenciaFactura:reference}),p_concepto:expect.stringContaining('Dos altavoces y montaje'),p_total:121})));
 });
+
+it('prepara Real Madrid con referencia fija y descripción editable del partido',()=>{
+ useStore.setState({proyectoEmisorMap:{real_madrid:'default'}});
+ render(<MemoryRouter><GenerateInvoices linea="real_madrid"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'Crear factura'}));
+ expect(screen.getByLabelText('Referencia del cliente / nº de pedido (opcional)')).toHaveProperty('value','2526SER4531032474');
+ expect(screen.getByLabelText(/Numeración solicitada/)).toHaveProperty('value','');
+ fireEvent.change(screen.getByLabelText('Fecha del evento'),{target:{value:'2026-08-30'}});
+ fireEvent.change(screen.getByLabelText('Partido'),{target:{value:'Real Madrid vs Málaga'}});
+ fireEvent.click(screen.getByRole('button',{name:'Rellenar descripción del partido'}));
+ expect(screen.getByLabelText('Descripción 1')).toHaveProperty('value','FECHA EVENTO: 30 Agosto 2026 Real Madrid vs Málaga');
+ fireEvent.change(screen.getByLabelText('Descripción 1'),{target:{value:'Descripción personalizada'}});
+ expect(screen.getByLabelText('Descripción 1')).toHaveProperty('value','Descripción personalizada');
+});
