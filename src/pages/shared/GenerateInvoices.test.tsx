@@ -124,3 +124,13 @@ it('desde el mismo ingreso abre la factura emitida existente',()=>{
  render(<MemoryRouter initialEntries={['/?ingreso=match-1']}><GenerateInvoices linea="real_madrid"/></MemoryRouter>);
  expect(screen.getByLabelText('Número de factura')).toHaveProperty('value','90');expect(screen.getByRole('button',{name:'Guardar cambios'})).toBeTruthy();expect(screen.queryByRole('button',{name:'Emitir factura'})).toBeNull();
 });
+
+
+it('precarga los datos fiscales confirmados y permite aplicarlos a un borrador',()=>{
+ render(<MemoryRouter><GenerateInvoices linea="real_madrid"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'Crear factura'}));
+ expect(screen.getByLabelText('Nombre / razón social')).toHaveProperty('value','REAL MADRID CLUB DE FÚTBOL');
+ expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','G28034718');
+ expect(screen.getByLabelText('Dirección fiscal')).toHaveProperty('value','AVENIDA DE CONCHA ESPINA, No 1 28028 - MADRID');
+ fireEvent.change(screen.getByLabelText('NIF/CIF'),{target:{value:'Editado'}});expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','Editado');
+ fireEvent.click(screen.getByRole('button',{name:'Usar datos fiscales de Real Madrid'}));expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','G28034718');
+});

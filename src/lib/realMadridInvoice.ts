@@ -1,5 +1,6 @@
 import type {Ingreso} from '../types';
 import {newInvoiceConcept} from './invoiceConcepts';
+export const REAL_MADRID_BILLING={nombre:'REAL MADRID CLUB DE FÚTBOL',nifCif:'G28034718',direccion:'AVENIDA DE CONCHA ESPINA, No 1 28028 - MADRID'};
 export const REAL_MADRID_REFERENCE = '2526SER4531032474';
 export function matchInvoiceDescription(date:string,match:string):string {
  const parsed=/^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
