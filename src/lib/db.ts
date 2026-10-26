@@ -304,7 +304,7 @@ export const mapFactura = (r: RawFactura): Factura => ({
   syncEstado: (r.sync_estado ?? undefined) as Factura['syncEstado'],
   syncUltimoError: r.sync_ultimo_error ?? undefined,
   emisorSnapshot: r.emisor_snapshot ? ('razonSocial' in (r.emisor_snapshot as object) ? r.emisor_snapshot as ConfiguracionFiscal : mapConfiguracionFiscal(r.emisor_snapshot as RawConfiguracionFiscal)) : undefined,
-  clienteSnapshot: r.cliente_snapshot ? ('nifCif' in (r.cliente_snapshot as object) ? r.cliente_snapshot as Cliente : mapCliente(r.cliente_snapshot as RawCliente)) : undefined,
+  clienteSnapshot: r.cliente_snapshot ? ('nifCif' in (r.cliente_snapshot as object) ? r.cliente_snapshot as Cliente : {...mapCliente(r.cliente_snapshot as RawCliente),referenciaFactura:(r.cliente_snapshot as {referenciaFactura?:string}).referenciaFactura}) : undefined,
   clienteBorrador: r.datos_cliente_borrador ?? undefined,
   ocultaEn: r.oculta_en ?? undefined,
   fechaEvento: r.fecha_evento ?? undefined,

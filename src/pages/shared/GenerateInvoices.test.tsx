@@ -77,3 +77,15 @@ it('si falla la restauración conserva la factura archivada y muestra el error',
  const invoice={...issuedInvoice(),ocultaEn:'2026-10-16T10:00:00Z'};useStore.setState({facturas:[invoice]});mocks.rpc.mockResolvedValue({error:{message:'Sin permiso para restaurar'}});
  render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:/Abrir factura 90/}));await act(async()=>{await useConfirmStore.getState().onConfirm?.();});expect(screen.getByRole('alert').textContent).toBe('Sin permiso para restaurar');expect(screen.queryByLabelText('Número de factura')).toBeNull();expect(useStore.getState().facturas[0]).toEqual(invoice);
 });
+
+it('conserva referencia y descripción al cerrar, reabrir y emitir',async()=>{
+ mocks.rpc.mockResolvedValue({error:null});const view=render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fill();
+ const reference='0000123456789012345678901234567890-PO';
+ fireEvent.change(screen.getByLabelText('Referencia del cliente / nº de pedido (opcional)'),{target:{value:reference}});
+ fireEvent.change(screen.getByLabelText('Descripción 1'),{target:{value:'Dos altavoces y montaje'}});
+ view.unmount();render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'Crear factura'}));
+ expect(screen.getByLabelText('Referencia del cliente / nº de pedido (opcional)')).toHaveProperty('value',reference);
+ expect(screen.getByLabelText('Descripción 1')).toHaveProperty('value','Dos altavoces y montaje');
+ fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
+ await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_numero_solicitado:null,p_datos_cliente:expect.objectContaining({referenciaFactura:reference}),p_concepto:expect.stringContaining('Dos altavoces y montaje'),p_total:121})));
+});

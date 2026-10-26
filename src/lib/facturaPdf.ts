@@ -29,7 +29,7 @@ export function generarFacturaPdf(input:FacturaPdfInput):jsPDF {
  y=43;block(cf?.razonSocial||'[Emisor pendiente]',10,true);block(`CIF: ${cf?.nifCif||'[Pendiente]'}`);block(cf?.direccionFiscal||'[Dirección pendiente]');
  y+=3;doc.setDrawColor(...brown);doc.setLineWidth(.8);doc.line(16,y,194,y);y+=8;
  const left=[`Fecha de emisión: ${f.fecha}`,`Nº factura: ${f.numero||'VISTA PREVIA'}`,...(fechaEvento?[`Fecha del evento: ${fechaEvento}`]:[]),...(f.porcentajeFacturado!=null&&f.porcentajeFacturado<100?[`Porcentaje facturado: ${f.porcentajeFacturado}%`]:[])];
- const right=[`Cliente: ${cliente.nombre}`,`NIF / CIF: ${cliente.nifCif||'[Pendiente]'}`,cliente.direccion||'[Dirección pendiente]'];
+ const right=[`Cliente: ${cliente.nombre}`,...(cliente.referenciaFactura?.trim()?[`Referencia: ${cliente.referenciaFactura.trim()}`]:[]),`NIF / CIF: ${cliente.nifCif||'[Pendiente]'}`,cliente.direccion||'[Dirección pendiente]'];
  font();const a=left.flatMap(t=>doc.splitTextToSize(t,76) as string[]),b=right.flatMap(t=>doc.splitTextToSize(t,76) as string[]);const height=Math.max(a.length,b.length)*4.6+12;
  if(height<100){for(const [x,lines] of [[16,a],[108,b]] as const){doc.setFillColor(255,255,255);doc.setDrawColor(222,215,210);doc.setLineWidth(.25);doc.roundedRect(x,y,86,height,2,2,'FD');font();lines.forEach((line,i)=>doc.text(line,x+5,y+8+i*4.6));}y+=height+8;}
  else{for(const t of [...left,...right])block(t);y+=6;}
@@ -38,7 +38,7 @@ export function generarFacturaPdf(input:FacturaPdfInput):jsPDF {
  if(concepts&&Math.abs(concepts.filter(c=>!c.suplido).reduce((sum,c)=>sum+conceptAmount(c),0)-f.baseImponible)<.01){
   const header=()=>{ensure(16);doc.setFillColor(...brown);doc.rect(16,y,178,11,'F');font(8,true);doc.setTextColor(255,255,255);doc.text('CONCEPTO',19,y+7);doc.text('UDS.',111,y+7,{align:'right'});doc.text('PRECIO',138,y+7,{align:'right'});doc.text('DTO./UD.',165,y+7,{align:'right'});doc.text('TOTAL',191,y+7,{align:'right'});y+=11;};
   header();
-  for(const c of concepts){font();const lines=doc.splitTextToSize(c.descripcion+(c.suplido?' · Suplido (sin IVA)':''),80) as string[];for(let i=0;i<lines.length;i++){if(y+9>258){next();header();}doc.setFillColor(255,255,255);doc.rect(16,y,178,7,'F');font(8);doc.text(lines[i],19,y+5);if(i===0){doc.text(String(c.cantidad),111,y+5,{align:'right'});doc.text(money(c.precio),138,y+5,{align:'right'});doc.text(money(c.descuento),165,y+5,{align:'right'});doc.text(money(conceptAmount(c)),191,y+5,{align:'right'});}y+=7;}doc.setDrawColor(222,215,210);doc.line(16,y,194,y);}
+  for(const c of concepts){font();const lines=doc.splitTextToSize(c.descripcion+(c.suplido?' · Suplido (sin IVA)':'')+(c.detalle?'\n'+c.detalle:''),80) as string[];for(let i=0;i<lines.length;i++){if(y+9>258){next();header();}doc.setFillColor(255,255,255);doc.rect(16,y,178,7,'F');font(8);doc.text(lines[i],19,y+5);if(i===0){doc.text(String(c.cantidad),111,y+5,{align:'right'});doc.text(money(c.precio),138,y+5,{align:'right'});doc.text(money(c.descuento),165,y+5,{align:'right'});doc.text(money(conceptAmount(c)),191,y+5,{align:'right'});}y+=7;}doc.setDrawColor(222,215,210);doc.line(16,y,194,y);}
  }else{
  const header=()=>{ensure(16);doc.setFillColor(...brown);doc.rect(16,y,178,11,'F');font(8,true);doc.setTextColor(255,255,255);doc.text('CONCEPTO / DESCRIPCIÓN',19,y+7);doc.text('IMPORTE',191,y+7,{align:'right'});y+=11;};
  header();font();const lines=doc.splitTextToSize(f.concepto||'[Concepto pendiente]',133) as string[];

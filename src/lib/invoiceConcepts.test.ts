@@ -20,3 +20,13 @@ it('suplidos: conserva la marca y suma fuera de base e IVA en PDF',()=>{
  expect(invoiceAmounts([rows[1]],21)).toEqual({base:0,suplidos:50,tax:0,total:50});
  expect(invoiceAmounts(restored.map(c=>({...c,suplido:false})),21)).toEqual({base:150,suplidos:0,tax:31.5,total:181.5});
 });
+
+it('conserva descripción independiente y referencia larga sin alterar importes ni numeración',()=>{
+ const reference='0000123456789012345678901234567890-PO';
+ const rows=[{id:'a',descripcion:'Equipo de sonido',detalle:'Dos altavoces\nMontaje y desmontaje incluidos',cantidad:2,precio:100,descuento:10}];
+ const parsed=parseConcepts(serializeConcepts(rows))!;
+ expect(parsed[0].descripcion).toBe('Equipo de sonido');expect(parsed[0].detalle).toBe(rows[0].detalle);
+ expect(invoiceAmounts(parsed,21)).toEqual({base:180,suplidos:0,tax:37.8,total:217.8});
+ const pdf=generarFacturaPdf({factura:{numero:'101',fecha:'2026-10-26',concepto:serializeConcepts(rows),baseImponible:180,importeIVA:37.8,porcentajeIVA:21,total:217.8},cliente:{nombre:'Empresa',referenciaFactura:reference},configuracionFiscal:{razonSocial:'Test'}}).output();
+ expect(pdf).toContain(reference);expect(pdf).toContain('Dos altavoces');expect(pdf).toContain('Montaje y desmontaje incluidos');expect(pdf).toContain('Factura 101');
+});

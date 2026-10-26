@@ -346,6 +346,7 @@ export interface Factura {
 
 // ── Cliente — datos fiscales para autocompletar facturas ────────────────
 export interface Cliente {
+  referenciaFactura?: string; // Referencia externa de esta factura, no del perfil fiscal.
   id: string;
   nombre: string;                    // razón social o nombre comercial
   nifCif?: string;
