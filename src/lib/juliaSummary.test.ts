@@ -28,3 +28,17 @@ it('total personal: beneficio sin IVA DJ y Real Madrid más solo repartos de Jul
  expect(rows[0].amounts).toEqual({dj:700,real_madrid:2500,montada_sound:300,montada_installations:200});
  expect(rows[0].total).toBe(3700);
 });
+
+
+it('Real Madrid: atribuye los costes al mes del partido, incluso entre años',()=>{
+ const rows=juliaSummary(2026,[income('enero','real_madrid',3000),income('febrero','real_madrid',2000,'2026-02-20'),income('anterior','real_madrid',1000,'2025-12-20')],
+ [{lineaNegocio:'real_madrid',area:'dj',fecha:'2026-01-15',baseImponible:100,total:121} as Gasto],
+ [{ingresoId:'enero',area:'dj',fecha:'2025-12-30',importe:605,importeIVA:105},
+ {ingresoId:'enero',area:'dj',fecha:'2026-02-05',importe:242,baseImponible:200},
+ {ingresoId:'febrero',area:'dj',fecha:'2026-03-01',importe:300},
+ {ingresoId:'anterior',area:'dj',fecha:'2026-01-05',importe:400}] as GastoEvento[],[]);
+ expect(rows[0].amounts.real_madrid).toBe(2200);
+ expect(rows[1].amounts.real_madrid).toBe(1700);
+ expect(rows[2].amounts.real_madrid).toBe(0);
+ expect(rows.reduce((sum,m)=>sum+m.total,0)).toBe(3900);
+});
