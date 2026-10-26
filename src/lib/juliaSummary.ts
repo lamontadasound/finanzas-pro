@@ -1,3 +1,4 @@
+import {gastoEventoSinIVA} from './ingresoRentabilidad';
 import type {Ingreso,Gasto,GastoEvento,Socio,MovimientoSocio} from '../types';
 import {resolveLinea} from '../config/resolveLinea';
 import {LINEA_IDS,type LineaId} from '../config/businessLines';
@@ -11,7 +12,7 @@ export function juliaSummary(year:number,ingresos:Ingreso[],gastos:Gasto[],event
   const profit=Object.fromEntries(LINEA_IDS.map(l=>[l,0])) as Record<LineaId,number>;
   ingresos.filter(i=>i.fechaEvento.startsWith(prefix)).forEach(i=>profit[resolveLinea(i)]+=i.baseImponible);
   gastos.filter(g=>g.fecha.startsWith(prefix)).forEach(g=>profit[resolveLinea(g)]-=g.baseImponible);
-  eventCosts.filter(g=>g.fecha.startsWith(prefix)).forEach(g=>profit[resolveLinea(parents.get(g.ingresoId)??g)]-=g.importe);
+  eventCosts.filter(g=>g.fecha.startsWith(prefix)).forEach(g=>profit[resolveLinea(parents.get(g.ingresoId)??g)]-=gastoEventoSinIVA(g));
   const amounts:Record<LineaId,number|null>={dj:round(profit.dj),real_madrid:round(profit.real_madrid),montada_sound:0,montada_installations:0};
   for(const m of movimientos){
    if(m.tipo!=='reparto_beneficio_cobrado'||!m.fecha.startsWith(prefix)||!juliaIds.has(m.socioId))continue;

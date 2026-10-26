@@ -19,3 +19,12 @@ describe('Resumen de Julia con repartos manuales',()=>{
  const changed=juliaSummary(2026,[],[],[],socios,[{...ms[0],cantidad:500},...ms.slice(1)]);expect(changed[2].total).toBe(500);
  });
 });
+
+
+it('total personal: beneficio sin IVA DJ y Real Madrid más solo repartos de Julia',()=>{
+ const rows=juliaSummary(2026,[income('d','dj',1000),income('r','real_madrid',3000),income('s','montada_sound',90000),income('i','montada_installations',50000)],
+ [{lineaNegocio:'dj',fecha:'2026-01-01',baseImponible:100,total:121} as Gasto],
+ [{ingresoId:'d',fecha:'2026-01-02',importe:242,baseImponible:200,importeIVA:42} as GastoEvento,{ingresoId:'r',fecha:'2026-01-03',importe:605,importeIVA:105} as GastoEvento],socios,[mov('js',300,'2026-01-31'),mov('ji',200,'2026-01-31'),mov('ms',999,'2026-01-31')]);
+ expect(rows[0].amounts).toEqual({dj:700,real_madrid:2500,montada_sound:300,montada_installations:200});
+ expect(rows[0].total).toBe(3700);
+});
