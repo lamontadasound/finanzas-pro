@@ -17,8 +17,8 @@ const paths = {
 };
 
 /** Ficha del evento: cifras clave, margen y gastos vinculados. */
-export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense }: {
-  ingreso: Ingreso; gastos: GastoEvento[]; onClose: () => void; onAddExpense?: () => void;
+export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense, onGenerateInvoice }: {
+  ingreso: Ingreso; gastos: GastoEvento[]; onClose: () => void; onAddExpense?: () => void; onGenerateInvoice?: () => void;
 }) {
   const r = ingresoRentabilidad(ingreso, gastos);
   const margen = r.margen == null ? null : Math.round(r.margen * 10) / 10;
@@ -67,6 +67,7 @@ export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense }: 
       </div>
       <div className="flex items-center justify-between mt-6 mb-2">
         <h3 className="widget-title">Gastos <span className="text-ink-3 font-normal">{r.gastos.length}</span></h3>
+        {onGenerateInvoice && <Btn variant="primary" onClick={onGenerateInvoice}>Generar factura</Btn>}
         {onAddExpense && <Btn variant="secondary" onClick={onAddExpense}><Plus size={15} strokeWidth={2.4} />Añadir gasto</Btn>}
       </div>
       {r.gastos.length ? (

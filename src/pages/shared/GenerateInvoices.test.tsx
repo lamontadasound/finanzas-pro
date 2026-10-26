@@ -98,7 +98,29 @@ it('prepara Real Madrid con referencia fija y descripción editable del partido'
  fireEvent.change(screen.getByLabelText('Fecha del evento'),{target:{value:'2026-08-30'}});
  fireEvent.change(screen.getByLabelText('Partido'),{target:{value:'Real Madrid vs Málaga'}});
  fireEvent.click(screen.getByRole('button',{name:'Rellenar descripción del partido'}));
- expect(screen.getByLabelText('Descripción 1')).toHaveProperty('value','FECHA EVENTO: 30 Agosto 2026 Real Madrid vs Málaga');
+ expect((screen.getByLabelText('Descripción 1') as HTMLTextAreaElement).value).toContain('FECHA EVENTO: 30 Agosto 2026 Real Madrid vs Málaga');
  fireEvent.change(screen.getByLabelText('Descripción 1'),{target:{value:'Descripción personalizada'}});
  expect(screen.getByLabelText('Descripción 1')).toHaveProperty('value','Descripción personalizada');
+});
+
+it('desde ingresos de Real Madrid precarga partido, fecha, importes y plantilla editable sin líneas vacías',async()=>{
+ const i={id:'match-1',area:'dj',lineaNegocio:'real_madrid',cliente:'Real Madrid',concepto:'Real Madrid vs Málaga',fechaEvento:'2026-08-30',baseImponible:3000,porcentajeIVA:21,total:3630} as import('../../types').Ingreso;
+ useStore.setState({ingresos:[i],proyectoEmisorMap:{real_madrid:'default'}});mocks.rpc.mockResolvedValue({error:null});
+ render(<MemoryRouter initialEntries={['/?ingreso=match-1']}><GenerateInvoices linea="real_madrid"/></MemoryRouter>);
+ expect(screen.getByLabelText('Concepto 1')).toHaveProperty('value','L.ESTE (AFFINITY) + DJ JULIA CENTENO Y L.OESTE + DJ CARLOS');
+ expect(screen.getByLabelText('Descripción 1').getAttribute('placeholder')).toBeTruthy();
+ expect((screen.getByLabelText('Descripción 1') as HTMLTextAreaElement).value).toContain('FECHA EVENTO: 30 Agosto 2026 Real Madrid vs Málaga');
+ expect((screen.getByLabelText('Descripción 1') as HTMLTextAreaElement).value).toContain('48 x Focos Wash White');
+ expect(screen.getByLabelText('Precio 1')).toHaveProperty('value','3000');
+ fireEvent.change(screen.getByLabelText('NIF/CIF'),{target:{value:'B12345678'}});fireEvent.change(screen.getByLabelText('Dirección fiscal'),{target:{value:'Dirección'}});
+ fireEvent.change(screen.getByLabelText('Concepto 1'),{target:{value:'Servicio editado'}});
+ fireEvent.click(screen.getByRole('button',{name:'Añadir concepto'}));
+ fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
+ await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_ingreso_id:'match-1',p_fecha_evento:'2026-08-30',p_base_imponible:3000,p_total:3630,p_concepto:expect.stringContaining('Servicio editado'),p_datos_cliente:expect.objectContaining({referenciaFactura:'2526SER4531032474'})})));
+ expect(mocks.rpc.mock.calls[0][1].p_concepto.match(/total /g)).toHaveLength(1);
+});
+it('desde el mismo ingreso abre la factura emitida existente',()=>{
+ const f={...issuedInvoice(),lineaNegocio:'real_madrid',ingresoId:'match-1'} as Factura;useStore.setState({facturas:[f]});
+ render(<MemoryRouter initialEntries={['/?ingreso=match-1']}><GenerateInvoices linea="real_madrid"/></MemoryRouter>);
+ expect(screen.getByLabelText('Número de factura')).toHaveProperty('value','90');expect(screen.getByRole('button',{name:'Guardar cambios'})).toBeTruthy();expect(screen.queryByRole('button',{name:'Emitir factura'})).toBeNull();
 });
