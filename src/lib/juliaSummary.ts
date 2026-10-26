@@ -15,9 +15,11 @@ export function juliaSummary(year:number,ingresos:Ingreso[],gastos:Gasto[],event
   eventCosts.forEach(g=>{
    const ingreso=parents.get(g.ingresoId);
    const line=resolveLinea(ingreso??g);
-   // El beneficio de Real Madrid pertenece al mes del partido, aunque
-   // sus gastos se registren o paguen en otro mes.
-   const fecha=line==='real_madrid'&&ingreso?ingreso.fechaEvento:g.fecha;
+   // DJ y Real Madrid usan los mismos gastos vinculados y el mes del
+   // evento que sus resúmenes operativos, no la fecha de pago del gasto.
+   const personal=line==='dj'||line==='real_madrid';
+   if(personal&&(!ingreso||(line==='dj'&&g.area!=='dj')))return;
+   const fecha=personal&&ingreso?ingreso.fechaEvento:g.fecha;
    if(fecha.startsWith(prefix))profit[line]-=gastoEventoSinIVA(g);
   });
   const amounts:Record<LineaId,number|null>={dj:round(profit.dj),real_madrid:round(profit.real_madrid),montada_sound:0,montada_installations:0};

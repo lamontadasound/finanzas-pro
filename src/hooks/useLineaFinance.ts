@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { gastoEventoSinIVA } from '../lib/ingresoRentabilidad';
 import type { Ingreso, Gasto, GastoEvento, Equipo } from '../types';
 
 // ── Cálculos financieros comunes por línea de negocio ───────────────────────
@@ -45,7 +46,7 @@ export function useLineaFinance(
     const facturacionConIva = ingresos.reduce((s, i) => s + i.total, 0);
     const ingresosOperativos = ingresos.reduce((s, i) => s + i.baseImponible, 0);
     const ivaRepercutido = ingresos.reduce((s, i) => s + i.importeIVA, 0);
-    const gastosActuacion = gastosVinculados.reduce((s, g) => s + g.importe, 0);
+    const gastosActuacion = gastosVinculados.reduce((s, g) => s + gastoEventoSinIVA(g), 0);
     const gastosGeneralesTotal = gastosGenerales.reduce((s, g) => s + g.baseImponible, 0);
     const gastosOperativos = gastosActuacion + gastosGeneralesTotal;
     const beneficioOperativo = ingresosOperativos - gastosOperativos;
