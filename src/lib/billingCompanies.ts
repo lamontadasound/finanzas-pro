@@ -1,0 +1,6 @@
+import {supabase} from './supabase';
+import type {LineaId} from '../config/businessLines';
+export interface BillingCompany {id?:string;nombre:string;nifCif:string;direccion:string;email:string;telefono:string}
+export const emptyCompany=():BillingCompany=>({nombre:'',nifCif:'',direccion:'',email:'',telefono:''});
+export async function listCompanies(linea:LineaId):Promise<BillingCompany[]>{const {data,error}=await supabase.from('billing_companies').select('id,nombre,nif_cif,direccion,email,telefono').eq('linea_negocio',linea).order('nombre');if(error)throw error;return (data??[]).map(c=>({...c,nifCif:c.nif_cif}));}
+export async function saveCompany(linea:LineaId,c:BillingCompany){if(!c.nombre.trim()||!c.nifCif.trim()||!c.direccion.trim())throw Error('Completa razón social, NIF/CIF y dirección fiscal.');const row={linea_negocio:linea,nombre:c.nombre.trim(),nif_cif:c.nifCif.replace(/[\s-]/g,'').toUpperCase(),direccion:c.direccion.trim(),email:c.email.trim(),telefono:c.telefono.trim()};const result=c.id?await supabase.from('billing_companies').update(row).eq('id',c.id).eq('linea_negocio',linea).select('id').single():await supabase.from('billing_companies').insert(row).select('id').single();if(result.error)throw Error(result.error.code==='23505'?'Ya hay una empresa con ese NIF/CIF. Abre su ficha para editarla.':result.error.message);}

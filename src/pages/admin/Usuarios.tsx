@@ -1,3 +1,5 @@
+import {LINEA_NAV_ITEMS} from '../../config/lineaNavItems';
+import {SECTION_LABELS,sectionForPath} from '../../config/serviceSections';
 import {LimitedList} from '../../components/kit/LimitedList';
 import {PageHeader,FormGroup,Field} from '../../components/kit';
 import { useMemo, useState } from 'react';
@@ -140,7 +142,7 @@ export const AdminUsuarios = () => {
   // Convierte el shape del formulario al que espera la Edge Function
   // `create-user` (ver supabase/functions/create-user/index.ts).
   const permisosParaFuncion = () => ({
-    permisosLineas: Object.fromEntries(LINEA_IDS.map((id) => [id, form.permisosLineas[id] ?? { ...NO_PERM_CRUD }])),
+    permisosLineas: emptyLineas(),
     permisosModulos: Object.fromEntries(MODULO_IDS.map((id) => [id, form.permisosModulos[id] ?? { ...NO_PERM_CRUD }])),
   });
 
@@ -176,6 +178,8 @@ export const AdminUsuarios = () => {
           setCreateError(data?.error || error?.message || 'No se pudo invitar al usuario.');
           return;
         }
+        const {error:permissionsError}=await supabase.rpc('admin_save_user',{p_user_id:data.userId,p_nombre:form.nombre,p_rol:form.rol,p_activo:form.activo,p_lineas:form.permisosLineas,p_modulos:form.permisosModulos,p_facturacion:form.permisosFacturacion});
+        if(permissionsError){setCreateError('Invitación creada. No se han activado los accesos por servicio: '+permissionsError.message);await initData();return;}
         await initData();
         closeModal();
       }
@@ -372,13 +376,12 @@ export const AdminUsuarios = () => {
 
                   {permSection === 'lineas' ? (
                     LINEA_IDS.map((id) => (
-                      <MatrixRow
-                        key={id}
+                      <div key={id}><MatrixRow
                         label={BUSINESS_LINES[id].label}
                         perm={form.permisosLineas[id] ?? { ...NO_PERM_CRUD }}
                         disabled={!!editing && editandoAUnoMismo(editing)}
-                        onChange={(p) => setForm((f) => ({ ...f, permisosLineas: { ...f.permisosLineas, [id]: p } }))}
-                      />
+                        onChange={(p) => setForm((f) => ({ ...f, permisosLineas: { ...f.permisosLineas, [id]: {...p,secciones:f.permisosLineas[id]?.secciones} } }))}
+                      />{form.permisosLineas[id]?.ver&&<fieldset className="pl-4 pb-4" disabled={!!editing&&editandoAUnoMismo(editing)}><legend className="text-sm font-semibold">Apartados disponibles</legend><p className="text-xs text-gray-500 mb-2">Crear, editar y eliminar se aplican solo a los apartados seleccionados. Resumen e informes incluyen datos financieros.</p><div className="grid sm:grid-cols-2 gap-2">{[...new Set(LINEA_NAV_ITEMS[id].map(item=>sectionForPath(item.to)))].map(section=><label key={section} className="flex gap-2 text-sm"><input type="checkbox" checked={form.permisosLineas[id]?.secciones==null||form.permisosLineas[id]?.secciones?.includes(section)} onChange={e=>setForm(f=>{const current=f.permisosLineas[id]??NO_PERM_CRUD;const all=[...new Set(LINEA_NAV_ITEMS[id].map(item=>sectionForPath(item.to)))];const selected=current.secciones??all;return {...f,permisosLineas:{...f.permisosLineas,[id]:{...current,secciones:e.target.checked?[...selected,section]:selected.filter(s=>s!==section)}}};})}/>{SECTION_LABELS[section]??section}</label>)}</div></fieldset>}</div>
                     ))
                   ) : (
                     MODULO_IDS.map((id) => (

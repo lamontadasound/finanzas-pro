@@ -53,6 +53,7 @@ export type ModuloId = 'contabilidad' | 'informes' | 'impuestos' | 'administraci
 export const MODULO_IDS: ModuloId[] = ['contabilidad', 'informes', 'impuestos', 'administracion'];
 
 export interface PermisoCRUD {
+  secciones?: string[] | null;
   ver: boolean;
   crear: boolean;
   editar: boolean;

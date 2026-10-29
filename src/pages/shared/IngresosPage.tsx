@@ -1,3 +1,5 @@
+import {BUSINESS_LINES} from '../../config/businessLines';
+import {lineaDeIngreso} from '../../lib/contabilidad';
 import {useNavigate} from 'react-router-dom';
 import {EventExpenseVatFields} from '../../components/forms/EventExpenseVatFields';
 import {IngresoRentabilidad} from '../../components/lineas/IngresoRentabilidad';
@@ -340,10 +342,10 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
 
 
   const navigate=useNavigate();
-  const canInvoice=useAuthStore(s=>s.canEmitirFacturas()&&s.canCreateLinea('real_madrid'));
-  const invoiceFromIncome=(i:Ingreso)=>navigate('/lineas/real-madrid/generar-facturas?ingreso='+encodeURIComponent(i.id));
+  const canInvoice=useAuthStore(s=>s.canEmitirFacturas());
+  const invoiceFromIncome=(i:Ingreso)=>navigate(BUSINESS_LINES[lineaDeIngreso(i)].routeBase+'/generar-facturas?ingreso='+encodeURIComponent(i.id));
   const actionsFor = (i: Ingreso) => [
-    ...(filterLinea==='real_madrid'&&canInvoice?[{label:'Generar factura',onClick:()=>invoiceFromIncome(i)}]:[]),
+    ...(canInvoice&&useAuthStore.getState().canCreateLinea(lineaDeIngreso(i))&&useAuthStore.getState().canViewSeccion(lineaDeIngreso(i),'facturas')?[{label:'Generar factura',onClick:()=>invoiceFromIncome(i)}]:[]),
     ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
     ...(canDelete() ? [{ label: 'Eliminar', icon: <Trash2 size={13} />, danger: true, onClick: () => showConfirm('¿Eliminar este ingreso? No se puede deshacer.', () => deleteIngreso(i.id)) }] : []),
   ];
@@ -413,7 +415,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
         </>
       )}
 
-      {detailIngreso&&<IngresoRentabilidad onGenerateInvoice={filterLinea==='real_madrid'&&canInvoice?()=>invoiceFromIncome(detailIngreso):undefined} ingreso={detailIngreso} gastos={allGastosEvento} onClose={()=>setDetailId(null)} onAddExpense={canCreate()?()=>{setDetailId(null);openGasto(detailIngreso);}:undefined}/>}
+      {detailIngreso&&<IngresoRentabilidad onGenerateInvoice={canInvoice&&useAuthStore.getState().canCreateLinea(lineaDeIngreso(detailIngreso))&&useAuthStore.getState().canViewSeccion(lineaDeIngreso(detailIngreso),'facturas')?()=>invoiceFromIncome(detailIngreso):undefined} ingreso={detailIngreso} gastos={allGastosEvento} onClose={()=>setDetailId(null)} onAddExpense={canCreate()?()=>{setDetailId(null);openGasto(detailIngreso);}:undefined}/>}
       {/* Modal edición */}
       <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar evento' : 'Nuevo ingreso'} size="lg">
         <FormGroup title="Evento">

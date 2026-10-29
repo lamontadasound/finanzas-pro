@@ -8,6 +8,8 @@
 // las herramientas de red podría seguir consultando Supabase directamente
 // con la anon key. Este guard evita fugas de UI (menú, rutas, Dashboard,
 // parpadeo de datos), no sustituye a RLS.
+import {useLocation} from 'react-router-dom';
+import {sectionForPath,sectionAllowed} from '../../config/serviceSections';
 import type { ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -52,11 +54,12 @@ interface RequireLineaProps {
 }
 
 export const RequireLinea = ({ linea, accion = 'ver', children }: RequireLineaProps) => {
+  const {pathname}=useLocation();
   const ready = useAuthStore((s) => s.status === 'ready');
   const permiso = useAuthStore((s) => s.permisoLinea(linea));
   if (!ready) return <CheckingAccess />;
   const permitido = accion === 'ver' ? permiso.ver : accion === 'crear' ? permiso.crear : accion === 'editar' ? permiso.editar : permiso.eliminar;
-  if (!permitido) return <AccessDenied />;
+  if (!permitido || !sectionAllowed(permiso,sectionForPath(pathname))) return <AccessDenied />;
   return <>{children}</>;
 };
 

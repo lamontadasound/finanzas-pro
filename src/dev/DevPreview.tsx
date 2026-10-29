@@ -1,3 +1,6 @@
+import {AdminUsuarios} from '../pages/admin/Usuarios';
+import {EmpresasPage} from '../pages/shared/EmpresasPage';
+import {GenerateInvoices} from '../pages/shared/GenerateInvoices';
 // ── Entorno local de pruebas visuales — SOLO DESARROLLO ─────────────────────
 // Objetivo: poder ver y hacer capturas de las pantallas internas (Dashboard,
 // Ingresos, Facturas, Administración…) sin credenciales reales de producción
@@ -58,7 +61,7 @@ function seedFixtures() {
   useStore.setState({
     eventos: fixtureEventos, ingresos: fixtureIngresos, gastos: fixtureGastos,
     suplidos: [], facturas: fixtureFacturas, equipo: [], gastosEvento: [], pagosEvento: [],
-    documentos: [], usuarios: [], socios: [], movimientosSocios: [], impuestos: [],
+    documentos: [], usuarios: [{id:"fx-user",nombre:"Colaboradora de prueba",email:"demo@example.test",rol:"usuario",activo:true,permisos:{} as never,permisosLineas:FIXTURE_PERMISOS_LINEAS,permisosModulos:ALL_PERMS_MODULOS,createdAt:"2026-10-28"}], socios: [], movimientosSocios: [], impuestos: [],
     clientes: fixtureClientes, emisores: fixtureEmisores, proyectoEmisorMap: fixtureProyectoEmisorMap,
     permisosFacturacion: { 'fx-admin': ALL_PERMS_FACTURACION },
     _loaded: true, _error: null,
@@ -93,7 +96,7 @@ export function DevPreview() {
   void navigate;
   return (
     <Routes>
-      <Route index element={<Menu />} />
+      <Route index element={<Menu />} /><Route path="permisos" element={<Layout><AdminUsuarios/></Layout>}/><Route path="empresas" element={<Layout><EmpresasPage linea="montada_sound"/></Layout>}/><Route path="generar" element={<Layout><GenerateInvoices linea="montada_sound"/></Layout>}/>
       <Route path="dashboard" element={<Layout><Dashboard /></Layout>} />
       <Route path="ingresos" element={<Layout><IngresosPage area="montada" /></Layout>} />
       <Route path="gastos" element={<Layout><GastosPage area="montada" /></Layout>} />

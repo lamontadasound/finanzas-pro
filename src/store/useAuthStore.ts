@@ -1,3 +1,4 @@
+import {sectionAllowed} from '../config/serviceSections';
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
 import type { PermisosLineas, PermisosModulos, ModuloId, PermisoCRUD, UserRol, PermisosFacturacion } from '../types';
@@ -84,6 +85,7 @@ interface AuthState {
   isAdmin: () => boolean;
 
   permisoLinea: (linea: LineaId) => PermisoCRUD;
+  canViewSeccion: (linea: LineaId, seccion:string) => boolean;
   canViewLinea:   (linea: LineaId) => boolean;
   canCreateLinea: (linea: LineaId) => boolean;
   canEditLinea:   (linea: LineaId) => boolean;
@@ -121,7 +123,7 @@ async function cargarPerfil(userId: string, email: string): Promise<Profile | nu
     if (!perfilRow.activo) return null; // usuario desactivado — 0 acceso, aunque exista la fila
 
     const [{ data: lineaRows }, { data: moduloRows }, { data: facturacionRow }] = await Promise.all([
-      supabase.from('user_line_permissions').select('linea_negocio, can_view, can_create, can_edit, can_delete').eq('user_id', userId),
+      supabase.from('user_line_permissions').select('linea_negocio, can_view, can_create, can_edit, can_delete, secciones').eq('user_id', userId),
       supabase.from('user_module_permissions').select('modulo, can_view, can_create, can_edit, can_delete').eq('user_id', userId),
       // Tabla nueva (Fase H) — si no existe todavía (migración no ejecutada),
       // el catch de más abajo la trata como "sin permisos de facturación",
@@ -131,7 +133,7 @@ async function cargarPerfil(userId: string, email: string): Promise<Profile | nu
 
     const permisosLineas: PermisosLineas = {};
     for (const r of lineaRows ?? []) {
-      permisosLineas[r.linea_negocio] = { ver: r.can_view, crear: r.can_create, editar: r.can_edit, eliminar: r.can_delete };
+      permisosLineas[r.linea_negocio] = { secciones:r.secciones, ver: r.can_view, crear: r.can_create, editar: r.can_edit, eliminar: r.can_delete };
     }
     const permisosModulos = {} as PermisosModulos;
     for (const r of moduloRows ?? []) {
@@ -251,6 +253,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!cached) { cached = p.permisosLineas?.[linea] ?? NO_PERM_CRUD; userCache.set(linea, cached); }
     return cached;
   },
+  canViewSeccion: (linea,seccion) => sectionAllowed(get().permisoLinea(linea),seccion),
   canViewLinea:   (linea) => get().permisoLinea(linea).ver,
   canCreateLinea: (linea) => get().permisoLinea(linea).crear,
   canEditLinea:   (linea) => get().permisoLinea(linea).editar,

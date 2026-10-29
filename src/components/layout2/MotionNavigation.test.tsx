@@ -1,3 +1,4 @@
+import {useAuthStore} from '../../store/useAuthStore';
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
@@ -7,6 +8,7 @@ import {LINEA_NAV_ITEMS} from '../../config/lineaNavItems';
 afterEach(cleanup);
 describe('Navegación animada',()=>{
  it('solo muestra las líneas autorizadas y permite volver desde el submenú',()=>{
+  useAuthStore.setState({profile:{activo:true,rol:'admin'} as never});
   render(<MemoryRouter><SlideMenuLineas visibleLineas={['montada_sound']}/></MemoryRouter>);
   expect(screen.queryByRole('button',{name:'DJ'})).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'La Montada'}));
@@ -26,4 +28,11 @@ describe('Navegación animada',()=>{
  it('expone Presupuestos únicamente en Sound e Installations',()=>{
   for(const [line,items] of Object.entries(LINEA_NAV_ITEMS))expect(items.some(i=>i.label==='Presupuestos')).toBe(['montada_sound','montada_installations'].includes(line));
  });
+});
+
+it('limita los enlaces a los apartados concedidos',()=>{
+ useAuthStore.setState({profile:{activo:true,rol:'usuario',permisosLineas:{montada_sound:{ver:true,crear:false,editar:false,eliminar:false,secciones:['calendario','contratos']}}} as never});
+ render(<MemoryRouter><SlideMenuLineas visibleLineas={['montada_sound']}/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'La Montada'}));
+ expect(screen.getByRole('link',{name:'Calendario'})).toBeTruthy();expect(screen.getByRole('link',{name:'Contratos'})).toBeTruthy();expect(screen.queryByRole('link',{name:'Ingresos'})).toBeNull();
 });

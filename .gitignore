@@ -7,3 +7,6 @@ supabase/.temp/
 *.tsbuildinfo
 .DS_Store
 .claude/
+
+# Local schema-only QA evidence; never publish production security metadata.
+docs/agent-work/service-access/*-before.json

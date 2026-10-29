@@ -1,3 +1,4 @@
+vi.mock('../../lib/billingCompanies',()=>({listCompanies:vi.fn().mockResolvedValue([]),saveCompany:vi.fn().mockResolvedValue(undefined)}));
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 import {render,screen,fireEvent,waitFor,cleanup,act} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
@@ -133,4 +134,13 @@ it('precarga los datos fiscales confirmados y permite aplicarlos a un borrador',
  expect(screen.getByLabelText('Dirección fiscal')).toHaveProperty('value','AVENIDA DE CONCHA ESPINA, No 1 28028 - MADRID');
  fireEvent.change(screen.getByLabelText('NIF/CIF'),{target:{value:'Editado'}});expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','Editado');
  fireEvent.click(screen.getByRole('button',{name:'Usar datos fiscales de Real Madrid'}));expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','G28034718');
+});
+
+it('prepara la factura directamente desde un ingreso Sound',async()=>{
+ useStore.setState({ingresos:[{id:'sound-income',lineaNegocio:'montada_sound',concepto:'Sonido corporativo',cliente:'Empresa evento',fechaEvento:'2026-11-04',baseImponible:500,porcentajeIVA:21,total:605}] as never});
+ render(<MemoryRouter initialEntries={['/?ingreso=sound-income']}><GenerateInvoices linea="montada_sound"/></MemoryRouter>);
+ expect(screen.getByLabelText('Nombre / razón social')).toHaveProperty('value','Empresa evento');
+ expect(screen.getByLabelText('Concepto 1')).toHaveProperty('value','Sonido corporativo');
+ expect(screen.getByLabelText('Precio 1')).toHaveProperty('value','500');
+ expect(screen.getByLabelText('Fecha del evento')).toHaveProperty('value','2026-11-04');
 });

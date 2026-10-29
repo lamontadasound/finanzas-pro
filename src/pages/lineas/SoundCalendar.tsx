@@ -1,4 +1,6 @@
-import {useMemo,useState} from 'react';
+import {supabase} from '../../lib/supabase';
+import {useAuthStore} from '../../store/useAuthStore';
+import {useEffect,useMemo,useState} from 'react';
 import {ChevronLeft,ChevronRight,CalendarDays} from 'lucide-react';
 import {useStore} from '../../store/useStore';
 import {PageHeader,Widget,Btn,Pill} from '../../components/kit';
@@ -8,7 +10,11 @@ const longDate=(d:string)=>new Date(`${d}T12:00:00`).toLocaleDateString('es-ES',
 const label=(s:string)=>s.replaceAll('_',' ');
 export function SoundCalendar(){
  const incomes=useStore(s=>s.ingresos),events=useStore(s=>s.eventos);
- const all=useMemo(()=>soundCalendarEvents(incomes,events),[incomes,events]);
+ const user=useAuthStore(s=>s.user),canReadIncome=useAuthStore(s=>s.canViewSeccion('montada_sound','ingresos'));
+ const fallback=useMemo(()=>soundCalendarEvents(incomes,events),[incomes,events]);
+ const [projection,setProjection]=useState<CalendarEvent[]|null>(null),[error,setError]=useState('');
+ useEffect(()=>{let active=true;setProjection(null);setError('');supabase.rpc('get_sound_calendar').then(({data,error})=>{if(active){if(error)setError('No se pudo cargar el calendario. Recarga para reintentar.');else setProjection(data??[]);}});return()=>{active=false;};},[user]);
+ const all=projection??(canReadIncome?fallback:[]);
  const [selected,setSelected]=useState(()=>localDate(new Date()));
  const [month,setMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1,12));
  const [detail,setDetail]=useState<CalendarEvent|null>(null);
@@ -17,10 +23,10 @@ export function SoundCalendar(){
  const move=(by:number)=>{const d=new Date(month.getFullYear(),month.getMonth()+by,1,12);setMonth(d);setSelected(localDate(d));};
  const today=()=>{const d=new Date();setMonth(new Date(d.getFullYear(),d.getMonth(),1,12));setSelected(localDate(d));};
  return <div className="space-y-5"><PageHeader title="Calendario"><Btn onClick={today}>Hoy</Btn></PageHeader>
-  <Widget><div className="flex items-center justify-between gap-2 mb-5"><Btn aria-label="Mes anterior" onClick={()=>move(-1)}><ChevronLeft size={18}/></Btn><h2 className="font-semibold capitalize text-center" aria-live="polite">{month.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</h2><Btn aria-label="Mes siguiente" onClick={()=>move(1)}><ChevronRight size={18}/></Btn></div>
+  {error&&<p role="alert" className="text-red-700">{error}</p>}<Widget><div className="flex items-center justify-between gap-2 mb-5"><Btn aria-label="Mes anterior" onClick={()=>move(-1)}><ChevronLeft size={18}/></Btn><h2 className="font-semibold capitalize text-center" aria-live="polite">{month.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</h2><Btn aria-label="Mes siguiente" onClick={()=>move(1)}><ChevronRight size={18}/></Btn></div>
   <p className="text-sm text-ink-3 mb-4">{monthly.length} eventos</p>
   <div className="grid grid-cols-7 gap-1" aria-label="Días del mes">{['L','M','X','J','V','S','D'].map(d=><span key={d} className="text-center text-xs text-ink-3 pb-2" aria-hidden>{d}</span>)}{monthDays(month.getFullYear(),month.getMonth()).map(d=>{const rows=groups.get(d.date)??[];return <button key={d.date} disabled={!d.inMonth} aria-label={`${longDate(d.date)} · ${rows.length} eventos`} aria-pressed={selected===d.date} onClick={()=>setSelected(d.date)} className={`min-w-0 min-h-14 sm:min-h-24 rounded-xl p-1 sm:p-2 text-center transition-colors ${selected===d.date?'bg-[var(--tint-a)] text-[var(--tint-ink)]':'hover:bg-black/5'} ${rows.length>0?'bg-[#fff0a8] text-[#362600] ring-1 ring-inset ring-[#e4b92f]':''} ${!d.inMonth?'opacity-25':''}`}><span className="font-semibold text-sm">{d.day}</span>{rows.length>0&&<><span className="block text-[10px] sm:hidden">{rows.length} ev.</span><span className="hidden sm:block text-[11px] truncate">{rows[0].title||rows[0].client}</span>{rows.length>1&&<span className="hidden sm:block text-[10px]">+{rows.length-1}</span>}</>}</button>;})}</div></Widget>
   <Widget title={longDate(selected)} pad><div className="divide-y">{daily.length?daily.map(e=><button key={e.id} onClick={()=>setDetail(e)} className="list-row w-full text-left !px-0"><CalendarDays size={20} className="shrink-0 text-[var(--tint-a)]"/><span className="list-main"><b>{e.title||e.client}</b><small>{e.client} · {label(e.type)}</small></span><ChevronRight size={18}/></button>):<p className="text-sm text-ink-3 py-4">No hay eventos este día.</p>}</div></Widget>
-  <Modal isOpen={!!detail} onClose={()=>setDetail(null)} title={detail?.title||'Evento'}>{detail&&<div className="space-y-4"><p className="capitalize">{longDate(detail.date)}</p><h3 className="font-semibold">{detail.client}</h3><div className="flex flex-wrap gap-2"><Pill>{label(detail.type)}</Pill><Pill>{label(detail.status)}</Pill></div><p className="text-2xl font-semibold">{detail.total.toLocaleString('es-ES',{style:'currency',currency:'EUR'})}</p>{detail.notes&&<p className="whitespace-pre-wrap break-words">{detail.notes}</p>}</div>}</Modal>
+  <Modal isOpen={!!detail} onClose={()=>setDetail(null)} title={detail?.title||'Evento'}>{detail&&<div className="space-y-4"><p className="capitalize">{longDate(detail.date)}</p><h3 className="font-semibold">{detail.client}</h3><div className="flex flex-wrap gap-2"><Pill>{label(detail.type)}</Pill>{detail.status&&<Pill>{label(detail.status)}</Pill>}</div>{detail.total!=null&&<p className="text-2xl font-semibold">{detail.total.toLocaleString('es-ES',{style:'currency',currency:'EUR'})}</p>}{detail.notes&&<p className="whitespace-pre-wrap break-words">{detail.notes}</p>}</div>}</Modal>
  </div>;
 }

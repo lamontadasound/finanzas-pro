@@ -673,7 +673,7 @@ export const db = {
       const [profiles,lines,modules]=results.map(x=>x.data??[]);
       const perm=(r: Record<string,unknown>)=>({ver:!!r.can_view,crear:!!r.can_create,editar:!!r.can_edit,eliminar:!!r.can_delete});
       return profiles.map(p=>({id:p.id,email:p.email,nombre:p.nombre,rol:p.rol,activo:p.activo,createdAt:p.created_at,permisos:NO_PERMS,
-        permisosLineas:Object.fromEntries(lines.filter(x=>x.user_id===p.id).map(x=>[x.linea_negocio,perm(x)])),
+        permisosLineas:Object.fromEntries(lines.filter(x=>x.user_id===p.id).map(x=>[x.linea_negocio,{...perm(x),secciones:x.secciones}])),
         permisosModulos:Object.fromEntries(modules.filter(x=>x.user_id===p.id).map(x=>[x.modulo,perm(x)])),
       } as Usuario));
     },

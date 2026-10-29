@@ -1,3 +1,4 @@
+import {EmpresasPage} from './pages/shared/EmpresasPage';
 import { useEffect, lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -152,6 +153,11 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       <Route index element={<Dashboard />} />
+                      <Route path="lineas/montada-sound/empresas" element={<RequireLinea linea="montada_sound"><EmpresasPage linea="montada_sound"/></RequireLinea>}/>
+                      <Route path="lineas/dj/empresas" element={<RequireLinea linea="dj"><EmpresasPage linea="dj"/></RequireLinea>}/>
+                      <Route path="lineas/real-madrid/empresas" element={<RequireLinea linea="real_madrid"><EmpresasPage linea="real_madrid"/></RequireLinea>}/>
+                      <Route path="lineas/installations/empresas" element={<RequireLinea linea="montada_installations"><EmpresasPage linea="montada_installations"/></RequireLinea>}/>
+
                       <Route path="lineas/montada-sound/contratos" element={<RequireLinea linea="montada_sound"><SoundContracts/></RequireLinea>}/>
                       <Route path="contabilidad/generar-facturas" element={<Navigate to="/contabilidad/facturas" replace />}/>
                       <Route path="lineas/montada-sound/generar-facturas" element={<RequireLinea linea="montada_sound"><GenerateInvoices linea="montada_sound"/></RequireLinea>}/>

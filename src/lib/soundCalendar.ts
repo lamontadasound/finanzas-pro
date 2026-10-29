@@ -1,6 +1,6 @@
 import type {Evento,Ingreso} from '../types';
 import {lineaDeIngreso} from './contabilidad';
-export type CalendarEvent={id:string;date:string;title:string;client:string;type:string;notes?:string;total:number;status:string};
+export type CalendarEvent={id:string;date:string;title:string;client:string;type:string;notes?:string;total:number|null;status:string};
 export const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 export function soundCalendarEvents(incomes:Ingreso[],events:Evento[]):CalendarEvent[]{
  const linked=new Set(incomes.map(i=>i.eventoId).filter(Boolean));

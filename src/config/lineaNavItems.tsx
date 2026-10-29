@@ -13,6 +13,8 @@ export interface LineaNavItem {
 // de esta reestructuración) para no duplicar páginas ni romper enlaces.
 export const LINEA_NAV_ITEMS: Record<LineaId, LineaNavItem[]> = {
   montada_sound: [
+    {to:'/lineas/montada-sound/calendario',label:'Calendario',icon:Calendar},
+    {to:'/lineas/montada-sound/resultados',label:'Resultados',icon:FileText},
     {to:"/lineas/montada-sound/crm",label:"CRM",icon:Users},
     {to:"/lineas/montada-sound/clientes",label:"Clientes",icon:Users},
     { to: '/lineas/montada-sound/resumen',       label: 'Resumen',          icon: LayoutDashboard },
@@ -54,6 +56,7 @@ for (const [id,items] of Object.entries(LINEA_NAV_ITEMS)) {
  if(id==='montada_sound'||id==='montada_installations') items.push({to:base+'/presupuestos',label:'Presupuestos',icon:FileText});
  if(id==='montada_sound')items.push({to:base+'/contratos',label:'Contratos',icon:FileText});
  items.push({to:base+'/generar-facturas',label:'Facturas',icon:FileText});
+ items.push({to:base+'/empresas',label:'Empresas cliente',icon:Users});
  items.push({to:base+'/pagos',label:'Pagos',icon:CreditCard});
  const order=['Resumen','Ingresos','Gastos de eventos','Gastos de actuación','Gastos de instalación','Gastos generales','CRM','Presupuestos','Contratos','Facturas','Clientes','Inversiones','Reparto socios','Pagos','Informes'];
  const rank=(label:string)=>order.indexOf(label) < 0 ? 99 : order.indexOf(label);

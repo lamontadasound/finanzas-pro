@@ -24,6 +24,8 @@ const BASE='/lineas/montada-sound';
 export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
  const {clienteId}=useParams();const navigate=useNavigate();
  const canCreate=useAuthStore(s=>s.canCreateLinea('montada_sound')),canEdit=useAuthStore(s=>s.canEditLinea('montada_sound'));
+ const canViewSection=useAuthStore(s=>s.canViewSeccion);
+ const categoryAllowed=(key:CategoriaCRM)=>canViewSection('montada_sound',({informacion:'clientes',contrato:'contratos',presupuesto:'presupuestos',factura:'facturas'} as const)[key]);
  const canDelete=useAuthStore(s=>s.canDeleteLinea('montada_sound'));
  const [deleting,setDeleting]=useState<FichaCRM|null>(null);
  const allClients=useStore(s=>s.clientes),facturas=useStore(s=>s.facturas),ingresos=useStore(s=>s.ingresos),documentos=useStore(s=>s.documentos);
@@ -87,7 +89,7 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
     </dl>
    </Widget>
   </div>
-  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">{(Object.entries(CATEGORIAS) as [CategoriaCRM,string][]).map(([key,label])=>{const Icon=FOLDER_ICON[key];return <button key={key} aria-pressed={categoria===key} onClick={()=>setCategoria(key)} className="widget tile p-4 text-left flex items-center gap-3" data-current={categoria===key}>
+  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">{(Object.entries(CATEGORIAS) as [CategoriaCRM,string][]).filter(([key])=>categoryAllowed(key)).map(([key,label])=>{const Icon=FOLDER_ICON[key];return <button key={key} aria-pressed={categoria===key} onClick={()=>setCategoria(key)} className="widget tile p-4 text-left flex items-center gap-3" data-current={categoria===key}>
    <span className="cat-glyph" style={{background:'color-mix(in srgb, var(--tint-a) 16%, #fff)',color:'var(--tint-a)'}}><Icon size={18}/></span>
    <span className="min-w-0"><b className="block text-[14.5px] font-semibold truncate">{label}</b><small className="text-[12.5px] text-ink-3">{docCount(key)} {docCount(key)===1?'documento':'documentos'}</small></span>
   </button>;})}</div>
