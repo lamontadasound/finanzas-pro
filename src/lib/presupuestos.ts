@@ -13,7 +13,7 @@ export interface PresupuestoContenido {
 export interface Presupuesto {
   id: string; numero: number; linea_negocio: LineaId; contenido: PresupuestoContenido; revision: number;
 }
-export const dinero = (n: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
+export const dinero = (n: number) => new Intl.NumberFormat('es-ES', {style:'currency',currency:'EUR' ,useGrouping:'always'} as Intl.NumberFormatOptions).format(n);
 const centimos = (n: number) => Math.round((n + Number.EPSILON) * 100);
 export function totalesPresupuesto(p: PresupuestoContenido) {
   const baseCentimos = p.conceptos.reduce((sum, c) => sum + centimos(c.incluido ? 0 : c.cantidad * ((c.precio ?? 0) - (c.descuento ?? 0))), 0);

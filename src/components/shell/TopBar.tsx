@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { HardDriveDownload, LogOut } from 'lucide-react';
+import { Bell, HardDriveDownload, LogOut } from 'lucide-react';
+import { diasPendienteDe, lineaDeIngreso } from '../../lib/contabilidad';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useStore } from '../../store/useStore';
 import { isItemActive, type Space } from './spaces';
@@ -43,8 +44,12 @@ const ProfileMenu = () => {
 
   return (
     <div className="relative" ref={ref}>
-      <button className="avatar" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label="Mi cuenta">
-        {initial}
+      <button className="flex items-center gap-2 press" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label="Mi cuenta">
+        <span className="avatar">{initial}</span>
+        <span className="hidden xl:block text-left leading-tight">
+          <b className="block text-[13px] font-semibold">{user?.nombre}</b>
+          <small className="block text-[11px] text-ink-3 max-w-[130px] truncate">{user?.email}</small>
+        </span>
       </button>
       <AnimatePresence>
         {open && (
@@ -77,6 +82,19 @@ const ProfileMenu = () => {
   );
 };
 
+/** Campana: cobros con 30 días o más de antigüedad; lleva a Pagos. */
+const AvisosCobro = () => {
+  const lineas = useAuthStore((s) => s.lineasVisibles());
+  const ingresos = useStore((s) => s.ingresos);
+  const n = ingresos.filter((i) => lineas.includes(lineaDeIngreso(i)) && ['pendiente', 'parcial'].includes(i.estadoPago) && diasPendienteDe(i) >= 30).length;
+  return (
+    <Link to="/contabilidad/pagos" className="round-btn" aria-label={`${n} cobros con más de 30 días`}>
+      <Bell size={16} />
+      {n > 0 && <span className="round-badge num">{n}</span>}
+    </Link>
+  );
+};
+
 export const TopBar = ({ space }: { space: Space }) => {
   const { pathname } = useLocation();
   const scroller = useRef<HTMLDivElement>(null);
@@ -98,7 +116,7 @@ export const TopBar = ({ space }: { space: Space }) => {
   return (
     <header className="topbar" data-scrolled={scrolled}>
       <div className="topbar-inner">
-        <Link to={space.home} className="flex items-center gap-2.5 shrink-0 press">
+        <Link to={space.home} className="topbar-brand flex items-center gap-2.5 shrink-0 press">
           <SpaceGlyph space={space} size={30} />
           <span className="text-[17px] font-semibold tracking-[-0.02em]">{space.label}</span>
         </Link>
@@ -119,7 +137,8 @@ export const TopBar = ({ space }: { space: Space }) => {
           </div>
         )}
 
-        <div className="flex items-center gap-3 shrink-0 ml-auto lg:ml-0">
+        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+          <AvisosCobro />
           <ProfileMenu />
         </div>
       </div>

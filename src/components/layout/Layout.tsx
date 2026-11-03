@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { SPACES, spaceForPath } from '../shell/spaces';
 import { Dock } from '../shell/Dock';
 import { TopBar } from '../shell/TopBar';
+import { Sidebar } from '../shell/Sidebar';
 
 export const Layout = ({ children }: { children: ReactNode }) => {
   const reduceMotion = useReducedMotion();
@@ -34,7 +35,8 @@ export const Layout = ({ children }: { children: ReactNode }) => {
       className="app"
       style={{ '--tint-a': space.tint.from, '--tint-b': space.tint.to, '--tint-glow': space.tint.glow, '--tint-ink': space.tint.ink ?? '#ffffff' } as CSSProperties}
     >
-      <div className="ambient" aria-hidden />
+      <Sidebar spaces={visible} activeId={space.id} />
+      <div className="app-body">
       <TopBar space={space} />
       {saveError && (
         <div role="alert" className="mx-auto max-w-6xl px-4 sm:px-6 mt-3">
@@ -48,13 +50,14 @@ export const Layout = ({ children }: { children: ReactNode }) => {
         <motion.div
           className="finance-page"
           key={pathname}
-          initial={reduceMotion ? false : { opacity: 0, y: 10, filter: 'blur(4px)' }}
+          initial={reduceMotion ? false : { opacity: 0, y: 12, filter: 'blur(8px)' }}
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={reduceMotion ? { duration: 0.12 } : { type: 'spring', bounce: 0, duration: 0.45 }}
         >
           {children}
         </motion.div>
       </main>
+      </div>
       <Dock spaces={visible} activeId={space.id} />
     </div>
   );

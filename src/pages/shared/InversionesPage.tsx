@@ -228,7 +228,7 @@ export const InversionesPage = ({ area }: Props) => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Inversiones">{canCreate()&&<Button variant="primary" icon={<Plus size={16}/>} onClick={openNew}>Añadir equipo</Button>}</PageHeader><div className="grid sm:grid-cols-2 gap-3"><Metric label="Invertido" value={totalInvertido}/><Metric label="Amortizado" value={totalAmortizado}/></div>
+      <PageHeader title="Inversiones">{canCreate()&&<Button variant="primary" icon={<Plus size={16}/>} onClick={openNew}>Añadir equipo</Button>}</PageHeader><div className="bento" style={{gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))"}}><Metric label="Invertido" value={totalInvertido}/><Metric label="Amortizado" value={totalAmortizado}/></div>
       {area === 'todos' && (
         <div className="flex gap-2 border-b border-gray-200">
           <button onClick={() => setVista('equipo')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === 'equipo' ? 'border-gold-500 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>

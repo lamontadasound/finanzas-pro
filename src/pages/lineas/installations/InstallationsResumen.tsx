@@ -15,5 +15,5 @@ export const InstallationsResumen=()=>{
  const pending=ing.reduce((n,i)=>n+Math.max(0,i.total-i.pagosRecibidos),0);
  const months=Array.from({length:12},(_,m)=>{const rows=ing.filter(i=>new Date(i.fechaEvento).getMonth()===m);return {cobrado:rows.reduce((n,i)=>n+i.total-Math.max(0,i.total-i.pagosRecibidos),0),pendiente:rows.reduce((n,i)=>n+Math.max(0,i.total-i.pagosRecibidos),0)};});
  const years=[year,new Date().getFullYear(),...incomes.map(i=>Number(i.fechaEvento.slice(0,4))),...expenses.map(g=>Number(g.fecha.slice(0,4)))];
- return <LineaResumenView year={year} allYears={years} onYearChange={setYear} finance={{...calc,pendiente:pending,cobrado:calc.facturacionConIva-pending}} months={months} ivaRecuperado={[...gas,...linked].reduce((n,g)=>n+(g.importeIVA??0),0)} eventLabel="Instalaciones"/>;
+ return <LineaResumenView year={year} allYears={years} onYearChange={setYear} finance={{...calc,pendiente:pending,cobrado:calc.facturacionConIva-pending}} months={months} ivaRecuperado={[...gas,...linked].reduce((n,g)=>n+(g.importeIVA??0),0)} ingresosTodos={incomes} ingresos={ing} gastos={gas} gastosEvento={linked} eventLabel="Instalaciones"/>;
 };

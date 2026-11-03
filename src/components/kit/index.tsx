@@ -38,8 +38,9 @@ interface WidgetProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
 }
 export const Widget = ({ children, title, action, pad = true, className, delay = 0, ...rest }: WidgetProps) => (
   <motion.section
-    initial={{ opacity: 0, y: 12, scale: 0.985 }}
-    animate={{ opacity: 1, y: 0, scale: 1 }}
+    initial={{ opacity: 0, y: 14, filter: 'blur(10px)' }}
+    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+    whileHover={{ y: -3 }}
     transition={{ type: 'spring', bounce: 0, duration: 0.55, delay }}
     className={clsx('widget', pad && 'p-5 sm:p-6', className)}
     {...(rest as object)}

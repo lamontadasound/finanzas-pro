@@ -9,7 +9,7 @@ import type {ReactNode} from 'react';
 const StatCard2=({label,value,format,sub}:{label:string;value:number;format:(n:number)=>string;sub?:string;icon?:ReactNode;tone?:string})=><Widget title={label}><p className="text-3xl font-semibold num break-words">{format(value)}</p>{sub&&<p className="text-xs text-ink-3 mt-2">{sub}</p>}</Widget>;
 import { driveAccounting, accountingTotals, type AccountingFile } from '../../lib/driveAccounting';
 import type { DriveExpenseAmount } from '../../lib/driveExpenses';
-const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const fmt = (n: number) => n.toLocaleString('es-ES', {style:'currency',currency:'EUR' ,useGrouping:'always'} as Intl.NumberFormatOptions);
 const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 export const ResumenContablePage = () => {
   const { facturas } = usePermittedFinancialData();

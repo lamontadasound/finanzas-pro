@@ -36,7 +36,7 @@ export const DjResumen = () => {
   const ivaRecuperado=gastosAnio.reduce((n,g)=>n+(g.importeIVA??0),0)+gastosEventoAnio.reduce((n,g)=>n+(g.importeIVA??0),0);
   return (
     <LineaResumenView
-      year={year} allYears={[...allYears,new Date().getFullYear()]} onYearChange={setYear} finance={calc} months={monthlyData} ivaRecuperado={ivaRecuperado} eventLabel="Actuaciones"
+      year={year} allYears={[...allYears,new Date().getFullYear()]} onYearChange={setYear} finance={calc} months={monthlyData} ivaRecuperado={ivaRecuperado} ingresosTodos={djIngresosTotal} ingresos={ingresosAnio} gastos={gastosAnio} gastosEvento={gastosEventoAnio} eventLabel="Actuaciones"
     />
   );
 };

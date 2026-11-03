@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { getAvailableYears } from '../../utils/helpers';
+import { getAvailableYears, fmtShort } from '../../utils/helpers';
 import { cobradoDe, pendienteDe } from '../../lib/contabilidad';
 import { gastoEventoSinIVA } from '../../lib/ingresoRentabilidad';
-import { PageHeader, YearStepper, Widget, Metric, Money, SplitBar, Dot } from '../../components/kit';
+import { PageHeader, YearStepper, Widget, Metric, Money, Dot } from '../../components/kit';
+import { GlowCard, DotMatrix, StripedBars, TickGauge } from '../../components/kit/dash';
+import { dashListas } from '../../components/kit/dashData';
+import { DateGlyph } from '../../components/ingresos/IngresosViews';
 import { defaultYear } from '../../components/kit/utils';
-import { MonthlyBars } from '../../components/kit/MonthlyBars';
 
 const yearOf = (d?: string) => (d ? new Date(d).getFullYear() : NaN);
 const monthOf = (d?: string) => (d ? new Date(d).getMonth() : -1);
@@ -46,7 +48,10 @@ export const MontadaSoundResumen = () => {
       meses[mo].pendiente += pendienteDe(i);
     }
 
+    const { categorias, proximos, porCobrar } = dashListas(ingresos, ing, gas, gev);
+
     return {
+      categorias, proximos, porCobrar,
       sinIva, conIva, generales, costeEventos, beneficio, cobrado, pendiente, ivaRecuperado, meses,
       eventos: ing.length,
       margen: sinIva > 0 ? Math.round((beneficio / sinIva) * 100) : 0,
@@ -60,49 +65,64 @@ export const MontadaSoundResumen = () => {
         <YearStepper year={year} years={years} onChange={setYear} />
       </PageHeader>
 
-      <div className="bento">
-        <Widget className="span-2 lg-row-2 hero-card flex flex-col">
-          <p className="text-[13px] font-medium opacity-75">Ingresos sin IVA · {year}</p>
+      <div className="dash-wrap"><div className="dash">
+        <Widget className="d-6" title="Gastos por categoría" delay={0.02}>
+          <p className="num text-[30px] font-semibold tracking-[-0.03em] -mt-2 mb-4"><Money value={m.generales + m.costeEventos} /></p>
+          <DotMatrix rows={m.categorias} />
+        </Widget>
+
+        <GlowCard className="d-6" delay={0.05}>
+          <p className="text-[13px] opacity-70">Ingresos sin IVA · {year}</p>
           <p className="hero-value mt-3"><Money value={m.sinIva} /></p>
-          <p className="mt-2 text-[15px] opacity-80">
-            <Money value={m.conIva} /> con IVA
-          </p>
-          <div className="mt-auto pt-8">
-            <SplitBar parts={[
-              { label: 'Cobrado', value: m.cobrado, color: 'var(--tint-ink)' },
-              { label: 'Pendiente', value: m.pendiente, color: 'color-mix(in srgb, var(--tint-ink) 30%, transparent)' },
-            ]} />
-            <div className="flex justify-between mt-3 text-[13px]">
-              <span className="flex items-center gap-1.5"><Dot color="var(--tint-ink)" />Cobrado <b className="num ml-1"><Money value={m.cobrado} /></b></span>
-              <span className="flex items-center gap-1.5 opacity-80"><Dot color="color-mix(in srgb, var(--tint-ink) 40%, transparent)" />Pendiente <b className="num ml-1"><Money value={m.pendiente} /></b></span>
-            </div>
+          <p className="mt-2 text-[14px] opacity-70"><Money value={m.conIva} /> con IVA</p>
+          <div className="mt-auto pt-6 flex gap-8 text-[13px]">
+            <span><span className="opacity-60 block">Beneficio operativo</span><b className="num text-[19px]"><Money value={m.beneficio} /></b></span>
+            <span><span className="opacity-60 block">Margen</span><b className="num text-[19px]">{m.margen}%</b></span>
           </div>
+        </GlowCard>
+
+        <Widget className="d-9" title="Ingresos por mes" delay={0.08} action={
+          <span className="flex gap-3 text-[12.5px] text-ink-2">
+            <span className="flex items-center gap-1.5"><Dot color="#16171c" />Cobrado</span>
+            <span className="flex items-center gap-1.5"><Dot color="color-mix(in srgb, var(--tint-b) 55%, #fff)" />Por cobrar</span>
+          </span>
+        }>
+          <StripedBars year={year} data={m.meses} />
         </Widget>
 
-        <Metric
-          label="Beneficio operativo" value={m.beneficio} delay={0.04}
-          tone={m.beneficio >= 0 ? 'positive' : 'negative'}
-        />
-        <Metric label="Pendiente de cobro" value={m.pendiente} delay={0.06} tone={m.pendiente > 0 ? 'warning' : 'neutral'} />
-        <Metric label="Margen" value={m.margen} kind="percent" delay={0.08} tone={m.margen >= 0 ? 'neutral' : 'negative'} />
-        <Metric label="Eventos" value={m.eventos} kind="count" delay={0.1} foot={m.eventos ? <>Ticket medio <Money value={m.ticket} /></> : null} />
-
-        <Metric label="Gastos" value={m.generales + m.costeEventos} delay={0.12} foot={<>Generales <Money value={m.generales} /></>} />
-        <Metric label="Coste de eventos" value={m.costeEventos} delay={0.14} />
-        <Metric label="IVA recuperado" value={m.ivaRecuperado} delay={0.16} />
-        <Metric label="Cobrado" value={m.cobrado} delay={0.18} tone="positive" />
-
-        <Widget className="span-full" title="Evolución de ingresos" delay={0.2}>
-          <MonthlyBars
-            year={year}
-            data={m.meses}
-            series={[
-              { key: 'cobrado', label: 'Cobrado', color: 'var(--tint-a)' },
-              { key: 'pendiente', label: 'Por cobrar', color: 'color-mix(in srgb, var(--tint-b) 38%, #fff)' },
-            ]}
-          />
+        <Widget className="d-3 flex flex-col" title="Cobrado" delay={0.11}>
+          <TickGauge percent={m.conIva > 0 ? Math.round((m.cobrado / m.conIva) * 100) : 0} label="del total" />
+          <dl className="mt-auto pt-4 space-y-2 text-[13.5px]">
+            <div className="flex justify-between"><dt className="text-ink-3">Cobrado</dt><dd className="num font-semibold"><Money value={m.cobrado} /></dd></div>
+            <div className="flex justify-between"><dt className="text-ink-3">Pendiente</dt><dd className="num font-semibold text-[#c26a00]"><Money value={m.pendiente} /></dd></div>
+          </dl>
         </Widget>
-      </div>
+
+        <Metric className="d-half" label="Gastos" value={m.generales + m.costeEventos} delay={0.14} foot={<>Generales <Money value={m.generales} /></>} />
+        <Metric className="d-half" label="Coste de eventos" value={m.costeEventos} delay={0.16} />
+        <Metric className="d-half" label="Eventos" value={m.eventos} kind="count" delay={0.18} foot={m.eventos ? <>Ticket medio <Money value={m.ticket} /></> : null} />
+        <Metric className="d-half" label="IVA recuperado" value={m.ivaRecuperado} delay={0.2} />
+
+        <Widget className="d-6" title="Próximos eventos" delay={0.22}>
+          {m.proximos.length === 0 ? <p className="text-ink-3 text-[14px]">Sin eventos próximos.</p> : m.proximos.map((i) => (
+            <div key={i.id} className="activity-row">
+              <DateGlyph date={i.fechaEvento} />
+              <span className="list-main"><b>{i.concepto}</b><small>{i.cliente}</small></span>
+              <span className="num font-semibold text-[14.5px]">{fmtShort(i.baseImponible)}</span>
+            </div>
+          ))}
+        </Widget>
+
+        <Widget className="d-6" title="Por cobrar" delay={0.24}>
+          {m.porCobrar.length === 0 ? <p className="text-ink-3 text-[14px]">Todo cobrado.</p> : m.porCobrar.map((i) => (
+            <div key={i.id} className="activity-row">
+              <DateGlyph date={i.fechaEvento} />
+              <span className="list-main"><b>{i.cliente}</b><small>{i.concepto}</small></span>
+              <span className="num font-semibold text-[14.5px] text-[#c26a00]">{fmtShort(pendienteDe(i))}</span>
+            </div>
+          ))}
+        </Widget>
+      </div></div>
     </div>
   );
 };

@@ -42,7 +42,7 @@ export const RealMadridResumen = () => {
   const ivaRecuperado=gastosAnio.reduce((n,g)=>n+(g.importeIVA??0),0)+gastosEventoAnio.reduce((n,g)=>n+(g.importeIVA??0),0);
   return (
     <LineaResumenView
-      year={year} allYears={[...allYears,new Date().getFullYear()]} onYearChange={setYear} finance={calc} months={monthlyData} ivaRecuperado={ivaRecuperado} eventLabel="Partidos / servicios"
+      year={year} allYears={[...allYears,new Date().getFullYear()]} onYearChange={setYear} finance={calc} months={monthlyData} ivaRecuperado={ivaRecuperado} ingresosTodos={rmIngresosTotal} ingresos={ingresosAnio} gastos={gastosAnio} gastosEvento={gastosEventoAnio} eventLabel="Partidos / servicios"
     >
 <div className="grid sm:grid-cols-2 gap-3 mt-4"><Metric label="Inversión del año" value={calc.inversiones}/><Metric label="Flujo tras inversión" value={calc.flujoCajaTrasInversiones}/></div>
       {ambiguos.length > 0 && (

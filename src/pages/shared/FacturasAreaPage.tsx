@@ -164,7 +164,7 @@ export const FacturasAreaPage = ({ area, linea }: Props) => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Facturas"/><div className="grid sm:grid-cols-2 gap-3"><Widget title="Ingresos registrados">{fmt(totalEmitidas)}</Widget><Widget title="Gastos registrados">{fmt(totalRecibidas)}</Widget></div>
+      <PageHeader title="Facturas"/><div className="bento" style={{gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))"}}><Metric label="Ingresos registrados" value={totalEmitidas}/><Metric label="Gastos registrados" value={totalRecibidas} delay={0.04}/></div>
       {tab==='emitida'&&puedeEmitir&&linea&&<div><Link className="inline-flex rounded-xl bg-gold-500 text-white px-4 py-2" to={linea?`${BUSINESS_LINES[linea].routeBase}/generar-facturas`:'/contabilidad/facturas'}>Generar factura</Link></div>}
       {/* KPIs de facturas registradas */}
       {tab === 'emitida' && origen === 'app' && <>

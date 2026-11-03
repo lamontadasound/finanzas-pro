@@ -5,7 +5,7 @@ import type { Area, Ingreso } from '../../types';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
-  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  n.toLocaleString('es-ES', {style:'currency',currency:'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 ,useGrouping:'always'} as Intl.NumberFormatOptions);
 
 const fmtFull = (n: number) =>
   n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
