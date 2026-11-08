@@ -168,6 +168,11 @@ export interface Ingreso {
   createdAt: string;
   // Reserva y "No factura"
   reserva?: number;
+  numeroReservas?: 1 | 2;
+  reserva2?: number;
+  fechaCobroReserva2?: string;
+  metodoPagoReserva2?: PaymentMethod;
+  reserva2IncluyeIva?: boolean;
   tieneReserva?: boolean;
   fechaCobroReserva?: string;
   metodoPagoReserva?: PaymentMethod;

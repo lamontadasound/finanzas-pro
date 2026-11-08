@@ -12,7 +12,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Button } from '../../components/ui/Button';
 import { matchesYQM, type YQMValue } from '../../components/ui/yqm';
 import { BUSINESS_LINES, type LineaId } from '../../config/businessLines';
-import { cobradoDe, pendienteDe, diasPendienteDe, lineaDeIngreso, estadoPagoDesdeCobrado } from '../../lib/contabilidad';
+import { totalReservasDe, cobradoDe, pendienteDe, diasPendienteDe, lineaDeIngreso, estadoPagoDesdeCobrado } from '../../lib/contabilidad';
 import type { Area, Ingreso, PaymentMethod } from '../../types';
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions);
@@ -46,6 +46,7 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
 
   const [tab, setTab] = useState<'cobrado' | 'porcobrar'>(defaultTab);
   const [filterLinea, setFilterLinea] = useState<LineaId | 'todas'>('todas');
+  const [paymentError, setPaymentError] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const [pagoModal, setPagoModal] = useState<Ingreso | null>(null);
   const [pagoModo, setPagoModo] = useState<'registrar' | 'editar'>('registrar');
@@ -83,6 +84,7 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
   const lista = tab === 'cobrado' ? cobrados : porCobrar;
 
   const openPago = (i: Ingreso) => {
+    setPaymentError('');
     setPagoModal(i); setPagoModo('registrar');
     setPagoImporte(Math.max(0, pendienteDe(i))); setPagoMetodo(i.metodoPago);
   };
@@ -91,10 +93,11 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
   // registrar un pago. El campo pasa a representar el cobrado ABSOLUTO,
   // no un incremento — se distingue con `pagoModo`.
   const openEditarCobro = (i: Ingreso) => {
+    setPaymentError('');
     setPagoModal(i); setPagoModo('editar');
     setPagoImporte(cobradoDe(i)); setPagoMetodo(i.metodoPago);
   };
-  const closePago = () => setPagoModal(null);
+  const closePago = () => { setPagoModal(null); setPaymentError(''); };
 
   // Recalcula estadoPago/pendiente a partir del cobrado resultante — misma
   // regla centralizada que `cobradoDe`/`pendienteDe`, así el estado nunca
@@ -103,9 +106,14 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
     const cobrado = Math.max(0, nuevoCobrado);
     const ingreso = allIngresos.find((x) => x.id === ingresoId);
     if (!ingreso) return;
+    const reservas = totalReservasDe(ingreso);
+    if (cobrado < reservas) {
+      setPaymentError('El total no puede ser menor que las reservas. Corrígelas en el ingreso.');
+      return false;
+    }
     const estado = estadoPagoDesdeCobrado(ingreso.total, cobrado);
     return await updateIngreso(ingresoId, {
-      pagosRecibidos: cobrado,
+      pagosRecibidos: Math.round((cobrado - reservas) * 100) / 100,
       estadoPago: estado,
       metodoPago: metodo,
       fechaPago: estado === 'pagado' ? new Date().toISOString().slice(0, 10) : (estado === 'pendiente' ? undefined : ingreso.fechaPago),
@@ -122,12 +130,11 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
     finally { setSavingPayment(false); }
   };
 
-  // Deshace/elimina el cobro registrado — vuelve el ingreso a "pendiente"
-  // sin duplicar ni crear ningún registro nuevo, solo corrige el existente.
+  // Elimina el pago restante y conserva las reservas detalladas del ingreso.
   const eliminarCobro = (i: Ingreso) => {
     showConfirm(
-      `¿Eliminar el cobro registrado de ${fmt(cobradoDe(i))} para "${i.cliente}"? El ingreso volverá a estado "pendiente".`,
-      () => aplicarCobro(i.id, 0, i.metodoPago),
+      totalReservasDe(i) > 0 ? `¿Eliminar el pago restante para "${i.cliente}"? Se conservarán las reservas de ${fmt(totalReservasDe(i))}.` : `¿Eliminar el cobro registrado de ${fmt(cobradoDe(i))} para "${i.cliente}"? El ingreso volverá a estado "pendiente".`,
+      () => aplicarCobro(i.id, totalReservasDe(i), i.metodoPago),
     );
   };
 
@@ -231,6 +238,7 @@ export const PagosPage = ({ area, defaultTab = 'porcobrar', fixedLinea }: Props)
       >
         {pagoModal && (
           <div className="space-y-4">
+            {paymentError && <p role="alert" className="text-sm text-red-700">{paymentError}</p>}
             <div>
               <label className="label-form">{pagoModo === 'editar' ? 'Importe total cobrado (€)' : 'Importe a registrar (€)'}</label>
               <input type="number" step="0.01" value={pagoImporte} onChange={(e) => setPagoImporte(parseFloat(e.target.value) || 0)} className="input-form" />

@@ -16,6 +16,9 @@ type RawEvento = {
 };
 
 type RawIngreso = {
+  numero_reservas?: 1 | 2; reserva_2?: number | null;
+  fecha_cobro_reserva_2?: string | null; metodo_pago_reserva_2?: string | null;
+  reserva_2_incluye_iva?: boolean | null;
   id: string; area: string; concepto: string; cliente: string;
   empresa: boolean | null;
   tipo_evento: string; evento_id: string | null; fecha_evento: string;
@@ -199,6 +202,11 @@ const mapIngreso = (r: RawIngreso): Ingreso => ({
   pagosRecibidos: Number(r.pagos_recibidos), facturaEmitida: r.factura_emitida,
   numeroFactura: r.numero_factura ?? undefined, notas: r.notas ?? undefined,
   createdAt: r.created_at,
+  numeroReservas: r.numero_reservas ?? 1,
+  reserva2: Number(r.reserva_2 ?? 0),
+  fechaCobroReserva2: r.fecha_cobro_reserva_2 ?? undefined,
+  metodoPagoReserva2: (r.metodo_pago_reserva_2 ?? undefined) as Ingreso['metodoPagoReserva'],
+  reserva2IncluyeIva: r.reserva_2_incluye_iva ?? undefined,
   reserva: r.reserva == null ? undefined : Number(r.reserva),
   sinFactura: r.sin_factura ?? undefined,
   lineaNegocio: (r.linea_negocio ?? undefined) as Ingreso['lineaNegocio'],
@@ -424,6 +432,11 @@ const toDbIngreso = (i: Ingreso): RawIngreso => ({
   estado_pago: i.estadoPago, pagos_recibidos: i.pagosRecibidos,
   factura_emitida: i.facturaEmitida, numero_factura: i.numeroFactura ?? null,
   notas: i.notas ?? null, created_at: i.createdAt,
+  numero_reservas: i.numeroReservas ?? 1,
+  reserva_2: i.reserva2 ?? 0,
+  fecha_cobro_reserva_2: i.fechaCobroReserva2 ?? null,
+  metodo_pago_reserva_2: i.metodoPagoReserva2 ?? null,
+  reserva_2_incluye_iva: i.reserva2IncluyeIva ?? null,
   reserva: i.reserva ?? null, sin_factura: i.sinFactura ?? null,
   linea_negocio: i.lineaNegocio ?? null,
   tiene_reserva: i.tieneReserva ?? null,

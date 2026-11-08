@@ -21,9 +21,14 @@ import { resolveLinea } from '../config/resolveLinea';
 // desactualizado en algún registro histórico. Para el resto de estados
 // ('pendiente'/'parcial'), el cobro real es lo recibido más la reserva ya
 // cobrada (si la hay) — igual que en InformesPage.
+/** Reservas activas, manteniendo intactos los registros históricos con una sola. */
+export const totalReservasDe = (i: Partial<Ingreso>): number => i.tieneReserva
+  ? Math.round(((i.reserva ?? 0) + (i.numeroReservas === 2 ? (i.reserva2 ?? 0) : 0)) * 100) / 100
+  : 0;
+
 export const cobradoDe = (i: Ingreso): number => {
   if (i.estadoPago === 'pagado') return i.total;
-  return (i.pagosRecibidos ?? 0) + (i.tieneReserva ? (i.reserva ?? 0) : 0);
+  return (i.pagosRecibidos ?? 0) + totalReservasDe(i);
 };
 
 /** Pendiente = total - cobrado, nunca negativo (evita mostrar "pendiente" negativo si hay sobrepago). */

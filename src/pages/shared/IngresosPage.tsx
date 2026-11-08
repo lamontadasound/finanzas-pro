@@ -9,7 +9,8 @@ import { EventCategoryField } from '../../components/forms/EventCategoryField';
 import { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
 import { uid } from '../../utils/helpers';
-import { pendienteDe } from '../../lib/contabilidad';
+import { ReservaFields } from '../../components/forms/ReservaFields';
+import { pendienteDe, totalReservasDe } from '../../lib/contabilidad';
 import { PageHeader, Metric, Btn, FormGroup, Field, Chips, ToggleCard } from '../../components/kit';
 import { YearGrid, MonthGrid, IngresoRows } from '../../components/ingresos/IngresosViews';
 import { MESES_FULL, ESTADO_LABEL } from '../../components/ingresos/estado';
@@ -292,8 +293,8 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
         next.importeIVA = iva;
         next.total      = base + iva;
       }
-      if (k === 'baseImponible' || k === 'porcentajeIVA' || k === 'pagosRecibidos' || k === 'reserva' || k === 'tieneReserva') {
-        const cobradoTotal = Number(next.pagosRecibidos ?? 0) + (next.tieneReserva ? Number(next.reserva ?? 0) : 0);
+      if (k === 'baseImponible' || k === 'porcentajeIVA' || k === 'pagosRecibidos' || k === 'reserva' || k === 'tieneReserva' || k === 'reserva2' || k === 'numeroReservas') {
+        const cobradoTotal = Number(next.pagosRecibidos ?? 0) + totalReservasDe(next);
         next.estadoPago = calcularEstado(Number(next.total ?? 0), cobradoTotal);
       }
       return next;
@@ -475,9 +476,12 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
             </select>
           </Field>
           <Field label="Pendiente de cobro">
-            <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.tieneReserva ? (form.reserva ?? 0) : 0)))}</div>
+            <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - totalReservasDe(form)))}</div>
           </Field>
-          <ToggleCard
+          {permLinea === 'montada_sound' ? <ReservaFields value={form} onChange={(patch) => setForm((previous) => {
+            const next = { ...previous, ...patch };
+            return { ...next, estadoPago: calcularEstado(next.total ?? 0, (next.pagosRecibidos ?? 0) + totalReservasDe(next)) };
+          })} /> : <ToggleCard
             label="Reserva"
             checked={!!form.tieneReserva}
             onChange={(tiene) => {
@@ -503,9 +507,9 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
               </select>
             </Field>
             <Field label="Importe pendiente">
-              <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - (form.reserva ?? 0)))}</div>
+              <div className="readout">{fmt(form.estadoPago === 'pagado' ? 0 : Math.max(0, (form.total ?? 0) - (form.pagosRecibidos ?? 0) - totalReservasDe(form)))}</div>
             </Field>
-          </ToggleCard>
+          </ToggleCard>}
 <Field label="IVA del pago restante"><select className="input-form" value={form.restanteIncluyeIva==null?'':String(form.restanteIncluyeIva)} onChange={e=>setField('restanteIncluyeIva',e.target.value===''?undefined:e.target.value==='true')}><option value="">Sin indicar</option><option value="true">Con IVA</option><option value="false">Sin IVA</option></select></Field>
           <p className="field-hint field-wide">Indica cómo se acordó cada cobro. La cantidad pagada es el importe recibido; esta etiqueta no cambia el IVA de la factura.</p>
           <Field label="Fecha del pago">

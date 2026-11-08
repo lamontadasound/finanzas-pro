@@ -62,7 +62,14 @@ export function IngresoRentabilidad({ ingreso, gastos, onClose, onAddExpense, on
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 mt-4 text-sm">
-       {ingreso.tieneReserva&&<div className="widget"><b>Reserva · {fmt(ingreso.reserva??0)}</b><p>{ingreso.reservaIncluyeIva==null?'IVA sin indicar':ingreso.reservaIncluyeIva?'Con IVA':'Sin IVA'} · {ingreso.metodoPagoReserva||'Método sin indicar'}</p></div>}
+       {ingreso.tieneReserva && (ingreso.numeroReservas === 2 ? [1, 2] : [1]).map((n) => {
+         const second = n === 2;
+         const amount = second ? ingreso.reserva2 : ingreso.reserva;
+         const date = second ? ingreso.fechaCobroReserva2 : ingreso.fechaCobroReserva;
+         const method = second ? ingreso.metodoPagoReserva2 : ingreso.metodoPagoReserva;
+         const iva = second ? ingreso.reserva2IncluyeIva : ingreso.reservaIncluyeIva;
+         return <div key={n} className="widget"><b>Reserva {n} · {fmt(amount ?? 0)}</b><p>{date || 'Fecha sin indicar'} · {method || 'Método sin indicar'}</p><p>{iva == null ? 'IVA sin indicar' : iva ? 'Con IVA' : 'Sin IVA'}</p></div>;
+       })}
        <div className="widget"><b>Restante pendiente · {fmt(r.pendiente)}</b><p>{ingreso.restanteIncluyeIva==null?'IVA sin indicar':ingreso.restanteIncluyeIva?'Con IVA':'Sin IVA'} · {ingreso.metodoPago||'Método sin indicar'}</p></div>
       </div>
       <div className="flex items-center justify-between mt-6 mb-2">
