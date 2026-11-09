@@ -136,11 +136,28 @@ it('precarga los datos fiscales confirmados y permite aplicarlos a un borrador',
  fireEvent.click(screen.getByRole('button',{name:'Usar datos fiscales de Real Madrid'}));expect(screen.getByLabelText('NIF/CIF')).toHaveProperty('value','G28034718');
 });
 
-it('prepara la factura directamente desde un ingreso Sound',async()=>{
+it('ignora enlaces antiguos a ingresos Sound y permite facturar manualmente',async()=>{
  useStore.setState({ingresos:[{id:'sound-income',lineaNegocio:'montada_sound',concepto:'Sonido corporativo',cliente:'Empresa evento',fechaEvento:'2026-11-04',baseImponible:500,porcentajeIVA:21,total:605}] as never});
+ mocks.rpc.mockResolvedValue({error:null});
  render(<MemoryRouter initialEntries={['/?ingreso=sound-income']}><GenerateInvoices linea="montada_sound"/></MemoryRouter>);
- expect(screen.getByLabelText('Nombre / razón social')).toHaveProperty('value','Empresa evento');
- expect(screen.getByLabelText('Concepto 1')).toHaveProperty('value','Sonido corporativo');
- expect(screen.getByLabelText('Precio 1')).toHaveProperty('value','500');
- expect(screen.getByLabelText('Fecha del evento')).toHaveProperty('value','2026-11-04');
+ expect(screen.queryByLabelText('Nombre / razón social')).toBeNull();
+ fill();
+ expect(screen.queryByLabelText('Relacionar con un ingreso (opcional)')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
+ await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_ingreso_id:null,p_base_imponible:100,p_total:121})));
+ expect(useStore.getState().ingresos[0].id).toBe('sound-income');
+});
+
+it('no restaura vínculos de un borrador Sound antiguo guardado en el navegador',async()=>{
+ const view=render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);fill();view.unmount();
+ const key='mi-espacio:factura-editor:user:montada_sound:nuevo';
+ const cached=JSON.parse(localStorage.getItem(key)!);
+ cached.value.ingresoOrigen='old-income';cached.value.linked='old-income';localStorage.setItem(key,JSON.stringify(cached));
+ useStore.setState({ingresos:[{id:'old-income',lineaNegocio:'montada_sound',total:999}] as never});
+ mocks.rpc.mockResolvedValue({error:null});
+ render(<MemoryRouter><GenerateInvoices linea="montada_sound"/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Crear factura'}));
+ expect(screen.getByRole('button',{name:'Emitir factura'})).toHaveProperty('disabled',false);
+ fireEvent.click(screen.getByRole('button',{name:'Emitir factura'}));
+ await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('emitir_factura_independiente',expect.objectContaining({p_ingreso_id:null,p_total:121})));
 });
