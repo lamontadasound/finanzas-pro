@@ -12,6 +12,7 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RequireLinea, RequireModulo } from './components/guards/RouteGuards';
 
+const MontadaIngresos = lazy(() => import('./pages/lineas/MontadaIngresos').then(m => ({default:m.MontadaIngresos})));
 const SoundCalendar = lazy(() => import('./pages/lineas/SoundCalendar').then(m => ({default:m.SoundCalendar})));
 const DevPreviewLazy = lazy(() => import('./dev/DevPreview').then((m) => ({ default: m.DevPreview })));
 
@@ -182,7 +183,8 @@ export default function App() {
                       <Route path="lineas/montada-sound/resumen"        element={<RequireLinea linea="montada_sound"><MontadaSoundResumen /></RequireLinea>} />
                       <Route path="lineas/montada-sound/resultados" element={<RequireLinea linea="montada_sound"><ResultadosPage soundOnly /></RequireLinea>} />
                       <Route path="lineas/montada-sound/calendario" element={<RequireLinea linea="montada_sound"><SoundCalendar/></RequireLinea>} />
-                      <Route path="lineas/montada-sound/ingresos"       element={<RequireLinea linea="montada_sound"><IngresosPage area="montada" /></RequireLinea>} />
+                      <Route path="lineas/montada-sound/eventos"        element={<RequireLinea linea="montada_sound"><IngresosPage area="montada" tituloOverride="Eventos" /></RequireLinea>} />
+                      <Route path="lineas/montada-sound/ingresos"       element={<RequireLinea linea="montada_sound"><MontadaIngresos /></RequireLinea>} />
                       <Route path="lineas/montada-sound/gastos-eventos" element={<RequireLinea linea="montada_sound"><GastosEventoPage area="montada" /></RequireLinea>} />
                       <Route path="lineas/montada-sound/gastos"         element={<RequireLinea linea="montada_sound"><GastosPage area="montada" /></RequireLinea>} />
                       <Route path="lineas/montada-sound/inversiones"    element={<RequireLinea linea="montada_sound"><InversionesPage area="montada" /></RequireLinea>} />
@@ -228,7 +230,7 @@ export default function App() {
                           ahora protegidas con el mismo guard por línea (antes usaban el
                           AreaKey legado 'montada', que ya no es la fuente de verdad). */}
                       <Route path="montada" element={<Navigate to="/montada/ingresos" replace />} />
-                      <Route path="montada/ingresos"       element={<RequireLinea linea="montada_sound"><IngresosPage area="montada" /></RequireLinea>} />
+                      <Route path="montada/ingresos"       element={<Navigate to="/lineas/montada-sound/eventos" replace />} />
                       <Route path="montada/gastos-eventos" element={<RequireLinea linea="montada_sound"><GastosEventoPage area="montada" /></RequireLinea>} />
                       <Route path="montada/gastos"         element={<RequireLinea linea="montada_sound"><GastosPage area="montada" /></RequireLinea>} />
                       <Route path="montada/beneficio"      element={<RequireLinea linea="montada_sound"><BeneficioPage area="montada" /></RequireLinea>} />

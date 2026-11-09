@@ -11,6 +11,7 @@ import { Plus, Edit2, Trash2, Folder, ChevronRight } from 'lucide-react';
 import { uid } from '../../utils/helpers';
 import { ReservaFields } from '../../components/forms/ReservaFields';
 import { pendienteDe, totalReservasDe } from '../../lib/contabilidad';
+import { EventosSwitch } from '../../components/kit/EventosSwitch';
 import { PageHeader, Metric, Btn, FormGroup, Field, Chips, ToggleCard } from '../../components/kit';
 import { YearGrid, MonthGrid, IngresoRows } from '../../components/ingresos/IngresosViews';
 import { MESES_FULL, ESTADO_LABEL } from '../../components/ingresos/estado';
@@ -345,6 +346,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   const navigate=useNavigate();
   const canInvoice=useAuthStore(s=>s.canEmitirFacturas());
   const invoiceFromIncome=(i:Ingreso)=>navigate(BUSINESS_LINES[lineaDeIngreso(i)].routeBase+'/generar-facturas?ingreso='+encodeURIComponent(i.id));
+  const esEventos = area === 'montada' && !filterLinea;
   const actionsFor = (i: Ingreso) => [
     ...(lineaDeIngreso(i)!=='montada_sound'&&canInvoice&&useAuthStore.getState().canCreateLinea(lineaDeIngreso(i))&&useAuthStore.getState().canViewSeccion(lineaDeIngreso(i),'facturas')?[{label:'Generar factura',onClick:()=>invoiceFromIncome(i)}]:[]),
     ...(canEdit() ? [{ label: 'Editar', icon: <Edit2 size={13} />, onClick: () => openEdit(i) }] : []),
@@ -354,13 +356,14 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
   return (
     <div>
       <PageHeader title={selectedMonth != null && selectedYear != null ? `${MESES_FULL[selectedMonth]} ${selectedYear}` : selectedYear != null ? String(selectedYear) : (tituloOverride ?? 'Ingresos')}>
+        {area === 'montada' && !filterLinea && <EventosSwitch />}
         {area === 'dj' && !isRealMadrid && (
           <button onClick={() => setShowSuplidosListado(true)} className="btn btn-secondary">
             Suplidos por cobrar <span className={`num ${totalSuplidosPendientes > 0 ? 'text-[#c26a00]' : ''}`}>{fmt(totalSuplidosPendientes)}</span>
           </button>
         )}
         {canCreate() && (
-          <Btn variant="primary" onClick={openNew}><Plus size={16} strokeWidth={2.4} />Nuevo ingreso</Btn>
+          <Btn variant="primary" onClick={openNew}><Plus size={16} strokeWidth={2.4} />{esEventos ? 'Nuevo evento' : 'Nuevo ingreso'}</Btn>
         )}
       </PageHeader>
 
@@ -380,8 +383,8 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
 
       {selectedYear == null && (
         resumenAnios.length === 0
-          ? <EmptyState icon={<Folder size={22} />} title="Sin ingresos registrados todavía" />
-          : <YearGrid years={resumenAnios} onOpen={(y) => { setSelectedYear(y); setSelectedMonth(null); }} />
+          ? <EmptyState icon={<Folder size={22} />} title={esEventos ? "Sin eventos registrados todavía" : "Sin ingresos registrados todavía"} />
+          : <YearGrid years={resumenAnios} onOpen={(y) => { setSelectedYear(y); setSelectedMonth(null); }} unit={esEventos ? ['evento', 'eventos'] : undefined} />
       )}
 
       {selectedYear != null && selectedMonth == null && (
@@ -392,7 +395,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
             <Metric label="Por cobrar" value={pendienteAnio} delay={0.06} tone={pendienteAnio > 0 ? 'warning' : 'neutral'} />
             <Metric label="Eventos" value={countAnio} kind="count" delay={0.09} />
           </div>
-          <MonthGrid year={selectedYear} months={resumenMeses} onOpen={setSelectedMonth} />
+          <MonthGrid year={selectedYear} months={resumenMeses} onOpen={setSelectedMonth} emptyLabel={esEventos ? 'Sin eventos' : undefined} />
         </>
       )}
 
@@ -405,7 +408,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
             <Metric label="Por cobrar" value={enElMes.reduce((a, i) => a + pendienteDe(i), 0)} delay={0.09} />
           </div>
           {filtered.length === 0
-            ? <EmptyState icon={<Folder size={22} />} title="Sin ingresos este mes" />
+            ? <EmptyState icon={<Folder size={22} />} title={esEventos ? "Sin eventos este mes" : "Sin ingresos este mes"} />
             : <IngresoRows
                 items={filtered}
                 gastosEvento={allGastosEvento}
@@ -418,7 +421,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
 
       {detailIngreso&&<IngresoRentabilidad onGenerateInvoice={lineaDeIngreso(detailIngreso)!=='montada_sound'&&canInvoice&&useAuthStore.getState().canCreateLinea(lineaDeIngreso(detailIngreso))&&useAuthStore.getState().canViewSeccion(lineaDeIngreso(detailIngreso),'facturas')?()=>invoiceFromIncome(detailIngreso):undefined} ingreso={detailIngreso} gastos={allGastosEvento} onClose={()=>setDetailId(null)} onAddExpense={canCreate()?()=>{setDetailId(null);openGasto(detailIngreso);}:undefined}/>}
       {/* Modal edición */}
-      <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar evento' : 'Nuevo ingreso'} size="lg">
+      <Modal isOpen={showModal} onClose={closeModal} title={editing ? 'Editar evento' : esEventos ? 'Nuevo evento' : 'Nuevo ingreso'} size="lg">
         <FormGroup title="Evento">
           <Field label="Concepto" wide>
             <input value={form.concepto ?? ''} onChange={(e) => setField('concepto', e.target.value)} className="input-form" placeholder="Boda Laura y Pablo" />

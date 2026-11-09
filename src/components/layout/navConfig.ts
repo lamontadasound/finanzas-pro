@@ -13,6 +13,7 @@ export const ALL_NAV_TITLES: { to: string; label: string; end?: boolean }[] = [
   {to:'/lineas/installations/pagos',label:'Installations · Pagos'},
   { to: '/', label: 'Resumen', end: true },
   { to: '/lineas/montada-sound/resumen',        label: 'La Montada Sound · Resumen' },
+  { to: '/lineas/montada-sound/eventos',        label: 'La Montada Sound · Eventos' },
   { to: '/lineas/montada-sound/ingresos',       label: 'La Montada Sound · Ingresos' },
   { to: '/lineas/montada-sound/gastos-eventos', label: 'La Montada Sound · Gastos de eventos' },
   { to: '/lineas/montada-sound/gastos',         label: 'La Montada Sound · Gastos generales' },

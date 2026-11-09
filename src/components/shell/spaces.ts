@@ -54,7 +54,7 @@ export const SPACES: Space[] = [
     home: `${montada}/resumen`, prefixes: [montada, '/montada/'],
     items: [
       { to: `${montada}/resumen`, label: 'Resumen', icon: LayoutGrid },
-      { to: `${montada}/calendario`, label: 'Calendario', icon: CalendarDays },
+      { to: `${montada}/eventos`, label: 'Eventos', icon: CalendarDays, alsoActive: [`${montada}/calendario`] },
       { to: `${montada}/ingresos`, label: 'Ingresos', icon: ArrowDownLeft },
       { to: `${montada}/gastos-eventos`, label: 'Gastos', icon: Receipt, alsoActive: [`${montada}/gastos`] },
       { to: `${montada}/clientes`, label: 'Clientes', icon: Contact, alsoActive: [`${montada}/crm`] },

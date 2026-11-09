@@ -18,6 +18,7 @@ export const LINEA_NAV_ITEMS: Record<LineaId, LineaNavItem[]> = {
     {to:"/lineas/montada-sound/crm",label:"CRM",icon:Users},
     {to:"/lineas/montada-sound/clientes",label:"Clientes",icon:Users},
     { to: '/lineas/montada-sound/resumen',       label: 'Resumen',          icon: LayoutDashboard },
+    { to: '/lineas/montada-sound/eventos',       label: 'Eventos',          icon: TrendingUp },
     { to: '/lineas/montada-sound/ingresos',      label: 'Ingresos',         icon: TrendingUp },
     { to: '/lineas/montada-sound/gastos-eventos', label: 'Gastos de eventos', icon: Calendar },
     { to: '/lineas/montada-sound/gastos',        label: 'Gastos generales', icon: Wallet },
