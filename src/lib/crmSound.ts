@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 import type { Cliente } from '../types';
 export const ETAPAS = {contacto:'Contacto',propuesta:'Propuesta enviada',negociacion:'Negociación',ganado:'Ganado',perdido:'Perdido'} as const;
-export const SERVICIOS_CRM={sin_clasificar:'Sin clasificar',alquiler:'Alquiler',boda:'Boda',corporativo:'Evento corporativo',privado:'Evento privado',otro:'Otro servicio'} as const;
+export const SERVICIOS_CRM={sin_clasificar:'Sin clasificar',alquiler:'Alquiler',boda:'Boda',corporativo:'Evento corporativo',privado:'Evento privado',otro:'Otro'} as const;
+export const SERVICIOS_OFRECIDOS=['Casino','Horas extra','DJ solo','Pack montaje completo','Sonorización','Pack + sonorización','Pantallas LED'];
 export const ORIGENES_CRM=['Instagram','Web','WhatsApp','Recomendación','Email','Llamada','Cliente recurrente','Otro'];
 export const CATEGORIAS = {informacion:'Información y listados',contrato:'Contratos',presupuesto:'Presupuestos',factura:'Facturas'} as const;
 export type CategoriaCRM = keyof typeof CATEGORIAS;
