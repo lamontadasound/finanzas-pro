@@ -1,4 +1,5 @@
-import {Plus} from 'lucide-react';
+import {Plus,ChevronDown} from 'lucide-react';
+const VISIBLES=8;
 import {motion} from 'framer-motion';
 import {PageHeader,YearStepper,Btn,Metric,Widget,Pill,Segmented,FormGroup,Field,Chips} from '../../components/kit';
 import {ClientesSwitch} from '../../components/kit/ClientesSwitch';
@@ -19,7 +20,8 @@ export function SoundProspects(){
  const [form,setForm]=useState<Lead|null>(null),[newRow,setNewRow]=useState(false),[deleting,setDeleting]=useState<Lead|null>(null);
  const [hasServicios,setHasServicios]=useState(false);
  useEffect(()=>{let active=true;void supabase.from('sound_leads').select('servicios_ofrecidos').limit(1).then(({error:e})=>{if(active)setHasServicios(!e);});return()=>{active=false;};},[]);
- const [folder,setFolder]=useState('todos'),[year,setYear]=useState(new Date().getFullYear());
+ const [folder,setFolder]=useState('todos'),[year,setYear]=useState(new Date().getFullYear()),[expanded,setExpanded]=useState(false);
+ useEffect(()=>setExpanded(false),[folder,year]);
  useEffect(()=>{let active=true;void supabase.from('sound_leads').select('*').eq('eliminado',false).order('fecha',{ascending:false}).then(({data,error:e})=>{if(active){if(e)setError(e.message);else{setRows(data??[]);setYear(defaultYear([...new Set((data??[]).map((r:Lead)=>Number(r.fecha.slice(0,4))).filter(Boolean))]));}setLoading(false);}});return()=>{active=false;};},[]);
  const save=async()=>{if(!form)return;setBusy(true);setError('');try{if(!form.nombre.trim()||!form.fecha||!form.canal.trim())throw Error('Completa nombre, canal y fecha de entrada.');if(form.estado==='no_convertido'&&!form.motivo.trim())throw Error('Indica el motivo de no conversión.');if(form.primer_contacto&&form.primer_contacto<form.fecha)throw Error('El primer contacto no puede ser anterior a la solicitud.');if(form.ultimo_contacto&&form.primer_contacto&&form.ultimo_contacto<form.primer_contacto)throw Error('El último contacto no puede ser anterior al primero.');const {servicios_ofrecidos,...base}=form;const payload={...base,...(hasServicios?{servicios_ofrecidos:servicios_ofrecidos??[]}:{}),nombre:form.nombre.trim(),canal:form.canal.trim(),cierre:form.estado==='pendiente'?null:form.cierre||new Date().toISOString().slice(0,10)};const result=newRow?await supabase.from('sound_leads').insert(payload).select().single():await supabase.from('sound_leads').update(payload).eq('id',form.id).select().single();if(result.error)throw result.error;setRows(old=>newRow?[result.data,...old]:old.map(r=>r.id===form.id?result.data:r));setForm(null);}catch(e){setError(e instanceof Error?e.message:'No se pudo guardar');}finally{setBusy(false);}};
  const deleteRow=async()=>{if(!deleting)return;setBusy(true);setError('');const {error:e,data}=await supabase.from('sound_leads').delete().eq('id',deleting.id).select('id');if(e||!data?.length)setError(e?.message||'No se pudo borrar con tus permisos.');else{setRows(old=>old.filter(r=>r.id!==deleting.id));setDeleting(null);}setBusy(false);};
@@ -76,7 +78,7 @@ export function SoundProspects(){
     <Segmented id="crm-estado" value={folder} onChange={setFolder} options={[['todos','Todos'],['pendiente','Pendientes'],['convertido','Convertidos'],['no_convertido','No convertidos']].map(([v,l])=>({value:v,label:<>{l} <span className="text-ink-3 num">{yearScope.filter(r=>v==='todos'||r.estado===v).length}</span></>}))}/>
    </div>
    <div className="span-full widget" style={{padding:0}}>
-    {list.length===0?<p className="p-6 text-ink-3">No hay contactos aquí.</p>:list.map((r,i)=>{const st=r.estado==='convertido'?'positive':r.estado==='no_convertido'?'negative':'warning';const days=responseDays(r);return <motion.button key={r.id} onClick={()=>open(r)} className="list-row"
+    {list.length===0?<p className="p-6 text-ink-3">No hay contactos aquí.</p>:(expanded?list:list.slice(0,VISIBLES)).map((r,i)=>{const st=r.estado==='convertido'?'positive':r.estado==='no_convertido'?'negative':'warning';const days=responseDays(r);return <motion.button key={r.id} onClick={()=>open(r)} className="list-row"
      initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{type:'spring',bounce:0,duration:.45,delay:Math.min(i,12)*.02}}>
      <ClientAvatar name={r.nombre}/>
      <span className="list-main"><b>{r.nombre}</b><small>{[r.canal||'Sin canal',r.contacto&&`atiende ${r.contacto}`,SERVICIOS_CRM[r.servicio as keyof typeof SERVICIOS_CRM]||r.servicio,r.fecha_evento&&`evento ${r.fecha_evento}`].filter(Boolean).join(' · ')}</small></span>
@@ -84,6 +86,8 @@ export function SoundProspects(){
      {r.precio_acordado!=null&&<span className="list-amount num hidden sm:flex">{fmtShort(Number(r.precio_acordado))}</span>}
      <Pill tone={st}>{({pendiente:'Pendiente',convertido:'Convertido',no_convertido:'No convertido'} as const)[r.estado]}</Pill>
     </motion.button>;})}
+    {list.length>VISIBLES&&<button type="button" onClick={()=>setExpanded(x=>!x)} aria-expanded={expanded} className="w-full py-3.5 text-[14px] font-medium text-ink-2 hover:text-ink border-t border-black/[.06] flex items-center justify-center gap-1.5">
+     {expanded?'Ver menos':`Ver los ${list.length-VISIBLES} restantes`}<ChevronDown size={16} className={expanded?'rotate-180 transition-transform':'transition-transform'}/></button>}
    </div>
   </div>}
  <Modal isOpen={!!form} onClose={()=>!busy&&setForm(null)} title={newRow?'Nuevo contacto CRM':'Ficha CRM'} size="lg">{form&&<form onSubmit={e=>{e.preventDefault();void save();}}>
