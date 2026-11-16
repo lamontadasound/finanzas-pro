@@ -33,6 +33,9 @@ export function SoundProspects(){
  const contar=(xs:string[])=>[...xs.reduce((m,x)=>m.set(x,(m.get(x)??0)+1),new Map<string,number>()).entries()].sort((a,b)=>b[1]-a[1]);
  const pedidos=hasServicios&&yearScope.some(r=>(r.servicios_ofrecidos??[]).length)?contar(yearScope.flatMap(r=>r.servicios_ofrecidos??[])).slice(0,7):contar(yearScope.map(r=>SERVICIOS_CRM[r.servicio as keyof typeof SERVICIOS_CRM]??r.servicio)).slice(0,7);
  const maxPedido=Math.max(1,...pedidos.map(([,n])=>n));
+ const equipo=[...new Set(['Julia','Rodrigo',...rows.map(r=>r.contacto.trim()).filter(Boolean)])];
+ const porPersona=[...yearScope.reduce((m,r)=>{const p=r.contacto.trim()||'Sin asignar';const g=m.get(p)??{persona:p,total:0,cerrados:0,importe:0};g.total++;if(r.estado==='convertido'){g.cerrados++;g.importe+=Number(r.precio_acordado??0);}return m.set(p,g);},new Map<string,{persona:string;total:number;cerrados:number;importe:number}>()).values()].sort((a,b)=>(a.persona==='Sin asignar'?1:0)-(b.persona==='Sin asignar'?1:0)||b.cerrados-a.cerrados||b.total-a.total);
+ const maxPersona=Math.max(1,...porPersona.map(p=>p.total));
  const open=(r:Lead)=>{setNewRow(false);setForm({...r});setError('');};
  return <div>
   <PageHeader title="Clientes">
@@ -62,6 +65,13 @@ export function SoundProspects(){
     {!hasServicios&&<p className="text-[12.5px] text-ink-3 mt-4">Por tipo de evento. Cuando se active el campo Servicio, se verá también qué servicios piden.</p>}
    </Widget>
 
+   <Widget className="span-full" title="Quién cierra más" delay={0.16}>
+    {porPersona.length===0?<p className="text-ink-3 text-[14px]">Sin contactos este año.</p>:<div className="grid gap-x-8 gap-y-3.5 sm:grid-cols-2">{porPersona.map(p=><div key={p.persona}>
+     <div className="flex justify-between gap-3 text-[14px] mb-1.5"><span className={"whitespace-nowrap "+(p.persona==='Sin asignar'?"text-ink-3":"font-medium")}>{p.persona}</span><span className="text-ink-3 text-right"><b className="text-ink num">{p.cerrados}</b> cerrados de {p.total} · {Math.round(100*p.cerrados/p.total)}%{p.importe>0&&<> · <span className="num">{fmtShort(p.importe)}</span></>}</span></div>
+     <div className="h-2.5 rounded-full bg-black/[.05] overflow-hidden flex"><motion.span className="h-full" style={{background:'var(--tint-a)'}} initial={{width:0}} animate={{width:`${100*p.cerrados/maxPersona}%`}} transition={{type:'spring',bounce:0,duration:.8}}/><motion.span className="h-full" style={{background:'color-mix(in srgb, var(--tint-b) 35%, #fff)'}} initial={{width:0}} animate={{width:`${100*(p.total-p.cerrados)/maxPersona}%`}} transition={{type:'spring',bounce:0,duration:.8,delay:.05}}/></div>
+    </div>)}</div>}
+   </Widget>
+
    <div className="span-full mt-2 flex items-center justify-between gap-3 flex-wrap">
     <Segmented id="crm-estado" value={folder} onChange={setFolder} options={[['todos','Todos'],['pendiente','Pendientes'],['convertido','Convertidos'],['no_convertido','No convertidos']].map(([v,l])=>({value:v,label:<>{l} <span className="text-ink-3 num">{yearScope.filter(r=>v==='todos'||r.estado===v).length}</span></>}))}/>
    </div>
@@ -69,7 +79,7 @@ export function SoundProspects(){
     {list.length===0?<p className="p-6 text-ink-3">No hay contactos aquí.</p>:list.map((r,i)=>{const st=r.estado==='convertido'?'positive':r.estado==='no_convertido'?'negative':'warning';const days=responseDays(r);return <motion.button key={r.id} onClick={()=>open(r)} className="list-row"
      initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{type:'spring',bounce:0,duration:.45,delay:Math.min(i,12)*.02}}>
      <ClientAvatar name={r.nombre}/>
-     <span className="list-main"><b>{r.nombre}</b><small>{[r.canal||'Sin canal',SERVICIOS_CRM[r.servicio as keyof typeof SERVICIOS_CRM]||r.servicio,r.fecha_evento&&`evento ${r.fecha_evento}`].filter(Boolean).join(' · ')}</small></span>
+     <span className="list-main"><b>{r.nombre}</b><small>{[r.canal||'Sin canal',r.contacto&&`atiende ${r.contacto}`,SERVICIOS_CRM[r.servicio as keyof typeof SERVICIOS_CRM]||r.servicio,r.fecha_evento&&`evento ${r.fecha_evento}`].filter(Boolean).join(' · ')}</small></span>
      <span className="hidden sm:flex flex-col items-end text-[12.5px] text-ink-3 mr-2"><span>Entró {r.fecha}</span>{days!=null&&<span>Respuesta {days} d</span>}</span>
      {r.precio_acordado!=null&&<span className="list-amount num hidden sm:flex">{fmtShort(Number(r.precio_acordado))}</span>}
      <Pill tone={st}>{({pendiente:'Pendiente',convertido:'Convertido',no_convertido:'No convertido'} as const)[r.estado]}</Pill>
@@ -80,7 +90,9 @@ export function SoundProspects(){
  <fieldset disabled={busy||(!newRow&&!edit)}>
  <FormGroup title="Contacto">
   <Field label="Nombre" wide><input required className="input-form" value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}/></Field>
-  <Field label="Persona de contacto"><input className="input-form" value={form.contacto} onChange={e=>setForm({...form,contacto:e.target.value})}/></Field>
+  <div className="field field-wide"><span className="field-label">Atendido por (La Montada)</span>
+   <div className="flex flex-wrap items-center gap-2"><Chips label="Atendido por" value={form.contacto} onChange={v=>setForm({...form,contacto:v})} options={equipo.map(p=>({value:p,label:p}))}/>
+   <input aria-label="Otra persona" placeholder="Otra persona…" className="input-form max-w-[180px]" value={equipo.includes(form.contacto)?'':form.contacto} onChange={e=>setForm({...form,contacto:e.target.value})}/></div></div>
   <Field label="Teléfono"><input type="tel" className="input-form" value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}/></Field>
   <Field label="Email"><input type="email" className="input-form" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></Field>
   <Field label="NIF/CIF"><input className="input-form" value={form.nif} onChange={e=>setForm({...form,nif:e.target.value})}/></Field>
