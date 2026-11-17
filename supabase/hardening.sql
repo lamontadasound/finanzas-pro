@@ -279,9 +279,6 @@ CREATE OR REPLACE FUNCTION public.protect_invoiced_income() RETURNS trigger LANG
 BEGIN
  IF EXISTS(SELECT 1 FROM public.facturas WHERE ingreso_id=OLD.id AND numero_secuencial IS NOT NULL) THEN
   IF TG_OP='DELETE' THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='No se puede borrar un ingreso con facturas emitidas.'; END IF;
-  IF NEW.linea_negocio IS DISTINCT FROM OLD.linea_negocio OR NEW.area IS DISTINCT FROM OLD.area OR NEW.base_imponible IS DISTINCT FROM OLD.base_imponible OR NEW.porcentaje_iva IS DISTINCT FROM OLD.porcentaje_iva OR NEW.total IS DISTINCT FROM OLD.total OR NEW.cliente IS DISTINCT FROM OLD.cliente THEN
-   RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='Un ingreso facturado conserva su cliente, importes y línea. Rectifica sus facturas antes de ajustar la operación.';
-  END IF;
  END IF;
  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
 END $$;
