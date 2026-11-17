@@ -10,7 +10,7 @@ import { AppleSwitch } from '../../components/unlumen-ui/apple-switch';
 
 
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Download, Trash2 } from 'lucide-react';
+import { Plus, Download, Trash2, Check, X } from 'lucide-react';
 import { BUSINESS_LINES, type LineaId } from '../../config/businessLines';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useConfirmStore } from '../../store/useConfirmStore';
@@ -18,7 +18,18 @@ import { Button2 } from '../../components/ui2/Button';
 import { conceptosDesdeTexto, MARCA_MONTADA, dinero, nuevoPresupuesto, referenciaPresupuesto, totalesPresupuesto, validarPresupuesto, type Presupuesto, type PresupuestoContenido } from '../../lib/presupuestos';
 import { listarPresupuestos, guardarPresupuesto, eliminarPresupuesto } from '../../lib/presupuestosDb';
 
-const estados = { borrador: 'Borrador', pendiente: 'Pendiente de respuesta', aceptado: 'Aceptado', rechazado: 'Rechazado' };
+const estados = { borrador: 'Borrador', pendiente: 'Pendiente de respuesta', aceptado: 'Aceptado', rechazado: 'No aceptado' };
+const tonoEstado = { borrador: 'neutral', pendiente: 'warning', aceptado: 'positive', rechazado: 'negative' } as const;
+type Respuesta = 'aceptado' | 'rechazado';
+function BotonesRespuesta({ estado, disabled, onChange }: { estado: PresupuestoContenido['estado']; disabled?: boolean; onChange: (e: PresupuestoContenido['estado']) => void }) {
+  const btn = (valor: Respuesta, label: string, Icon: typeof Check) => {
+    const on = estado === valor;
+    return <button type="button" disabled={disabled} aria-pressed={on} title={on ? 'Quitar marca' : `Marcar como ${label.toLowerCase()}`}
+      onClick={e => { e.stopPropagation(); onChange(on ? 'pendiente' : valor); }}
+      className={`quote-answer quote-answer-${valor}${on ? ' is-on' : ''}`}><Icon size={14} strokeWidth={2.6}/>{label}</button>;
+  };
+  return <span className="quote-answers" role="group" aria-label="Respuesta del cliente">{btn('aceptado', 'Aceptado', Check)}{btn('rechazado', 'No aceptado', X)}</span>;
+}
 export function PresupuestosPage({ linea }: { linea: LineaId }) {
   const userId=useAuthStore(s=>s.user?.id);
   if(linea !== 'montada_sound' && linea !== 'montada_installations') return <p role="status">Los presupuestos están disponibles en La Montada Sound e Installations.</p>;
@@ -96,6 +107,12 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
     }
     catch (e) { setError(e instanceof Error ? e.message : 'No se pudo generar el PDF. Inténtalo de nuevo.'); } finally { setBusy(false); }
   };
+  const marcar = async (p: Presupuesto, estado: PresupuestoContenido['estado']) => {
+    if (!canEdit || busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try { const n = await guardarPresupuesto(linea, { ...p.contenido, estado }, p); setItems(old => old.map(x => x.id === n.id ? n : x)); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
   const remove = (p: Presupuesto) => showConfirm(`¿Eliminar ${referenciaPresupuesto(p)}?`, async () => {
     setBusy(true); setError('');
     try { await eliminarPresupuesto(p); setItems(old => old.filter(x => x.id !== p.id)); setForm(null); setEditing(null); setDirty(false); }
@@ -112,7 +129,7 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
     {draftError&&<p role="alert" className="quotes-error">{draftError}</p>}
     {error && !form && <div role="alert" className="quotes-error">{error}{!form && <button onClick={() => { setError(''); setLoading(true); setReload(n => n + 1); }}>Reintentar</button>}</div>}
     {notice && !form && <p role="status" className="quotes-notice">{notice}</p>}
-    {loading?<p role="status">Cargando presupuestos…</p>:<DocumentArchive items={items} date={p=>p.contenido.fecha} total={p=>totalesPresupuesto(p.contenido).base} unit={['presupuesto','presupuestos']} render={p=><button key={p.id} className="list-row w-full text-left" onClick={()=>open(p)}><span className="list-main"><b>{p.contenido.cliente||p.contenido.titulo}</b><small>{referenciaPresupuesto(p)} · {p.contenido.fecha}</small></span><span className="text-right"><Pill>{estados[p.contenido.estado]}</Pill><strong className="block mt-1">{dinero(totalesPresupuesto(p.contenido).base)}</strong></span></button>}/>}
+    {loading?<p role="status">Cargando presupuestos…</p>:<DocumentArchive items={items} date={p=>p.contenido.fecha} total={p=>totalesPresupuesto(p.contenido).base} unit={['presupuesto','presupuestos']} render={p=><div key={p.id} className="list-row quote-row"><button type="button" className="quote-row-open" onClick={()=>open(p)}><span className="list-main"><b>{p.contenido.cliente||p.contenido.titulo}</b><small>{referenciaPresupuesto(p)} · {p.contenido.fecha}</small></span><span className="text-right"><Pill tone={tonoEstado[p.contenido.estado]}>{estados[p.contenido.estado]}</Pill><strong className="block mt-1">{dinero(totalesPresupuesto(p.contenido).base)}</strong></span></button>{canEdit&&<BotonesRespuesta estado={p.contenido.estado} disabled={busy} onChange={e=>void marcar(p,e)}/>}</div>}/>}
     <Modal isOpen={!!form} onClose={close} title={editing?'Editar presupuesto':'Crear presupuesto'} size="xl">{form&&<div className="quotes-page quotes-workspace">
     {error&&<p role="alert" className="quotes-error">{error}</p>}{notice&&<p role="status">{notice}</p>}
       <div className="quotes-editor">
@@ -154,7 +171,7 @@ function PresupuestosEditor({ linea }: { linea: LineaId }) {
           {photoBusy && <p role="status">Preparando la foto…</p>}
           {form.fotoMontaje && <figure className="quote-montaje"><img src={form.fotoMontaje.dataUrl} alt="Foto del montaje incluida en el presupuesto"/><figcaption>{form.fotoMontaje.nombre}</figcaption>{writable && <Button2 disabled={busy || photoBusy} variant="ghost" onClick={() => change({fotoMontaje:undefined})}>Quitar foto</Button2>}</figure>}
           <p className="quotes-help">La foto se guarda al pulsar «Guardar presupuesto».</p>
-        </section><aside className="quotes-panel quotes-summary" aria-label="Resumen del presupuesto"><p className="quotes-eyebrow">{editing ? referenciaPresupuesto(editing) : 'Nuevo presupuesto'}</p><h2>{form.titulo || 'Tu propuesta'}</h2><p>{form.cliente || 'Cliente pendiente'}</p><div className="quote-summary-rule"/><span>Total sin IVA{totals!.pendientes > 0 ? ' · parcial' : ''}</span><strong className="quote-total"><FinancialDigits value={dinero(totals!.base)}/></strong><dl><div><dt>IVA ({form.iva}%)</dt><dd>{dinero(totals!.iva)}</dd></div><div><dt>Total con IVA</dt><dd>{dinero(totals!.total)}</dd></div></dl>{totals!.pendientes > 0 && <p className="quotes-help">{totals!.pendientes} concepto(s) con precio pendiente.</p>}<div className="quotes-actions">{writable && <Button2 loading={busy || photoBusy} variant="primary" onClick={() => void save()}>Guardar presupuesto</Button2>}<Button2 disabled={busy || photoBusy} icon={<Download size={16}/>} onClick={() => void pdf()}>Descargar PDF</Button2>{editing && canDelete && <Button2 disabled={busy || photoBusy} variant="ghost" onClick={() => remove(editing)}>Eliminar presupuesto</Button2>}</div><p className="quotes-help">Numeración automática y única. Borrador recuperable en este navegador. Guardar lo guarda en la app; el PDF queda archivado al descargarlo.</p></aside></div>
+        </section><aside className="quotes-panel quotes-summary" aria-label="Resumen del presupuesto"><p className="quotes-eyebrow">{editing ? referenciaPresupuesto(editing) : 'Nuevo presupuesto'}</p><h2>{form.titulo || 'Tu propuesta'}</h2><p>{form.cliente || 'Cliente pendiente'}</p><div className="quote-summary-rule"/><span>Total sin IVA{totals!.pendientes > 0 ? ' · parcial' : ''}</span><strong className="quote-total"><FinancialDigits value={dinero(totals!.base)}/></strong><dl><div><dt>IVA ({form.iva}%)</dt><dd>{dinero(totals!.iva)}</dd></div><div><dt>Total con IVA</dt><dd>{dinero(totals!.total)}</dd></div></dl>{totals!.pendientes > 0 && <p className="quotes-help">{totals!.pendientes} concepto(s) con precio pendiente.</p>}<p className="quotes-help" style={{marginTop:12}}>¿Lo ha aceptado el cliente?</p><BotonesRespuesta estado={form.estado} disabled={!writable || busy} onChange={e => change({ estado: e })}/><div className="quotes-actions">{writable && <Button2 loading={busy || photoBusy} variant="primary" onClick={() => void save()}>Guardar presupuesto</Button2>}<Button2 disabled={busy || photoBusy} icon={<Download size={16}/>} onClick={() => void pdf()}>Descargar PDF</Button2>{editing && canDelete && <Button2 disabled={busy || photoBusy} variant="ghost" onClick={() => remove(editing)}>Eliminar presupuesto</Button2>}</div><p className="quotes-help">Numeración automática y única. Borrador recuperable en este navegador. Guardar lo guarda en la app; el PDF queda archivado al descargarlo.</p></aside></div>
     </div>}</Modal>
   </div>;
 }

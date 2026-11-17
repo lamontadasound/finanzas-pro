@@ -721,3 +721,15 @@ html, body { background: #fff; }
 .finance-page button.bg-gold-500:hover, .finance-modal button.bg-gold-500:hover { filter: brightness(1.06); }
 .finance-modal button.bg-gold-500 { background: #111114 !important; color: #fff !important; box-shadow: none; }
 .finance-page button.border-gray-200 { border-radius: 99px; }
+
+/* Presupuestos: respuesta del cliente */
+.quote-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.quote-row-open { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
+.quote-answers { display: inline-flex; gap: 6px; flex-shrink: 0; }
+.quote-answer { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-2, #55555c); background: rgb(0 0 0 / .045); border: 0; cursor: pointer; transition: background .15s, color .15s, transform .1s; }
+.quote-answer:hover:not(:disabled) { background: rgb(0 0 0 / .08); }
+.quote-answer:active:not(:disabled) { transform: scale(.96); }
+.quote-answer:disabled { opacity: .5; cursor: default; }
+.quote-answer-aceptado.is-on { background: #1f9d4c; color: #fff; }
+.quote-answer-rechazado.is-on { background: #d93a2e; color: #fff; }
+.quotes-summary .quote-answers { margin: 6px 0 4px; }
