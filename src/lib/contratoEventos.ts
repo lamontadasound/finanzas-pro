@@ -231,7 +231,24 @@ export function contratoEventosPdf(c: ContratoEventos, emisor: EmisorContrato, r
     const size = opts.size ?? 9.6;
     d.setFont('helvetica', opts.bold ? 'bold' : 'normal'); d.setFontSize(size); d.setTextColor(...(opts.color ?? [28, 28, 28] as const));
     const lh = size * 0.47;
-    for (const line of d.splitTextToSize(value, W) as string[]) { if (y > BOTTOM) next(); d.text(line, X, y); y += lh; }
+    // Texto justificado: cada línea ocupa todo el ancho, salvo la última de
+    // cada párrafo (o antes de un salto de línea), que va alineada a la izquierda.
+    for (const parrafo of value.split('\n')) {
+      const lines = d.splitTextToSize(parrafo, W) as string[];
+      lines.forEach((line, i) => {
+        if (y > BOTTOM) next();
+        const words = line.trim().split(/\s+/);
+        const last = i === lines.length - 1;
+        if (last || words.length < 2) { d.text(line.trim(), X, y); }
+        else {
+          const libre = W - words.reduce((a, w) => a + d.getTextWidth(w), 0);
+          const hueco = libre / (words.length - 1);
+          let x = X;
+          for (const w of words) { d.text(w, x, y); x += d.getTextWidth(w) + hueco; }
+        }
+        y += lh;
+      });
+    }
     y += opts.gap ?? 2.4;
   };
   const titulo = (t: string) => { if (y > BOTTOM - 22) next(); y += 1.5; text(t, { bold: true, size: 10, gap: 1.6, color: brown }); };
