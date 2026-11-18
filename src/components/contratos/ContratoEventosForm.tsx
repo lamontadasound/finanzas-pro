@@ -37,9 +37,6 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
         <Field label="Fecha del evento"><input type="date" className="input-form" value={c.fechaEvento} onChange={(e) => set('fechaEvento', e.target.value)} /></Field>
         <Field label="Último día (si dura varios)" hint="Déjalo vacío si es un solo día"><input type="date" className="input-form" min={c.fechaEvento || undefined} value={c.fechaFin} onChange={(e) => set('fechaFin', e.target.value)} /></Field>
         {txt('tipoYAsistentes', 'Tipo de evento y nº de invitados', { wide: true, placeholder: boda ? 'Boda · 180 invitados' : 'Cena de empresa · 250 asistentes' })}
-        {boda
-          ? txt('contrayentes', 'Novios', { wide: true, placeholder: 'Nombre y nombre' })
-          : txt('contrayentes', 'Personas homenajeadas (si las hay)', { wide: true })}
         {txt('recinto', 'Recinto, dirección y espacio de instalación', { wide: true, placeholder: 'Finca El Olivar, Ctra. M-501 km 10 · jardín y salón' })}
         {txt('responsableRecinto', 'Responsable del recinto (nombre, teléfono, correo)', { wide: true })}
       </FormGroup>
@@ -54,10 +51,9 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
       </FormGroup>
 
       <FormGroup title="Servicios">
-        {txt('presupuestoRef', 'Presupuesto adjunto', { wide: true, placeholder: 'PRE-00052 del 11/11/2026' })}
+        {txt('presupuestoRef', 'Presupuesto adjunto (referencia, fecha y versión)', { wide: true, placeholder: 'PRE-00052 · 11/11/2026 · v1' })}
         {txt('servicios', 'Servicios y equipos contratados', { wide: true, rows: 4, placeholder: 'Sonorización ceremonia y cóctel, pack montaje completo, DJ…' })}
         {txt('personal', 'Personal incluido')}
-        {txt('extras', 'Extras aceptados (con importe)')}
       </FormGroup>
 
       <FormGroup title="Precio y pago">
@@ -77,9 +73,7 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
 
       <FormGroup title="Personas de contacto">
         {txt('interlocutor', 'Interlocutor del cliente el día del evento', { wide: true, placeholder: 'Nombre y teléfono' })}
-        {txt('autorizado', 'Quién puede aprobar extras', { placeholder: 'Vacío = solo el cliente' })}
-        {txt('limiteAutorizado', 'Hasta cuánto (€ con IVA)')}
-        {txt('contactoMontada', 'Contacto de La Montada', { wide: true, placeholder: 'Nombre, teléfono y correo' })}
+        {txt('autorizado', 'Quién puede aprobar cambios y extras', { wide: true, placeholder: 'Nombre, teléfono y correo · vacío = solo el cliente' })}
       </FormGroup>
 
       <details className="fgroup">
@@ -106,7 +100,6 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
       <FormGroup title="Otras condiciones y firma">
         {txt('particulares', 'Condiciones particulares (opcional)', { wide: true, rows: 3, hint: 'Se añaden al Anexo I y prevalecen sobre las generales' })}
         {txt('firmante', 'Firma por La Montada')}
-        {txt('cargoFirmante', 'En calidad de', { placeholder: 'Ej. administradora' })}
         {txt('lugarFirma', 'Lugar de firma')}
         <Field label="Fecha de firma"><input type="date" className="input-form" value={c.fechaFirma} onChange={(e) => set('fechaFirma', e.target.value)} /></Field>
       </FormGroup>

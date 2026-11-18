@@ -22,11 +22,19 @@ describe('contrato de eventos y bodas', () => {
     expect(c2).toContain('IBAN ____');
   });
 
-  it('boda muestra contrayentes; evento solo si hay homenajeados', () => {
-    const boda = anexoContrato({ ...base(), tipoEvento: 'boda', contrayentes: 'Ana y Luis' }).flatMap((b) => b.lineas).join(' ');
-    expect(boda).toContain('Contrayentes: Ana y Luis');
-    const ev = anexoContrato({ ...base(), tipoEvento: 'evento' }).flatMap((b) => b.lineas).join(' ');
-    expect(ev).not.toContain('Contrayentes');
+  it('anexo del modelo v2: autorizado por defecto y particulares solo si hay', () => {
+    const a = anexoContrato(base()).flatMap((b) => b.lineas).join(' ');
+    expect(a).toContain('solo el Cliente');
+    expect(a).not.toContain('INVENTARIO');
+    expect(anexoContrato(base()).some((b) => b.titulo === 'CONDICIONES PARTICULARES')).toBe(false);
+    expect(anexoContrato({ ...base(), particulares: 'Montaje el día antes' }).some((b) => b.titulo === 'CONDICIONES PARTICULARES')).toBe(true);
+  });
+
+  it('horas extra 250 / 350 y sin frases quitadas en la v2', () => {
+    const c7 = clausulasContrato(base()).find((c) => c.titulo.startsWith('7.'))!.parrafos.join(' ');
+    expect(c7).toContain('250,00 €');
+    expect(c7).toContain('350,00 €');
+    expect(c7).not.toContain('treinta minutos');
   });
 
   it('varios días', () => {
