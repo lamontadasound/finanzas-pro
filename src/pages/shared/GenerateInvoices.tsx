@@ -18,7 +18,7 @@ import {lineaDeIngreso,lineaDeFactura} from '../../lib/contabilidad';
 import {BUSINESS_LINES,LINEA_IDS,type LineaId} from '../../config/businessLines';
 import {invoiceAmounts,newInvoiceConcept,serializeConcepts,parseConcepts,conceptAmount,roundMoney as round,type InvoiceConcept} from '../../lib/invoiceConcepts';
 import type {Factura} from '../../types';
-import {Btn as Button,PageHeader,Widget,Pill} from '../../components/kit';
+import {Btn as Button,PageHeader,Widget,Pill,YearStepper} from '../../components/kit';
 import {RowMenu2} from '../../components/ui2/RowMenu';
 import {Modal} from '../../components/ui/Modal';
 import {GenerarFacturaModal} from '../../components/facturacion/GenerarFacturaModal';
@@ -42,8 +42,15 @@ function InvoiceWorkspace({linea,requested,sourceIncome}:{linea:LineaId;requeste
  const [restoring,setRestoring]=useState(false);
  const [editor,setEditor]=useState<string|null>(requested??(sourceIncome?(facturas.find(f=>f.ingresoId===sourceIncome&&lineaDeFactura(f)===linea)?.id??'nuevo'):null)),[pdf,setPdf]=useState(''),[error,setError]=useState('');
  const deletion=useEliminarFactura();
+ const nowYear=new Date().getFullYear();
+ const [year,setYear]=useState(nowYear);
  const invoices=facturas.filter(f=>f.tipo==='emitida'&&lineaDeFactura(f)===linea).sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.numeroSecuencial??0)-(a.numeroSecuencial??0));
  useEffect(()=>()=>{if(pdf)URL.revokeObjectURL(pdf);},[pdf]);
+ const invoiceYears=[...new Set([nowYear,...invoices.map(f=>Number(f.fecha.slice(0,4))).filter(Number.isFinite)])].sort((a,b)=>b-a);
+ const delAnio=invoices.filter(f=>Number(f.fecha.slice(0,4))===year);
+ const porMes=[...delAnio.reduce((m,f)=>m.set(f.fecha.slice(0,7),[...(m.get(f.fecha.slice(0,7))??[]),f]),new Map<string,Factura[]>()).entries()];
+ const nombreMes=(ym:string)=>{const m=new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('es-ES',{month:'long'});return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${ym.slice(0,4)}`;};
+ const eur=(n:number)=>n.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions);
  const openInvoice=(f:Factura)=>{
   if(!f.ocultaEn){setEditor(f.id);return;}
   if(!canEdit||restoring)return;
@@ -64,13 +71,13 @@ function InvoiceWorkspace({linea,requested,sourceIncome}:{linea:LineaId;requeste
   if(download)doc.save(`Factura-${f.numero||'borrador'}.pdf`);else setPdf(URL.createObjectURL(doc.output('blob')));
  }catch(e){setError(e instanceof Error?e.message:'No se pudo generar el PDF.');}};
  return <>
-  <PageHeader title="Facturas"><Button size="lg" variant="primary" disabled={!canCreate} onClick={()=>setEditor('nuevo')}>Crear factura</Button></PageHeader>
+  <PageHeader title="Facturas">{invoiceYears.length>1&&<YearStepper year={year} years={invoiceYears} onChange={setYear}/>}<Button size="lg" variant="primary" disabled={!canCreate} onClick={()=>setEditor('nuevo')}>Crear factura</Button></PageHeader>
   {(error||deletion.error)&&<p role="alert" className="text-red-700">{error||deletion.error}</p>}
-  <Widget pad={false}><ul className="divide-y divide-black/5" aria-label="Facturas de la línea">{invoices.map(f=><li key={f.id} className="flex items-center gap-3 p-4 sm:p-5">
+  {porMes.map(([mes,lista])=><section key={mes} className="space-y-2" aria-label={`Facturas de ${nombreMes(mes)}`}><div className="flex items-baseline justify-between gap-3 px-1"><h2 className="text-[17px] font-semibold">{nombreMes(mes)}</h2><span className="text-[13px] text-ink-3 tabular-nums">{lista.length} {lista.length===1?'factura':'facturas'} · {eur(lista.reduce((n,f)=>n+f.total,0))}</span></div><Widget pad={false}><ul className="divide-y divide-black/5">{lista.map(f=><li key={f.id} className="flex items-center gap-3 p-4 sm:p-5">
    <button className="min-w-0 flex-1 text-left" disabled={restoring} onClick={()=>openInvoice(f)} aria-label={`Abrir ${f.numeroSecuencial!=null?'factura '+f.numero:'borrador'} · ${f.cliente}`}><strong className="block break-words">{f.numero||(f.numeroSolicitado?'Borrador · nº solicitado '+f.numeroSolicitado:'Borrador')} · {f.cliente}</strong><span className="text-sm text-gray-500">{f.fecha}</span></button>
    <div className="text-right space-y-1"><strong className="block tabular-nums">{f.total.toLocaleString('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'} as Intl.NumberFormatOptions)}</strong><div className="flex flex-wrap justify-end gap-1">{f.ocultaEn&&<Pill>Archivada</Pill>}<Pill tone={f.numeroSecuencial==null?'neutral':f.pagada?'positive':'info'}>{f.numeroSecuencial==null?'Borrador':f.pagada?'Cobrada':'Emitida'}</Pill>{f.driveFileId&&<Pill>En Drive</Pill>}</div></div>
    <RowMenu2 label={`Opciones de factura ${f.numero||f.cliente}`} actions={[...(canEdit?[{label:f.ocultaEn?'Restaurar y editar':'Editar',onClick:()=>openInvoice(f)}]:[]),{label:'Ver PDF',onClick:()=>showPdf(f)},{label:'Descargar PDF',onClick:()=>showPdf(f,true)},...(canDelete&&!f.ocultaEn?[{label:'Eliminar',danger:true,onClick:()=>{if(!deletion.busy)deletion.remove(f);}}]:[])]}/>
-  </li>)}</ul>{!invoices.length&&<p className="p-6 text-gray-500">Todavía no hay facturas en esta línea.</p>}</Widget>
+  </li>)}</ul></Widget></section>)}{!delAnio.length&&<Widget><p className="text-gray-500">{invoices.length?`No hay facturas en ${year}.`:'Todavía no hay facturas en esta línea.'}</p></Widget>}
   {editor!==null&&<InvoiceForm key={`${editor}:${sourceIncome}`} sourceIncome={sourceIncome} linea={linea} requested={editor==='nuevo'?null:editor} onClose={()=>setEditor(null)}/>}
   <Modal isOpen={!!pdf} title="Vista previa de factura" size="xl" onClose={()=>setPdf('')}><iframe title="PDF de factura" src={pdf} className="w-full h-[65vh]"/></Modal>
  </>;

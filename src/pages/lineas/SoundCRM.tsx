@@ -6,7 +6,6 @@ import {Link,useNavigate,useParams} from 'react-router-dom';
 import {Plus,FileText,Download,Users,Pencil,Trash2,ChevronRight,Phone,Mail,Upload,Info,Signature,ReceiptText} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {PageHeader,Btn,Widget,Pill,Chips} from '../../components/kit';
-import {ClientesSwitch} from '../../components/kit/ClientesSwitch';
 import {useStore} from '../../store/useStore';
 import {useAuthStore} from '../../store/useAuthStore';
 import {supabase} from '../../lib/supabase';
@@ -62,12 +61,11 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
  const docCount=(k:CategoriaCRM)=>archivos.filter(a=>a.cliente_id===clienteId&&a.categoria===k).length+relatedDocs.filter(d=>(d.tipo==='contrato'?'contrato':d.tipo==='presupuesto'?'presupuesto':d.tipo==='factura'?'factura':'informacion')===k).length+(k==='presupuesto'?relatedQuotes.length:0)+(k==='factura'?relatedInvoices.length:0);
  const FOLDER_ICON={informacion:Info,contrato:Signature,presupuesto:FileText,factura:ReceiptText} as const;
  return <div className="studio-crm">
- <PageHeader title={selected?.cliente.nombre||'Clientes'}>
-  {!clienteId&&<ClientesSwitch/>}
+ <PageHeader title={selected?.cliente.nombre||'Base de datos'}>
   {!clienteId&&canCreate&&<Btn variant="primary" onClick={()=>setNewOpen(true)}><Plus size={16} strokeWidth={2.4}/>Nuevo cliente</Btn>}
   {selected&&actions(selected)}
  </PageHeader>
- {clienteId&&<nav className="crumbs"><button onClick={()=>navigate(`${BASE}/clientes`)}>Clientes</button><ChevronRight size={14}/><b>{selected?SERVICIOS_CRM[selected.tipo_servicio]:''}</b></nav>}
+ {clienteId&&<nav className="crumbs"><button onClick={()=>navigate(`${BASE}/clientes`)}>Base de datos</button><ChevronRight size={14}/><b>{selected?SERVICIOS_CRM[selected.tipo_servicio]:''}</b></nav>}
  {error&&<p role="alert" className="banner banner-danger mb-4">{error}</p>}
  {loading?<p role="status" className="text-ink-3">Cargando clientes…</p>:clienteId&&!selected?<p>Cliente no disponible con tus permisos.</p>:selected?<>
   <div className="bento mb-4">
@@ -115,7 +113,7 @@ export function SoundCRM({vista='clientes'}:{vista?:'crm'|'clientes'}){
   </motion.div>)}</LimitedList></div>}
  </>}
 
- <Modal isOpen={!!deleting} onClose={()=>!busy&&setDeleting(null)} title="Borrar cliente" size="md">{deleting&&<div className="space-y-4"><p>¿Borrar a <strong>{deleting.cliente.nombre}</strong> de Clientes? Su contacto del CRM no se modificará.</p><p className="text-sm text-gray-500">Se conservarán sus facturas, presupuestos y documentos vinculados en el historial.</p><div className="flex gap-3"><Button2 disabled={busy} onClick={()=>setDeleting(null)}>Cancelar</Button2><Button2 variant="danger" loading={busy} onClick={remove}>Confirmar borrado</Button2></div>{error&&<p role="alert" className="text-red-700">{error}</p>}</div>}</Modal>
+ <Modal isOpen={!!deleting} onClose={()=>!busy&&setDeleting(null)} title="Borrar cliente" size="md">{deleting&&<div className="space-y-4"><p>¿Borrar a <strong>{deleting.cliente.nombre}</strong> de la base de datos? Su contacto del CRM no se modificará.</p><p className="text-sm text-gray-500">Se conservarán sus facturas, presupuestos y documentos vinculados en el historial.</p><div className="flex gap-3"><Button2 disabled={busy} onClick={()=>setDeleting(null)}>Cancelar</Button2><Button2 variant="danger" loading={busy} onClick={remove}>Confirmar borrado</Button2></div>{error&&<p role="alert" className="text-red-700">{error}</p>}</div>}</Modal>
  <Modal isOpen={newOpen} onClose={()=>!busy&&setNewOpen(false)} title="Nuevo cliente" size="md"><label className="block text-sm">Nombre o razón social<input className="input-form" value={name} onChange={e=>setName(e.target.value)} maxLength={200}/></label><Button2 disabled={busy||!name.trim()} onClick={create}>Crear cliente</Button2>{error&&<p role="alert">{error}</p>}</Modal>
  <Modal isOpen={!!edit} onClose={()=>!busy&&setEdit(null)} title="Ficha del cliente" size="lg">{edit&&<div className="space-y-4"><div className="grid sm:grid-cols-2 gap-4">{(['nombre','nifCif','email','telefono','direccion'] as const).map(key=><label key={key} className="text-sm">{{nombre:'Nombre',nifCif:'NIF/CIF',email:'Email',telefono:'Teléfono',direccion:'Dirección'}[key]}<input className="input-form" value={edit.cliente[key]??''} onChange={e=>setEdit({...edit,cliente:{...edit.cliente,[key]:e.target.value}})}/></label>)}<label className="text-sm">Fecha del evento<input type="date" className="input-form" value={edit.fecha_evento??''} onChange={e=>setEdit({...edit,fecha_evento:e.target.value})}/></label><label className="text-sm">Ubicación del evento<input className="input-form" value={edit.ubicacion_evento??''} maxLength={500} onChange={e=>setEdit({...edit,ubicacion_evento:e.target.value})}/></label><label className="text-sm">Persona de contacto<input className="input-form" value={edit.contacto_nombre} onChange={e=>setEdit({...edit,contacto_nombre:e.target.value})}/></label><label className="text-sm">Tipo de servicio<select className="input-form" value={edit.tipo_servicio} onChange={e=>setEdit({...edit,tipo_servicio:e.target.value as FichaCRM['tipo_servicio']})}>{Object.entries(SERVICIOS_CRM).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div><label className="block text-sm">Información, listados y notas<textarea rows={5} className="input-form" value={edit.notas} onChange={e=>setEdit({...edit,notas:e.target.value})}/></label><Button2 disabled={busy||!edit.cliente.nombre.trim()} onClick={save}>Guardar cambios</Button2>{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}</div>}</Modal>
  </div>;

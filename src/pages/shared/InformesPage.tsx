@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import type { Area } from '../../types';
 import { motion } from 'framer-motion';
 import { PageHeader, YearStepper, Btn, Metric, Widget } from '../../components/kit';
+import { ResultadosSwitch } from '../../components/kit/ResultadosSwitch';
 import { MonthlyBars } from '../../components/kit/MonthlyBars';
 import { gastoEventoSinIVA, ingresoRentabilidad } from '../../lib/ingresoRentabilidad';
 import { useExpenseCategories, categoryColor } from '../../lib/expenseCategoryConfig';
@@ -158,6 +159,7 @@ export const InformesPage = ({ area, filterLinea }: Props) => {
   return (
     <div>
       <PageHeader title="Informes">
+        {area === 'montada' && !filterLinea && <ResultadosSwitch />}
         <YearStepper year={year} years={yearOpts} onChange={setYear} />
         <Btn variant="secondary" onClick={exportCSV}><Download size={15} />Exportar</Btn>
       </PageHeader>

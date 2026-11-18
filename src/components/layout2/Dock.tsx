@@ -1,7 +1,7 @@
 import { MotionBarLinks } from './MotionBarLinks';
 import { LayoutDashboard, Building2, Music2, Trophy, HardHat, Wallet, Menu, BarChart3, CreditCard } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
-import { BUSINESS_LINES, LINEA_IDS, type LineaId } from '../../config/businessLines';
+import { BUSINESS_LINES, LINEAS_ACTIVAS, type LineaId } from '../../config/businessLines';
 
 interface DockItem { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }
 
@@ -30,7 +30,7 @@ export const Dock2 = ({ onOpenMenu }: { onOpenMenu: () => void }) => {
   const lineasVisibles = useAuthStore((s) => s.lineasVisibles());
   const canViewModulo = useAuthStore((s) => s.canViewModulo);
 
-  const lineaItems: DockItem[] = LINEA_IDS
+  const lineaItems: DockItem[] = LINEAS_ACTIVAS
     .filter((id) => lineasVisibles.includes(id))
     .slice(0, isAdmin ? 2 : 3)
     .map((id) => ({ to: RESUMEN_ROUTE[id], label: BUSINESS_LINES[id].shortLabel, icon: LINEA_ICON[id] }));

@@ -22,7 +22,8 @@ describe('Fase G — permisos derivados del perfil autenticado (Supabase Auth)',
   it('administrador: acceso completo a todas las líneas, sin necesitar permisosLineas', () => {
     setProfile(baseProfile({ rol: 'admin' }));
     const s = useAuthStore.getState();
-    expect(s.lineasVisibles().sort()).toEqual(['dj', 'montada_installations', 'montada_sound', 'real_madrid'].sort());
+    // Instalaciones queda integrada en La Montada: no se lista como línea propia.
+    expect(s.lineasVisibles().sort()).toEqual(['dj', 'montada_sound', 'real_madrid'].sort());
     expect(s.canViewLinea('real_madrid')).toBe(true);
     expect(s.canDeleteLinea('montada_installations')).toBe(true);
   });

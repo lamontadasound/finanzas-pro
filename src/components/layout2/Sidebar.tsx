@@ -10,7 +10,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useStore } from '../../store/useStore';
-import { LINEA_IDS } from '../../config/businessLines';
+import { LINEAS_ACTIVAS } from '../../config/businessLines';
 import { SlideMenuLineas } from './SlideMenuLineas';
 import { BrandMark } from '../ui/BrandMark';
 
@@ -70,7 +70,7 @@ const NavContent = ({ onClose }: { onClose?: () => void }) => {
 
   const showAdmin   = isAdmin();
   const showAdminModulo = canViewModulo('administracion');
-  const visibleLineas = LINEA_IDS.filter((id) => canViewLinea(id));
+  const visibleLineas = LINEAS_ACTIVAS.filter((id) => canViewLinea(id));
   const contabilidadItems = SUB_CONTABILIDAD.filter((item) => canViewModulo(item.modulo) && !['/contabilidad/informes','/contabilidad/pagos','/contabilidad/pagos-pendientes'].includes(item.to));
   const showContabilidad  = contabilidadItems.length > 0;
 

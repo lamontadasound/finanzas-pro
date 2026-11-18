@@ -1,6 +1,6 @@
 import {
   TrendingUp, CalendarDays,
-  AudioLines, Disc3, Crown, Cable, House, Calculator, Settings2,
+  AudioLines, Disc3, Crown, House, Calculator, Settings2,
   LayoutGrid, ArrowDownLeft, Receipt, Contact, FileText, Signature,
   ReceiptText, Boxes, Split, CreditCard, ChartNoAxesColumn, Landmark, Users,
 } from 'lucide-react';
@@ -35,7 +35,6 @@ export interface Space {
 const montada = '/lineas/montada-sound';
 const dj = '/lineas/dj';
 const rm = '/lineas/real-madrid';
-const inst = '/lineas/installations';
 
 export const SPACES: Space[] = [
   {
@@ -57,15 +56,15 @@ export const SPACES: Space[] = [
       { to: `${montada}/eventos`, label: 'Eventos', icon: CalendarDays, alsoActive: [`${montada}/calendario`] },
       { to: `${montada}/ingresos`, label: 'Ingresos', icon: ArrowDownLeft },
       { to: `${montada}/gastos-eventos`, label: 'Gastos', icon: Receipt, alsoActive: [`${montada}/gastos`] },
-      { to: `${montada}/clientes`, label: 'Clientes', icon: Contact, alsoActive: [`${montada}/crm`] },
+      { to: `${montada}/clientes`, label: 'Base de datos', icon: Contact },
+      { to: `${montada}/crm`, label: 'CRM', icon: Users },
       { to: `${montada}/presupuestos`, label: 'Presupuestos', icon: FileText },
       { to: `${montada}/contratos`, label: 'Contratos', icon: Signature },
       { to: `${montada}/generar-facturas`, label: 'Facturas', icon: ReceiptText },
       { to: `${montada}/inversiones`, label: 'Inversiones', icon: Boxes },
       { to: `${montada}/reparto-socios`, label: 'Reparto', icon: Split },
       { to: `${montada}/pagos`, label: 'Pagos', icon: CreditCard },
-      { to: `${montada}/resultados`, label: 'Resultados', icon: ChartNoAxesColumn },
-      { to: `${montada}/informes`, label: 'Informes', icon: ChartNoAxesColumn },
+      { to: `${montada}/resultados`, label: 'Resultados', icon: ChartNoAxesColumn, alsoActive: [`${montada}/informes`] },
     ],
   },
   {
@@ -93,21 +92,6 @@ export const SPACES: Space[] = [
       { to: `${rm}/generar-facturas`, label: 'Facturas', icon: ReceiptText },
       { to: `${rm}/pagos`, label: 'Pagos', icon: CreditCard },
       { to: `${rm}/informes`, label: 'Informes', icon: ChartNoAxesColumn },
-    ],
-  },
-  {
-    id: 'inst', label: 'Instalaciones', icon: Cable, linea: 'montada_installations',
-    tint: { from: '#5b3a29', to: '#a8714f', glow: '#c99a74' },
-    home: `${inst}/resumen`, prefixes: [inst],
-    items: [
-      { to: `${inst}/resumen`, label: 'Resumen', icon: LayoutGrid },
-      { to: `${inst}/ingresos`, label: 'Ingresos', icon: ArrowDownLeft },
-      { to: `${inst}/gastos-instalacion`, label: 'Gastos', icon: Receipt, alsoActive: [`${inst}/gastos`] },
-      { to: `${inst}/presupuestos`, label: 'Presupuestos', icon: FileText },
-      { to: `${inst}/generar-facturas`, label: 'Facturas', icon: ReceiptText },
-      { to: `${inst}/reparto-socios`, label: 'Reparto', icon: Split },
-      { to: `${inst}/pagos`, label: 'Pagos', icon: CreditCard },
-      { to: `${inst}/informes`, label: 'Informes', icon: ChartNoAxesColumn },
     ],
   },
   {

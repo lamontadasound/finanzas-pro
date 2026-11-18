@@ -2,7 +2,6 @@ import {Plus,ChevronDown} from 'lucide-react';
 const VISIBLES=8;
 import {motion} from 'framer-motion';
 import {PageHeader,YearStepper,Btn,Metric,Widget,Pill,Segmented,FormGroup,Field,Chips} from '../../components/kit';
-import {ClientesSwitch} from '../../components/kit/ClientesSwitch';
 import {fmtShort} from '../../utils/helpers';
 import {defaultYear} from '../../components/kit/utils';
 import {useEffect,useState} from 'react';
@@ -40,8 +39,7 @@ export function SoundProspects(){
  const maxPersona=Math.max(1,...porPersona.map(p=>p.total));
  const open=(r:Lead)=>{setNewRow(false);setForm({...r});setError('');};
  return <div>
-  <PageHeader title="Clientes">
-   <ClientesSwitch/>
+  <PageHeader title="CRM">
    {years.length>0&&<YearStepper year={year} years={years} onChange={setYear}/>}
    {create&&<Btn variant="primary" onClick={()=>{setNewRow(true);setForm(empty());setError('');}}><Plus size={16} strokeWidth={2.4}/>Nuevo contacto</Btn>}
   </PageHeader>

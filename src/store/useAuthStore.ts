@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { PermisosLineas, PermisosModulos, ModuloId, PermisoCRUD, UserRol, PermisosFacturacion } from '../types';
 import { NO_PERM_CRUD, ALL_PERM_CRUD, NO_PERMS_FACTURACION } from '../types';
 import type { LineaId } from '../config/businessLines';
-import { LINEA_IDS } from '../config/businessLines';
+import { LINEAS_ACTIVAS } from '../config/businessLines';
 import { supabase } from '../lib/supabase';
 
 // ============================================================================
@@ -33,7 +33,7 @@ import { supabase } from '../lib/supabase';
 // ============================================================================
 
 const EMPTY_LINEAS: LineaId[] = [];
-const ALL_LINEAS_STABLE: LineaId[] = [...LINEA_IDS];
+const ALL_LINEAS_STABLE: LineaId[] = [...LINEAS_ACTIVAS];
 const ADMIN_PERM_CRUD: PermisoCRUD = { ...ALL_PERM_CRUD };
 
 // Caché de referencia estable por objeto `profile` — imprescindible: estos
@@ -264,7 +264,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!p?.activo) return EMPTY_LINEAS;
     if (p.rol === 'admin') return ALL_LINEAS_STABLE;
     let cached = lineasVisiblesCache.get(p);
-    if (!cached) { cached = LINEA_IDS.filter((id) => get().canViewLinea(id)); lineasVisiblesCache.set(p, cached); }
+    if (!cached) { cached = LINEAS_ACTIVAS.filter((id) => get().canViewLinea(id)); lineasVisiblesCache.set(p, cached); }
     return cached;
   },
 

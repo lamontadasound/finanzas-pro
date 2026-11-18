@@ -439,7 +439,7 @@ export const IngresosPage = ({ area, filterLinea, tituloOverride }: Props) => {
                 options={TIPOS_EVENTO_REAL_MADRID.map((t) => ({ value: t, label: TIPO_EVENTO_RM_LABEL[t] }))} />
             ) : (
               <Chips label="Tipo de evento" value={String(form.tipoEvento ?? TIPOS_EVENTO_FORM[0])} onChange={(v) => setField('tipoEvento', v)}
-                options={[...TIPOS_EVENTO_FORM, ...(form.tipoEvento && !TIPOS_EVENTO_FORM.includes(form.tipoEvento) ? [form.tipoEvento] : [])].map((t) => ({ value: t, label: t }))} />
+                options={[...TIPOS_EVENTO_FORM, ...(area === 'montada' ? ['Instalación'] : []), ...(form.tipoEvento && !TIPOS_EVENTO_FORM.includes(form.tipoEvento) && form.tipoEvento !== 'Instalación' ? [form.tipoEvento] : [])].map((t) => ({ value: t, label: t }))} />
             )}
           </div>
           <Field label="Línea de negocio">

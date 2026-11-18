@@ -65,7 +65,9 @@ export const BUSINESS_LINES: Record<LineaId, BusinessLineConfig> = {
     routeBase: '/lineas/installations',
     legacyArea: null,
     tieneInversiones: false,
-    activa: true,
+    // 2026-11-18: Julia la integra dentro de La Montada (tipo de evento
+    // «Instalación»). Se oculta del menú, el resumen y los selectores.
+    activa: false,
     // Sin columna propia en Supabase todavía — creación bloqueada hasta
     // ejecutar la migración preparada. Ver MigrationRequiredNotice.
     puedeCrearHoy: false,
@@ -73,3 +75,6 @@ export const BUSINESS_LINES: Record<LineaId, BusinessLineConfig> = {
 };
 
 export const businessLine = (id: LineaId) => BUSINESS_LINES[id];
+
+/** Líneas que se muestran en la app (las inactivas quedan ocultas). */
+export const LINEAS_ACTIVAS: LineaId[] = LINEA_IDS.filter((id) => BUSINESS_LINES[id].activa);
