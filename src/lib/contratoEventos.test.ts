@@ -37,6 +37,26 @@ describe('contrato de eventos y bodas', () => {
     expect(c7).not.toContain('treinta minutos');
   });
 
+  it('sin hora extra no pone precios de hora extra', () => {
+    for (const c of [{ ...base(), hayHoraExtra: false }, { ...base(), horaExtra: 0 }]) {
+      const c7 = clausulasContrato(c).find((x) => x.titulo.startsWith('7.'))!.parrafos.join(' ');
+      expect(c7).not.toContain('250,00 €');
+      expect(c7).toContain('no incluye horas adicionales');
+      expect(anexoContrato(c).flatMap((b) => b.lineas).join(' ')).toContain('Hora adicional, IVA incluido: no se contempla');
+    }
+  });
+
+  it('precio con y sin IVA, y anexo sin apartados vacíos', () => {
+    const c2 = clausulasContrato(base()).find((c) => c.titulo.startsWith('2.'))!.parrafos.join(' ');
+    expect(c2).toContain('2.500,00 € sin IVA');
+    expect(c2).toContain('1.512,50 € IVA incluido (1.250,00 € sin IVA)');
+    const titulos = anexoContrato(base()).map((b) => b.titulo);
+    expect(titulos).not.toContain('MODELO DE PARTE DE INCIDENCIA');
+    expect(titulos).not.toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
+    expect(anexoContrato({ ...base(), electrico: '2 tomas 16 A' }).map((b) => b.titulo)).toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
+    expect(anexoContrato(base()).flatMap((b) => b.lineas).join(' ')).not.toContain('Interlocutor');
+  });
+
   it('varios días', () => {
     expect(fechasEvento({ fechaEvento: '2027-06-12', fechaFin: '2027-06-13' })).toMatch(/^del 12 de junio de 2027 al 13 de junio de 2027$/);
   });

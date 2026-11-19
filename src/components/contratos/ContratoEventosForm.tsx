@@ -60,11 +60,16 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
         <Field label="Precio total con IVA (€)">
           <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c.precioTotal || ''} onChange={(e) => set('precioTotal', Number(e.target.value))} />
         </Field>
-        <Field label="Hora extra con IVA (€)" hint="Si se pide el mismo día: +100 €">
+        <div className="field">
+          <span className="field-label">¿Hay hora extra?</span>
+          <Chips label="¿Hay hora extra?" value={c.hayHoraExtra === false ? 'no' : 'si'} onChange={(x) => onChange({ ...c, hayHoraExtra: x === 'si', horaExtra: x === 'si' && !(c.horaExtra > 0) ? 250 : c.horaExtra })}
+            options={[{ value: 'si', label: 'Sí' }, { value: 'no', label: 'No' }]} />
+        </div>
+        {c.hayHoraExtra !== false && <Field label="Hora extra con IVA (€)" hint="Si se pide el mismo día: +100 € · 0 = sin hora extra">
           <input type="number" min="0" step="1" className="input-form num" value={c.horaExtra || ''} onChange={(e) => set('horaExtra', Number(e.target.value))} />
-        </Field>
+        </Field>}
         <div className="field field-wide text-[13.5px] text-ink-2">
-          Reserva a la firma (50%): <b className="num">{euros(imp.reserva)}</b> · Resto 10 días antes: <b className="num">{euros(imp.resto)}</b>
+          Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Reserva a la firma (50%): <b className="num">{euros(imp.reserva)}</b> · Resto 10 días antes: <b className="num">{euros(imp.resto)}</b>
         </div>
         {txt('cuentaTitular', 'Titular de la cuenta')}
         {txt('cuentaEntidad', 'Banco')}
@@ -72,7 +77,7 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
       </FormGroup>
 
       <FormGroup title="Personas de contacto">
-        {txt('interlocutor', 'Interlocutor del cliente el día del evento', { wide: true, placeholder: 'Nombre y teléfono' })}
+        {txt('interlocutor', 'Persona de contacto del cliente el día del evento (opcional)', { wide: true, placeholder: 'Ej. la wedding planner · nombre y teléfono', hint: 'Si lo dejas vacío no sale en el contrato' })}
         {txt('autorizado', 'Quién puede aprobar cambios y extras', { wide: true, placeholder: 'Nombre, teléfono y correo · vacío = solo el cliente' })}
       </FormGroup>
 

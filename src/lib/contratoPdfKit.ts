@@ -100,11 +100,11 @@ export function nuevoDocContrato() {
     y += 6;
   };
 
-  const pie = (referencia: string) => {
+  const pie = () => {
     const n = d.getNumberOfPages();
     for (let p = 1; p <= n; p++) {
       d.setPage(p); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(...BROWN);
-      d.text(`${referencia} · ${p} / ${n}`, X, 288);
+      d.text(`${p} / ${n}`, X, 288);
     }
   };
 

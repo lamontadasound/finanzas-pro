@@ -83,7 +83,7 @@ const fechaHora = (f: string, h: string) => `fecha ${f ? fechaLarga(f) : BLANCO}
 
 /** Cláusulas del contrato con los datos ya puestos. */
 export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parrafos: string[] }[] {
-  const { total } = importesAlquiler(c);
+  const { total, base } = importesAlquiler(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
       'La Montada alquila al Cliente los equipos de sonido, iluminación, vídeo y accesorios expresamente identificados en el Anexo I (los “Equipos”), durante el periodo allí indicado y a cambio del precio pactado. El presupuesto aceptado, adjunto al Anexo I, forma parte del contrato.',
@@ -100,7 +100,7 @@ export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parraf
       'El periodo de alquiler comienza en el momento en que el Cliente o la persona autorizada recibe los Equipos y termina en el momento en que La Montada los recibe de vuelta en sus manos, en el almacén o en la recogida, según la modalidad elegida. El precio se calcula por jornadas de veinticuatro horas o fracción.',
     ] },
     { titulo: '4. PRECIO Y FORMA DE PAGO', parrafos: [
-      `El precio total del alquiler es de ${euros(total)}, IVA (21%) incluido, conforme al desglose del Anexo I, e incluye, en su caso, el transporte.`,
+      `El precio total del alquiler es de ${euros(total)}, IVA (21%) incluido (${euros(base)} sin IVA más ${euros(r2(total - base))} de IVA), conforme al desglose del Anexo I, e incluye, en su caso, el transporte.`,
       `El Cliente abonará el 100% del precio a la firma del contrato y, en todo caso, antes de la entrega de los Equipos, mediante transferencia a la cuenta bancaria abierta a nombre de La Montada Sound, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”), u otro medio aceptado por La Montada. La reserva de los Equipos solo quedará confirmada una vez recibido el pago. La Montada no entregará los Equipos mientras no haya recibido el precio total y la fianza.`,
       'La Montada emitirá los justificantes y facturas correspondientes. Cuando el Cliente actúe como empresario o profesional, las cantidades vencidas devengarán el interés de demora previsto en la Ley 3/2004, de 29 de diciembre.',
     ] },
@@ -185,7 +185,7 @@ export function anexoAlquiler(c: ContratoAlquiler): { titulo?: string; lineas: s
       `Contacto del Cliente (teléfono y correo): ${v(contacto)}. Teléfono de La Montada: ${v(c.telefonoMontada)}.`,
     ] },
     { titulo: 'PRECIO Y FIANZA', lineas: [
-      `Precio del alquiler, IVA incluido: ${euros(alquiler)}. Transporte (entrega y recogida), IVA incluido: ${entrega ? euros(transporte) : 'no aplica (recogida en almacén)'}. Total a pagar antes de la entrega (100%): ${euros(total)}.`,
+      `Precio del alquiler, IVA incluido: ${euros(alquiler)}. Transporte (entrega y recogida), IVA incluido: ${entrega ? euros(transporte) : 'no aplica (recogida en almacén)'}. Total a pagar antes de la entrega (100%): ${euros(total)} IVA incluido (${euros(r2(total / 1.21))} sin IVA).`,
       `Importe de la fianza: ${c.fianza > 0 ? euros(c.fianza) : `${BLANCO} €`}. Medio: ${v(c.fianzaMedio)}. Cuenta o medio para su devolución: ${v(c.fianzaDevolucion)}.`,
       `Tarifa por desplazamiento adicional o espera, IVA incluido: ${entrega ? (c.tarifaEspera > 0 ? euros(c.tarifaEspera) : `${BLANCO} €`) : 'no aplica (recogida en almacén)'}.`,
       `Condiciones particulares: ${c.particulares.trim() || 'ninguna'}.`,
@@ -201,7 +201,7 @@ export function contratoAlquilerPdf(c: ContratoAlquiler, emisor: EmisorContrato,
   const { text, titulo } = k;
   const periodo = c.entregaFecha ? (c.devolucionFecha && c.devolucionFecha !== c.entregaFecha ? `del ${fechaLarga(c.entregaFecha)} al ${fechaLarga(c.devolucionFecha)}` : fechaLarga(c.entregaFecha)) : 'fechas por confirmar';
   text('CONTRATO DE ALQUILER DE EQUIPOS AUDIOVISUALES', { bold: true, size: 12.5, gap: 1.5 });
-  text(`Alquiler · ${periodo} · Ref. ${referencia}`, { size: 8.5, color: BROWN, gap: 5 });
+  text(`Alquiler · ${periodo}`, { size: 8.5, color: BROWN, gap: 5 });
 
   text(parteMontada(emisor, c.firmante));
   text(`De otra parte, D./D.ª o entidad ${v(c.cliente)}, con DNI/NIE/NIF ${v(c.nif)}, domicilio en ${v(c.domicilio)}, ${c.representante.trim() ? `representada por ${c.representante.trim()}` : 'actuando en nombre propio'}, en adelante, el “Cliente”.`);
@@ -243,6 +243,6 @@ export function contratoAlquilerPdf(c: ContratoAlquiler, emisor: EmisorContrato,
   text('La firma de la devolución no impide reclamar los daños detectados en la revisión técnica de tres días hábiles prevista en la cláusula 11.', { size: 8.5 });
   k.firmas(['Recibe La Montada', ''], ['Devuelve el Cliente', ''], 12);
 
-  k.pie(referencia);
+  k.pie();
   return k.d;
 }

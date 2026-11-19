@@ -21,7 +21,7 @@ export interface ContratoEventos {
   fechaEvento: string; fechaFin: string; tipoYAsistentes: string;
   recinto: string; responsableRecinto: string;
   montaje: string; pruebas: string; servicio: string; desmontaje: string;
-  duracion: string; horaExtra: number; tecnicosDjs: string;
+  duracion: string; hayHoraExtra?: boolean; horaExtra: number; tecnicosDjs: string;
   contrayentes: string; interlocutor: string; autorizado: string; limiteAutorizado: string; contactoMontada: string;
   // Anexo I · servicios
   presupuestoRef: string; servicios: string; personal: string; extras: string;
@@ -43,7 +43,7 @@ export const nuevoContratoEventos = (previo?: Partial<ContratoEventos>): Contrat
   lugarFirma: previo?.lugarFirma || 'Pozuelo de Alarcón (Madrid)', fechaFirma: hoy(),
   fechaEvento: '', fechaFin: '', tipoYAsistentes: '', recinto: '', responsableRecinto: '',
   montaje: '', pruebas: '', servicio: '', desmontaje: '',
-  duracion: '3 horas', horaExtra: 250, tecnicosDjs: '',
+  duracion: '3 horas', hayHoraExtra: true, horaExtra: 250, tecnicosDjs: '',
   contrayentes: '', interlocutor: '', autorizado: '', limiteAutorizado: '', contactoMontada: previo?.contactoMontada ?? '',
   presupuestoRef: '', servicios: '', personal: '', extras: 'Ninguno',
   electrico: '', accesos: '', zonaTecnica: '', liquidos: '',
@@ -58,6 +58,10 @@ export const importesContrato = (c: Pick<ContratoEventos, 'precioTotal'>) => {
   return { total, reserva, resto: r2(total - reserva), base: r2(total / 1.21) };
 };
 
+/** Hay hora extra si no se ha marcado que no y el precio es mayor que 0. */
+export const hayHoraExtra = (c: Pick<ContratoEventos, 'hayHoraExtra' | 'horaExtra'>) => c.hayHoraExtra !== false && Number(c.horaExtra) > 0;
+/** «X € IVA incluido (Y € sin IVA)». */
+const conIva = (n: number) => `${euros(n)} IVA incluido (${euros(Math.round(n / 1.21 * 100) / 100)} sin IVA)`;
 export const fechasEvento = (c: Pick<ContratoEventos, 'fechaEvento' | 'fechaFin'>) =>
   c.fechaFin && c.fechaFin !== c.fechaEvento ? `del ${fechaLarga(c.fechaEvento)} al ${fechaLarga(c.fechaFin)}` : fechaLarga(c.fechaEvento);
 
@@ -76,15 +80,16 @@ export function validarContratoEventos(c: ContratoEventos): string | null {
 /** Cláusulas del contrato con los datos ya puestos (modelo v2). */
 export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafos: string[] }[] {
   const { total, reserva, resto } = importesContrato(c);
-  const hora = Number(c.horaExtra) || 250;
+  const hora = Number(c.horaExtra) || 0;
+  const { base } = importesContrato(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
       'La Montada prestará los servicios de sonido, iluminación y montaje audiovisual expresamente descritos en el Anexo I, incluido el montaje y desmontaje allí especificado, para el evento, fecha y recinto identificados en dicho anexo. El presupuesto aceptado, adjunto al Anexo I forma parte del contrato. No se incluyen servicios de fotografía, grabación, edición, retransmisión, conexión a Internet ni entrega de archivos, salvo inclusión expresa. Cualquier adicional requerirá aceptación previa y escrita de su alcance y precio total.',
     ] },
     { titulo: '2. PRECIO Y FORMA DE PAGO', parrafos: [
-      `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido.`,
-      `A la firma se abonará el 50% del precio total, esto es, ${euros(reserva)}, como pago a cuenta para la reserva de fecha y la preparación del servicio, a la cuenta bancaria abierta a nombre de ${v(c.cuentaTitular)}, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. La falta de pago no dejará sin efecto automáticamente el contrato: se aplicará el requerimiento y, en su caso, la resolución previstos a continuación.`,
-      `El 50% restante, esto es, ${euros(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
+      `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido, que corresponde a ${euros(base)} sin IVA más ${euros(Math.round((total - base) * 100) / 100)} de IVA.`,
+      `A la firma se abonará el 50% del precio total, esto es, ${conIva(reserva)}, como pago a cuenta para la reserva de fecha y la preparación del servicio, a la cuenta bancaria abierta a nombre de ${v(c.cuentaTitular)}, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. La falta de pago no dejará sin efecto automáticamente el contrato: se aplicará el requerimiento y, en su caso, la resolución previstos a continuación.`,
+      `El 50% restante, esto es, ${conIva(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
       'Ante un impago vencido, La Montada requerirá por escrito su subsanación, concediendo al menos tres días naturales y advirtiendo de sus consecuencias. Si persiste el impago después del referido plazo de tres días naturales, podrá suspender las prestaciones pendientes o resolver el contrato mediante comunicación expresa, con liquidación conforme a la cláusula 7. Si la contratación próxima al evento exige otro plazo, este deberá acordarse expresamente antes de contratar, quedando dispuesto expresamente en el Anexo I.',
     ] },
     { titulo: '3. RESPONSABILIDAD SOBRE LOS EQUIPOS', parrafos: [
@@ -134,8 +139,10 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
       'El presupuesto indicará la fecha, el lugar, los servicios incluidos y los horarios, diferenciando el montaje y desmontaje del tiempo de actuación o servicio. Dichos términos se reproducen de forma íntegra en el Anexo I, formando parte del contrato.',
       'Los retrasos atribuibles al Cliente, al recinto o a otros proveedores no ampliarán automáticamente la hora de finalización acordada. Cualquier ampliación deberá aceptarse expresamente. Los retrasos atribuibles a La Montada no se facturarán como horas extra.',
       '(B) Horas extra',
-      `Cada hora adicional de servicio tendrá un precio de ${euros(hora)}, IVA incluido, si se contrata antes del día del evento. Si se solicita el mismo día del evento, el precio será de ${euros(Math.max(350, hora + 100))} por hora adicional, IVA incluido. Este precio incluye el conjunto del servicio contratado: DJ, personal técnico y equipos. El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.`,
-      'Las horas extra estarán sujetas a la disponibilidad del personal y los equipos, a las condiciones del recinto y a las restricciones de horario y ruido. Las solicitudes de asistentes no autorizados no supondrán una contratación válida.',
+      ...(hayHoraExtra(c) ? [
+        `Cada hora adicional de servicio tendrá un precio de ${euros(hora)}, IVA incluido, si se contrata antes del día del evento. Si se solicita el mismo día del evento, el precio será de ${euros(Math.max(350, hora + 100))} por hora adicional, IVA incluido. Este precio incluye el conjunto del servicio contratado: DJ, personal técnico y equipos. El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.`,
+        'Las horas extra estarán sujetas a la disponibilidad del personal y los equipos, a las condiciones del recinto y a las restricciones de horario y ruido. Las solicitudes de asistentes no autorizados no supondrán una contratación válida.',
+      ] : ['Este contrato no incluye horas adicionales de servicio. Cualquier ampliación del horario requerirá un nuevo acuerdo por escrito, con su precio.']),
       '(C) Modificaciones',
       'Los cambios de fecha, lugar, horario, equipos o servicios deberán solicitarse por escrito con al menos quince días naturales de antelación. Las solicitudes posteriores podrán valorarse, sin garantía de disponibilidad.',
       'Las modificaciones solo serán efectivas cuando ambas partes acepten por escrito las nuevas condiciones y, en su caso, el precio revisado.',
@@ -174,28 +181,35 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
 
 /** Anexo I con los datos del evento (modelo v2). */
 export function anexoContrato(c: ContratoEventos): { titulo?: string; lineas: string[] }[] {
+  const hora = Number(c.horaExtra) || 0;
+  const tecnicas = ([
+    ['Potencia, tomas, protecciones eléctricas y responsable del suministro', c.electrico],
+    ['Accesos, descarga, escaleras, distancias y espacio mínimo', c.accesos],
+    ['Zona técnica y medidas de delimitación/protección del cableado', c.zonaTecnica],
+    ['Protección frente a líquidos y ubicación de bebidas', c.liquidos],
+    ['Instalación exterior; cubierta y ubicación alternativa segura', c.exterior === 'si' ? c.exteriorPlan : ''],
+    ['Responsable y plazo de activación del plan meteorológico', c.exterior === 'si' ? c.planMeteo : ''],
+    ['Límites acústicos, limitador y hora máxima autorizada', c.acustica],
+    ['Coordinación con otros proveedores y efectos especiales previstos', c.proveedores],
+    ['Comida y bebida: número de personas y horario', c.comida],
+    ['Licencias y autorizaciones necesarias y responsable de su gestión', c.licencias],
+  ] as const).filter(([, val]) => (val ?? '').trim()).map(([k, val]) => `${k}: ${val.trim()}.`);
   return [
     { lineas: [
       `Fecha del evento: ${c.fechaEvento ? fechasEvento(c) : BLANCO}. Tipo de evento y número previsto de asistentes: ${v(c.tipoYAsistentes || (c.tipoEvento === 'boda' ? 'Boda' : ''))}.`,
       `Recinto, dirección completa y espacio de instalación: ${v(c.recinto)}.`,
       `Responsable del recinto, teléfono y correo: ${v(c.responsableRecinto)}.`,
       `Acceso y montaje: ${v(c.montaje)}. Pruebas: ${v(c.pruebas)}. Inicio y fin del servicio al público: ${v(c.servicio)}. Desmontaje y retirada: ${v(c.desmontaje)}.`,
-      `Duración contratada del servicio al público: ${v(c.duracion)}. Hora adicional, IVA incluido: ${euros(Number(c.horaExtra) || 250)}. Número de técnicos y DJs incluidos: ${v(c.tecnicosDjs)}.`,
-      `Interlocutor del Cliente durante el evento: ${v(c.interlocutor)}. Persona autorizada para aceptar modificaciones y extras: ${c.autorizado.trim() || 'no se designa; solo el Cliente'}.`,
+      `Duración contratada del servicio al público: ${v(c.duracion)}. Hora adicional, IVA incluido: ${hayHoraExtra(c) ? euros(hora) : 'no se contempla'}. Número de técnicos y DJs incluidos: ${v(c.tecnicosDjs)}.`,
+      `${c.interlocutor.trim() ? `Interlocutor del Cliente durante el evento: ${c.interlocutor.trim()}. ` : ''}Persona autorizada para aceptar modificaciones y extras: ${c.autorizado.trim() || 'no se designa; solo el Cliente'}.`,
     ] },
     { titulo: 'SERVICIOS Y EQUIPO CONTRATADO', lineas: [
       `Presupuesto adjunto: ${v(c.presupuestoRef)}.`,
       `Descripción de los servicios y equipos, cantidades y prestaciones:\n${v(c.servicios)}`,
       `Personal incluido: ${v(c.personal)}.`,
     ] },
-    { titulo: 'CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS', lineas: [
-      `Potencia, tomas, protecciones eléctricas y responsable del suministro: ${v(c.electrico)}. Accesos, descarga, escaleras, distancias y espacio mínimo: ${v(c.accesos)}. Zona técnica y medidas de delimitación/protección del cableado: ${v(c.zonaTecnica)}. Protección frente a líquidos y ubicación de bebidas: ${v(c.liquidos)}. Instalación exterior: ${c.exterior === 'si' ? 'SÍ' : 'NO'}${c.exterior === 'si' ? `; cubierta y ubicación alternativa segura: ${v(c.exteriorPlan)}. Responsable y plazo de activación del plan meteorológico: ${v(c.planMeteo)}` : ''}. Límites acústicos, limitador y hora máxima autorizada: ${v(c.acustica)}. Coordinación con otros proveedores y efectos especiales previstos: ${v(c.proveedores)}. Comida y bebida: número de personas y horario, si procede: ${v(c.comida)}. Licencias y autorizaciones necesarias y responsable de su gestión: ${v(c.licencias)}.`,
-    ] },
+    ...(tecnicas.length ? [{ titulo: 'CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS', lineas: [tecnicas.join(' ')] }] : []),
     ...(c.particulares.trim() ? [{ titulo: 'CONDICIONES PARTICULARES', lineas: [c.particulares.trim()] }] : []),
-    { titulo: 'MODELO DE PARTE DE INCIDENCIA', lineas: [
-      `Evento y lugar: ${BLANCO}. Fecha y hora: ${BLANCO}. Equipo y número de serie: ${BLANCO}. Estado anterior documentado: ${BLANCO}. Descripción objetiva de los hechos y medidas adoptadas: ${BLANCO}. Posible causante y testigos, si se conocen: ${BLANCO}. Fotografías u otras pruebas: ${BLANCO}. Servicio afectado y duración: ${BLANCO}. Observaciones del Cliente: ${BLANCO}. Documentación económica pendiente: ${BLANCO}. Copia entregada a ${BLANCO} por ${BLANCO} el ${BLANCO}.`,
-      `Firma del técnico: ${BLANCO}. Firma de recepción del Cliente o interlocutor: ${BLANCO}. La firma solo acredita recepción del parte, no conformidad con los hechos, responsabilidad ni deuda. Cualquier acuerdo de responsabilidad, anticipo o pago se documentará separadamente, identificando conceptos, importe y vencimiento.`,
-    ] },
   ];
 }
 
@@ -203,7 +217,7 @@ export function contratoEventosPdf(c: ContratoEventos, emisor: EmisorContrato, r
   const k = nuevoDocContrato();
   const { text, titulo } = k;
   text('CONTRATO DE SERVICIOS AUDIOVISUALES PARA EVENTOS', { bold: true, size: 12.5, gap: 1.5 });
-  text(`${c.tipoEvento === 'boda' ? 'Boda' : 'Evento'} · ${c.fechaEvento ? fechasEvento(c) : 'fecha por confirmar'} · Ref. ${referencia}`, { size: 8.5, color: [75, 56, 54], gap: 5 });
+  text(`${c.tipoEvento === 'boda' ? 'Boda' : 'Evento'} · ${c.fechaEvento ? fechasEvento(c) : 'fecha por confirmar'}`, { size: 8.5, color: [75, 56, 54], gap: 5 });
 
   const cliente = `${v(c.cliente)}, con DNI/NIE/NIF ${v(c.nif)}, domicilio en ${v(c.domicilio)}, ${c.representante.trim() ? `representada por ${c.representante.trim()}` : 'actuando en nombre propio'}${[c.email, c.telefono].some((s) => s.trim()) ? ` (contacto: ${[c.email, c.telefono].filter((s) => s.trim()).join(' · ')})` : ''}`;
   text(parteMontada(emisor, c.firmante));
@@ -228,6 +242,6 @@ export function contratoEventosPdf(c: ContratoEventos, emisor: EmisorContrato, r
     if (bloque.titulo) titulo(bloque.titulo);
     for (const l of bloque.lineas) text(l);
   }
-  k.pie(referencia);
+  k.pie();
   return k.d;
 }
