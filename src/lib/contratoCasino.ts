@@ -6,7 +6,7 @@ import { BLANCO, BROWN, v, euros, fechaLarga, nuevoDocContrato, parteMontada, ty
 
 export const PLANTILLA_CASINO = 'casino-2026' as const;
 
-export interface MesaCasino { mesa: string; cantidad: number; croupiers: number; material: string; espacio: string; precioBase: number }
+export interface MesaCasino { mesa: string; cantidad: number; croupiers: number; material: string; espacio: string; /** Solo contratos antiguos: antes se ponía precio por mesa. */ precioBase?: number }
 
 export interface ContratoCasino {
   firmante: string;
@@ -21,6 +21,7 @@ export interface ContratoCasino {
   hayHoraExtra: boolean; horaExtraMesaBase: number; // sin IVA
   fichasPorAsistente: string; personalizacion: string; vestuario: string; premios: string;
   reposicionFicha: number; reposicionBaraja: number; reposicionOtros: string; // con IVA
+  precioBase: number; // precio total sin IVA
   primerPago: number; // con IVA; 0 = 50%
   comida: string;
   particulares: string;
@@ -32,10 +33,10 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const conIva = (n: number) => `${euros(n)} IVA incluido (${euros(r2(n / 1.21))} sin IVA)`;
 
 export const MESAS_TIPICAS: MesaCasino[] = [
-  { mesa: 'Ruleta', cantidad: 1, croupiers: 1, material: 'Mesa profesional, tapete, ruleta, bola, fichas, marcador y rastrillo', espacio: '', precioBase: 0 },
-  { mesa: 'Blackjack', cantidad: 1, croupiers: 1, material: 'Mesa profesional, tapete, sabot, barajas, fichas y bandeja de fichas', espacio: '', precioBase: 0 },
+  { mesa: 'Ruleta', cantidad: 1, croupiers: 1, material: 'Mesa profesional, tapete, ruleta, bola, fichas, marcador y rastrillo', espacio: '' },
+  { mesa: 'Blackjack', cantidad: 1, croupiers: 1, material: 'Mesa profesional, tapete, sabot, barajas, fichas y bandeja de fichas', espacio: '' },
 ];
-export const mesaVacia = (): MesaCasino => ({ mesa: '', cantidad: 1, croupiers: 1, material: '', espacio: '', precioBase: 0 });
+export const mesaVacia = (): MesaCasino => ({ mesa: '', cantidad: 1, croupiers: 1, material: '', espacio: '' });
 
 export const nuevoContratoCasino = (previo?: Partial<ContratoCasino>): ContratoCasino => ({
   firmante: previo?.firmante || 'D.ª Julia Centeno Hernández de Santamaría',
@@ -50,6 +51,7 @@ export const nuevoContratoCasino = (previo?: Partial<ContratoCasino>): ContratoC
   hayHoraExtra: true, horaExtraMesaBase: previo?.horaExtraMesaBase ?? 0,
   fichasPorAsistente: '', personalizacion: 'No', vestuario: 'Estándar de La Montada', premios: 'No',
   reposicionFicha: previo?.reposicionFicha ?? 0, reposicionBaraja: previo?.reposicionBaraja ?? 0, reposicionOtros: previo?.reposicionOtros ?? '',
+  precioBase: 0,
   primerPago: 0,
   comida: '',
   particulares: '',
@@ -58,9 +60,10 @@ export const nuevoContratoCasino = (previo?: Partial<ContratoCasino>): ContratoC
 
 export const mesasConDatos = (c: Pick<ContratoCasino, 'mesas'>) => (c.mesas ?? []).filter((m) => m.mesa.trim());
 
-/** Total = suma de las mesas (sin IVA) + 21% de IVA. Primer pago: 50% salvo que se elija otra cantidad. */
-export const importesCasino = (c: Pick<ContratoCasino, 'mesas' | 'primerPago'>) => {
-  const base = r2(mesasConDatos(c).reduce((a, m) => a + (Number(m.precioBase) || 0), 0));
+/** Total = precio sin IVA + 21% de IVA. Primer pago: 50% salvo que se elija otra cantidad.
+ *  (Contratos antiguos sin precio total: suma de los precios por mesa.) */
+export const importesCasino = (c: Pick<ContratoCasino, 'mesas' | 'primerPago'> & { precioBase?: number }) => {
+  const base = Number(c.precioBase) > 0 ? r2(Number(c.precioBase)) : r2(mesasConDatos(c).reduce((a, m) => a + (Number(m.precioBase) || 0), 0));
   const total = r2(base * 1.21);
   const mitad = r2(total / 2);
   const elegido = r2(Number(c.primerPago) || 0);
@@ -74,7 +77,7 @@ export function validarContratoCasino(c: ContratoCasino): string | null {
   if (!c.nif.trim()) return 'Falta el DNI/NIF del cliente.';
   if (!c.fechaEvento) return 'Falta la fecha del evento.';
   if (!mesasConDatos(c).length) return 'Añade al menos una mesa.';
-  if (!(importesCasino(c).total > 0)) return 'Pon el precio sin IVA de las mesas.';
+  if (!(importesCasino(c).total > 0)) return 'Pon el precio total sin IVA.';
   return null;
 }
 
@@ -189,7 +192,7 @@ export function anexoCasino(c: ContratoCasino): { evento: string[]; casino: stri
 }
 
 export const filasMesas = (c: Pick<ContratoCasino, 'mesas'>) =>
-  mesasConDatos(c).map((m) => [m.mesa.trim(), String(m.cantidad || 1), String(m.croupiers || 0), m.material.trim() || '—', m.espacio.trim() ? `${m.espacio.trim()} m` : '', m.precioBase > 0 ? euros(r2(m.precioBase * 1.21)) : '']);
+  mesasConDatos(c).map((m) => [m.mesa.trim(), String(m.cantidad || 1), String(m.croupiers || 0), m.material.trim() || '—', m.espacio.trim() ? `${m.espacio.trim()} m` : '']);
 
 export function contratoCasinoPdf(c: ContratoCasino, emisor: EmisorContrato) {
   const k = nuevoDocContrato();
@@ -215,8 +218,8 @@ export function contratoCasinoPdf(c: ContratoCasino, emisor: EmisorContrato) {
   titulo('DATOS DEL EVENTO'); a.evento.forEach((l) => text(l));
   titulo('CASINO');
   const filas = filasMesas(c);
-  k.tabla(['Mesa', 'Cant.', 'Croupiers', 'Material incluido', 'Espacio mínimo', 'Precio (IVA incl.)'],
-    filas.length ? filas : [['', '', '', '', '', '']], [15, 7, 13, 37, 14, 16]);
+  k.tabla(['Mesa / concepto', 'Cant.', 'Croupiers', 'Qué incluye', 'Espacio mínimo'],
+    filas.length ? filas : [['', '', '', '', '']], [18, 7, 13, 47, 15]);
   a.casino.forEach((l) => text(l));
   k.pie();
   return k.d;

@@ -3,8 +3,7 @@ import { nuevoContratoCasino, importesCasino, validarContratoCasino, clausulasCa
 
 const base = () => {
   const c = nuevoContratoCasino();
-  return { ...c, cliente: 'Empresa Ejemplo SL', nif: 'B00000000', fechaEvento: '2027-05-20',
-    mesas: [{ ...c.mesas[0], precioBase: 600 }, { ...c.mesas[1], precioBase: 400 }] };
+  return { ...c, cliente: 'Empresa Ejemplo SL', nif: 'B00000000', fechaEvento: '2027-05-20', precioBase: 1000 };
 };
 
 describe('contrato de casino', () => {
@@ -15,7 +14,8 @@ describe('contrato de casino', () => {
 
   it('pide lo mínimo', () => {
     expect(validarContratoCasino(nuevoContratoCasino())).toMatch(/cliente/);
-    expect(validarContratoCasino({ ...base(), mesas: base().mesas.map((m) => ({ ...m, precioBase: 0 })) })).toMatch(/precio/);
+    expect(validarContratoCasino({ ...base(), precioBase: 0 })).toMatch(/precio/);
+    expect(importesCasino({ ...base(), precioBase: 0, mesas: [{ ...base().mesas[0], precioBase: 500 }] }).base).toBe(500);
     expect(validarContratoCasino(base())).toBeNull();
   });
 
