@@ -57,9 +57,20 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
       </FormGroup>
 
       <FormGroup title="Precio y pago">
-        <Field label="Precio total con IVA (€)">
-          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c.precioTotal || ''} onChange={(e) => set('precioTotal', Number(e.target.value))} />
+        <Field label="Precio sin IVA (€)" hint={imp.total > 0 ? `IVA 21%: ${euros(imp.iva)} · Total con IVA: ${euros(imp.total)}` : 'El IVA (21%) se calcula solo'}>
+          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c.precioBase || (c.precioTotal ? imp.base : '') || ''}
+            onChange={(e) => { const b = Number(e.target.value) || 0; onChange({ ...c, precioBase: b, precioTotal: Math.round(b * 1.21 * 100) / 100 }); }} />
         </Field>
+        <Field label="Primer pago a la firma, con IVA (€)" hint={<>
+          {imp.es50 ? '50% del total' : `${Math.round(imp.reserva / (imp.total || 1) * 1000) / 10}% del total`} · Sin IVA: {euros(Math.round(imp.reserva / 1.21 * 100) / 100)}
+          {!imp.es50 && <> · <button type="button" className="underline" onClick={() => set('primerPago', 0)}>volver al 50%</button></>}
+        </>}>
+          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={imp.total > 0 ? (c.primerPago || imp.reserva) : ''}
+            onChange={(e) => set('primerPago', Number(e.target.value) || 0)} />
+        </Field>
+        <div className="field field-wide text-[13.5px] text-ink-2">
+          Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Primer pago: <b className="num">{euros(imp.reserva)}</b> · Resto 10 días antes: <b className="num">{euros(imp.resto)}</b>
+        </div>
         <div className="field">
           <span className="field-label">¿Hay hora extra?</span>
           <Chips label="¿Hay hora extra?" value={c.hayHoraExtra === false ? 'no' : 'si'} onChange={(x) => onChange({ ...c, hayHoraExtra: x === 'si', horaExtra: x === 'si' && !(c.horaExtra > 0) ? 250 : c.horaExtra })}
@@ -68,12 +79,9 @@ export function ContratoEventosForm({ value: c, onChange, disabled }: Props) {
         {c.hayHoraExtra !== false && <Field label="Hora extra con IVA (€)" hint="Si se pide el mismo día: +100 € · 0 = sin hora extra">
           <input type="number" min="0" step="1" className="input-form num" value={c.horaExtra || ''} onChange={(e) => set('horaExtra', Number(e.target.value))} />
         </Field>}
-        <div className="field field-wide text-[13.5px] text-ink-2">
-          Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Reserva a la firma (50%): <b className="num">{euros(imp.reserva)}</b> · Resto 10 días antes: <b className="num">{euros(imp.resto)}</b>
+        <div className="field field-wide text-[13px] text-ink-3">
+          Cuenta para los pagos (fija): {c.cuentaTitular || 'La Montada Sound, S.L.'} · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}
         </div>
-        {txt('cuentaTitular', 'Titular de la cuenta')}
-        {txt('cuentaEntidad', 'Banco')}
-        {txt('iban', 'IBAN', { wide: true })}
       </FormGroup>
 
       <FormGroup title="Personas de contacto">

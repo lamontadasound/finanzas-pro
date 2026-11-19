@@ -44,3 +44,11 @@ describe('contrato de alquiler de equipos', () => {
     expect(d.getNumberOfPages()).toBeGreaterThanOrEqual(6);
   });
 });
+
+import { bancoDeIban } from './contratoPdfKit';
+describe('banco desde el IBAN', () => {
+  it('reconoce la entidad', () => {
+    expect(bancoDeIban('ES91 2100 0418 4502 0005 1332')).toBe('CaixaBank');
+    expect(bancoDeIban('')).toBe('');
+  });
+});

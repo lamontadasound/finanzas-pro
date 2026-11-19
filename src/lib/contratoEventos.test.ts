@@ -5,7 +5,10 @@ const base = () => ({ ...nuevoContratoEventos(), cliente: 'Ana López', nif: '12
 
 describe('contrato de eventos y bodas', () => {
   it('reparte el 50% de reserva y el resto', () => {
-    expect(importesContrato({ precioTotal: 3025 })).toEqual({ total: 3025, reserva: 1512.5, resto: 1512.5, base: 2500 });
+    expect(importesContrato({ precioTotal: 3025 })).toMatchObject({ total: 3025, reserva: 1512.5, resto: 1512.5, base: 2500, iva: 525, es50: true });
+    expect(importesContrato({ precioTotal: 0, precioBase: 2500 })).toMatchObject({ total: 3025, iva: 525 });
+    expect(importesContrato({ precioTotal: 3025, primerPago: 1000 })).toMatchObject({ reserva: 1000, resto: 2025, es50: false });
+    expect(importesContrato({ precioTotal: 3025, primerPago: 9999 }).es50).toBe(true);
     expect(importesContrato({ precioTotal: 1000.01 }).resto).toBe(500);
   });
 
@@ -51,10 +54,17 @@ describe('contrato de eventos y bodas', () => {
     expect(c2).toContain('2.500,00 € sin IVA');
     expect(c2).toContain('1.512,50 € IVA incluido (1.250,00 € sin IVA)');
     const titulos = anexoContrato(base()).map((b) => b.titulo);
-    expect(titulos).not.toContain('MODELO DE PARTE DE INCIDENCIA');
+    expect(titulos).toContain('MODELO DE PARTE DE INCIDENCIA');
     expect(titulos).not.toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
     expect(anexoContrato({ ...base(), electrico: '2 tomas 16 A' }).map((b) => b.titulo)).toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
     expect(anexoContrato(base()).flatMap((b) => b.lineas).join(' ')).not.toContain('Interlocutor');
+  });
+
+  it('primer pago elegido a mano', () => {
+    const c2 = clausulasContrato({ ...base(), primerPago: 1000 }).find((c) => c.titulo.startsWith('2.'))!.parrafos.join(' ');
+    expect(c2).toContain('como primer pago 1.000,00 € IVA incluido');
+    expect(c2).toContain('El resto del precio, esto es, 2.025,00 €');
+    expect(c2).not.toContain('50%');
   });
 
   it('varios días', () => {

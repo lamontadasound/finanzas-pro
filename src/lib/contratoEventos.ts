@@ -13,7 +13,9 @@ export interface ContratoEventos {
   firmante: string; cargoFirmante: string;
   cliente: string; nif: string; domicilio: string; representante: string; email: string; telefono: string;
   // Precio y pago
-  precioTotal: number; // IVA incluido
+  precioTotal: number; // IVA incluido (se calcula desde precioBase si lo hay)
+  precioBase?: number; // sin IVA, lo que se escribe en la ficha
+  primerPago?: number; // con IVA; vacío = 50%
   cuentaTitular: string; cuentaEntidad: string; iban: string;
   // Firma
   lugarFirma: string; fechaFirma: string;
@@ -52,10 +54,14 @@ export const nuevoContratoEventos = (previo?: Partial<ContratoEventos>): Contrat
 });
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-export const importesContrato = (c: Pick<ContratoEventos, 'precioTotal'>) => {
-  const total = r2(Number(c.precioTotal) || 0);
-  const reserva = r2(total / 2);
-  return { total, reserva, resto: r2(total - reserva), base: r2(total / 1.21) };
+export const importesContrato = (c: Pick<ContratoEventos, 'precioTotal'> & Partial<Pick<ContratoEventos, 'precioBase' | 'primerPago'>>) => {
+  const conBase = Number(c.precioBase) > 0;
+  const base = conBase ? r2(Number(c.precioBase)) : r2((Number(c.precioTotal) || 0) / 1.21);
+  const total = conBase ? r2(base * 1.21) : r2(Number(c.precioTotal) || 0);
+  const mitad = r2(total / 2);
+  const elegido = r2(Number(c.primerPago) || 0);
+  const reserva = elegido > 0 && elegido <= total ? elegido : mitad;
+  return { total, base, iva: r2(total - base), reserva, resto: r2(total - reserva), es50: reserva === mitad };
 };
 
 /** Hay hora extra si no se ha marcado que no y el precio es mayor que 0. */
@@ -71,7 +77,7 @@ export function validarContratoEventos(c: ContratoEventos): string | null {
   if (!c.nif.trim()) return 'Falta el DNI/NIF del cliente.';
   if (!c.fechaEvento) return 'Falta la fecha del evento.';
   if (c.fechaFin && c.fechaFin < c.fechaEvento) return 'La fecha de fin no puede ser anterior a la del evento.';
-  if (!(c.precioTotal > 0)) return 'Indica el precio total (IVA incluido).';
+  if (!(importesContrato(c).total > 0)) return 'Indica el precio sin IVA.';
   if (!c.servicios.trim()) return 'Describe los servicios y equipos contratados.';
   return null;
 }
@@ -79,17 +85,16 @@ export function validarContratoEventos(c: ContratoEventos): string | null {
 
 /** Cláusulas del contrato con los datos ya puestos (modelo v2). */
 export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafos: string[] }[] {
-  const { total, reserva, resto } = importesContrato(c);
+  const { total, base, iva, reserva, resto, es50 } = importesContrato(c);
   const hora = Number(c.horaExtra) || 0;
-  const { base } = importesContrato(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
       'La Montada prestará los servicios de sonido, iluminación y montaje audiovisual expresamente descritos en el Anexo I, incluido el montaje y desmontaje allí especificado, para el evento, fecha y recinto identificados en dicho anexo. El presupuesto aceptado, adjunto al Anexo I forma parte del contrato. No se incluyen servicios de fotografía, grabación, edición, retransmisión, conexión a Internet ni entrega de archivos, salvo inclusión expresa. Cualquier adicional requerirá aceptación previa y escrita de su alcance y precio total.',
     ] },
     { titulo: '2. PRECIO Y FORMA DE PAGO', parrafos: [
-      `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido, que corresponde a ${euros(base)} sin IVA más ${euros(Math.round((total - base) * 100) / 100)} de IVA.`,
-      `A la firma se abonará el 50% del precio total, esto es, ${conIva(reserva)}, como pago a cuenta para la reserva de fecha y la preparación del servicio, a la cuenta bancaria abierta a nombre de ${v(c.cuentaTitular)}, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. La falta de pago no dejará sin efecto automáticamente el contrato: se aplicará el requerimiento y, en su caso, la resolución previstos a continuación.`,
-      `El 50% restante, esto es, ${conIva(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
+      `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido, que corresponde a ${euros(base)} sin IVA más ${euros(iva)} de IVA.`,
+      `A la firma se abonará ${es50 ? 'el 50% del precio total, esto es, ' : 'como primer pago '}${conIva(reserva)}, como pago a cuenta para la reserva de fecha y la preparación del servicio, a la cuenta bancaria abierta a nombre de ${v(c.cuentaTitular)}, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. La falta de pago no dejará sin efecto automáticamente el contrato: se aplicará el requerimiento y, en su caso, la resolución previstos a continuación.`,
+      `${es50 ? 'El 50% restante' : 'El resto del precio'}, esto es, ${conIva(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
       'Ante un impago vencido, La Montada requerirá por escrito su subsanación, concediendo al menos tres días naturales y advirtiendo de sus consecuencias. Si persiste el impago después del referido plazo de tres días naturales, podrá suspender las prestaciones pendientes o resolver el contrato mediante comunicación expresa, con liquidación conforme a la cláusula 7. Si la contratación próxima al evento exige otro plazo, este deberá acordarse expresamente antes de contratar, quedando dispuesto expresamente en el Anexo I.',
     ] },
     { titulo: '3. RESPONSABILIDAD SOBRE LOS EQUIPOS', parrafos: [
@@ -210,6 +215,10 @@ export function anexoContrato(c: ContratoEventos): { titulo?: string; lineas: st
     ] },
     ...(tecnicas.length ? [{ titulo: 'CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS', lineas: [tecnicas.join(' ')] }] : []),
     ...(c.particulares.trim() ? [{ titulo: 'CONDICIONES PARTICULARES', lineas: [c.particulares.trim()] }] : []),
+    { titulo: 'MODELO DE PARTE DE INCIDENCIA', lineas: [
+      `Evento y lugar: ${BLANCO}. Fecha y hora: ${BLANCO}. Equipo y número de serie: ${BLANCO}. Estado anterior documentado: ${BLANCO}. Descripción objetiva de los hechos y medidas adoptadas: ${BLANCO}. Posible causante y testigos, si se conocen: ${BLANCO}. Fotografías u otras pruebas: ${BLANCO}. Servicio afectado y duración: ${BLANCO}. Observaciones del Cliente: ${BLANCO}. Documentación económica pendiente: ${BLANCO}. Copia entregada a ${BLANCO} por ${BLANCO} el ${BLANCO}.`,
+      `Firma del técnico: ${BLANCO}. Firma de recepción del Cliente o interlocutor: ${BLANCO}. La firma solo acredita recepción del parte, no conformidad con los hechos, responsabilidad ni deuda. Cualquier acuerdo de responsabilidad, anticipo o pago se documentará separadamente, identificando conceptos, importe y vencimiento.`,
+    ] },
   ];
 }
 

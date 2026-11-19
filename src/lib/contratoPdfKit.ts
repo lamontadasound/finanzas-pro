@@ -115,3 +115,16 @@ export function nuevoDocContrato() {
     BOTTOM,
   };
 }
+
+const BANCOS: Record<string, string> = {
+  '2100': 'CaixaBank', '2038': 'CaixaBank', '0049': 'Banco Santander', '0030': 'Banco Santander', '0182': 'BBVA',
+  '0081': 'Banco Sabadell', '0128': 'Bankinter', '1465': 'ING', '0073': 'Openbank', '2085': 'Ibercaja',
+  '3058': 'Cajamar', '0239': 'EVO Banco', '2095': 'Kutxabank', '0487': 'Banco Mare Nostrum', '0238': 'Banco Pastor',
+  '0019': 'Deutsche Bank', '1491': 'Triodos Bank', '0186': 'Banco Mediolanum', '3025': 'Caixa d\'Enginyers',
+  '2080': 'Abanca', '3035': 'Laboral Kutxa', '0061': 'Banca March', '0234': 'Banco Caminos', '1583': 'Revolut',
+};
+/** Banco a partir de un IBAN español (código de entidad). */
+export const bancoDeIban = (iban?: string) => {
+  const limpio = (iban ?? '').replace(/\s+/g, '').toUpperCase();
+  return /^ES\d{6}/.test(limpio) ? BANCOS[limpio.slice(4, 8)] ?? '' : '';
+};

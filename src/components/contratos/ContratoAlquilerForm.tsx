@@ -19,6 +19,13 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
       <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c[k] || ''} onChange={(e) => set(k, Number(e.target.value))} />
     </Field>
   );
+  /** Campo en euros sin IVA; se guarda con IVA (21%). */
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const sinIva = (k: 'precioDiario' | 'precioAlquiler' | 'transporte' | 'tarifaEspera', label: string, hint?: string) => (
+    <Field label={label} hint={<>{c[k] > 0 ? `Con IVA: ${euros(c[k])}` : 'El IVA (21%) se calcula solo'}{hint ? ` · ${hint}` : ''}</>}>
+      <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c[k] ? r2(c[k] / 1.21) : ''} onChange={(e) => set(k, r2((Number(e.target.value) || 0) * 1.21))} />
+    </Field>
+  );
   const jornadas = jornadasAlquiler(c);
   const imp = importesAlquiler(c);
   const entrega = c.modalidad === 'entrega';
@@ -85,12 +92,12 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
       </FormGroup>
 
       <FormGroup title="Precio y fianza">
-        {num('precioDiario', 'Precio diario con IVA (€)', 'Se usa para retrasos y reparaciones')}
-        {num('precioAlquiler', 'Precio del alquiler con IVA (€)', jornadas && c.precioDiario > 0 ? `${jornadas} × ${euros(c.precioDiario)} = ${euros(jornadas * c.precioDiario)}` : 'Todo el periodo')}
-        {entrega && num('transporte', 'Transporte con IVA (€)', 'Entrega y recogida')}
-        {entrega && num('tarifaEspera', 'Desplazamiento extra o espera (€)')}
+        {sinIva('precioDiario', 'Precio diario sin IVA (€)', 'para retrasos y reparaciones')}
+        {sinIva('precioAlquiler', 'Precio del alquiler sin IVA (€)', jornadas && c.precioDiario > 0 ? `${jornadas} jornadas × ${euros(r2(c.precioDiario / 1.21))} = ${euros(r2(jornadas * c.precioDiario / 1.21))} sin IVA` : 'todo el periodo')}
+        {entrega && sinIva('transporte', 'Transporte sin IVA (€)', 'entrega y recogida')}
+        {entrega && sinIva('tarifaEspera', 'Desplazamiento extra o espera sin IVA (€)')}
         <div className="field field-wide text-[13.5px] text-ink-2">
-          Total a pagar antes de la entrega (100%): <b className="num">{euros(imp.total)}</b>
+          Total a pagar antes de la entrega (100%): <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA)
         </div>
         {num('fianza', 'Fianza (€)', 'Aparte del precio')}
         <Field label="Medio de la fianza">
@@ -99,8 +106,9 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
           </select>
         </Field>
         {txt('fianzaDevolucion', 'Cuenta o medio para devolver la fianza', { wide: true })}
-        {txt('cuentaEntidad', 'Banco de La Montada')}
-        {txt('iban', 'IBAN de La Montada')}
+        <div className="field field-wide text-[13px] text-ink-3">
+          Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}
+        </div>
       </FormGroup>
 
       <FormGroup title="Otras condiciones y firma">
