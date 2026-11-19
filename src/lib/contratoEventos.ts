@@ -2,8 +2,8 @@
 // El texto legal es fijo (transcrito del modelo de La Montada); solo se
 // rellenan los puntos clave. Los campos vacíos salen en el PDF como una
 // línea en blanco para completar a mano.
-import { jsPDF } from 'jspdf';
-import { BRAND_LOGO } from './brandLogo';
+import { BLANCO, v, euros, fechaLarga, nuevoDocContrato, parteMontada, type EmisorContrato } from './contratoPdfKit';
+export { euros, type EmisorContrato };
 
 export const PLANTILLA_EVENTOS = 'eventos-2026' as const;
 
@@ -58,12 +58,6 @@ export const importesContrato = (c: Pick<ContratoEventos, 'precioTotal'>) => {
   return { total, reserva, resto: r2(total - reserva), base: r2(total / 1.21) };
 };
 
-export const euros = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always' } as Intl.NumberFormatOptions) + ' €';
-const fechaLarga = (iso: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-};
 export const fechasEvento = (c: Pick<ContratoEventos, 'fechaEvento' | 'fechaFin'>) =>
   c.fechaFin && c.fechaFin !== c.fechaEvento ? `del ${fechaLarga(c.fechaEvento)} al ${fechaLarga(c.fechaFin)}` : fechaLarga(c.fechaEvento);
 
@@ -78,8 +72,6 @@ export function validarContratoEventos(c: ContratoEventos): string | null {
   return null;
 }
 
-const BLANCO = '____________________';
-const v = (s: string | number | undefined) => (String(s ?? '').trim() || BLANCO);
 
 /** Cláusulas del contrato con los datos ya puestos (modelo v2). */
 export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafos: string[] }[] {
@@ -207,53 +199,14 @@ export function anexoContrato(c: ContratoEventos): { titulo?: string; lineas: st
   ];
 }
 
-export interface EmisorContrato { razonSocial: string; nif: string; direccion: string }
-
 export function contratoEventosPdf(c: ContratoEventos, emisor: EmisorContrato, referencia: string) {
-  const d = new jsPDF({ compress: true });
-  const brown = [75, 56, 54] as const;
-  const X = 26, W = 166, BOTTOM = 272;
-  let y = 0;
-  const header = () => {
-    d.setFillColor(255, 255, 255); d.rect(0, 0, 210, 297, 'F');
-    d.setFillColor(...brown); d.rect(8, 0, 1.7, 297, 'F');
-    const size = 58 * 1563 / 1110;
-    d.addImage(BRAND_LOGO, 'PNG', 21 - 228 * size / 1563, 12 - 703 * size / 1563, size, size);
-    y = 46;
-  };
-  const next = () => { d.addPage(); header(); };
-  const text = (value: string, opts: { bold?: boolean; size?: number; gap?: number; color?: readonly [number, number, number] } = {}) => {
-    const size = opts.size ?? 9.6;
-    d.setFont('helvetica', opts.bold ? 'bold' : 'normal'); d.setFontSize(size); d.setTextColor(...(opts.color ?? [28, 28, 28] as const));
-    const lh = size * 0.47;
-    // Texto justificado: cada línea ocupa todo el ancho, salvo la última de
-    // cada párrafo (o antes de un salto de línea), que va alineada a la izquierda.
-    for (const parrafo of value.split('\n')) {
-      const lines = d.splitTextToSize(parrafo, W) as string[];
-      lines.forEach((line, i) => {
-        if (y > BOTTOM) next();
-        const words = line.trim().split(/\s+/);
-        const last = i === lines.length - 1;
-        if (last || words.length < 2) { d.text(line.trim(), X, y); }
-        else {
-          const libre = W - words.reduce((a, w) => a + d.getTextWidth(w), 0);
-          const hueco = libre / (words.length - 1);
-          let x = X;
-          for (const w of words) { d.text(w, x, y); x += d.getTextWidth(w) + hueco; }
-        }
-        y += lh;
-      });
-    }
-    y += opts.gap ?? 2.4;
-  };
-  const titulo = (t: string) => { if (y > BOTTOM - 22) next(); y += 1.5; text(t, { bold: true, size: 10, gap: 1.6, color: brown }); };
-
-  header();
+  const k = nuevoDocContrato();
+  const { text, titulo } = k;
   text('CONTRATO DE SERVICIOS AUDIOVISUALES PARA EVENTOS', { bold: true, size: 12.5, gap: 1.5 });
-  text(`${c.tipoEvento === 'boda' ? 'Boda' : 'Evento'} · ${c.fechaEvento ? fechasEvento(c) : 'fecha por confirmar'} · Ref. ${referencia}`, { size: 8.5, color: brown, gap: 5 });
+  text(`${c.tipoEvento === 'boda' ? 'Boda' : 'Evento'} · ${c.fechaEvento ? fechasEvento(c) : 'fecha por confirmar'} · Ref. ${referencia}`, { size: 8.5, color: [75, 56, 54], gap: 5 });
 
   const cliente = `${v(c.cliente)}, con DNI/NIE/NIF ${v(c.nif)}, domicilio en ${v(c.domicilio)}, ${c.representante.trim() ? `representada por ${c.representante.trim()}` : 'actuando en nombre propio'}${[c.email, c.telefono].some((s) => s.trim()) ? ` (contacto: ${[c.email, c.telefono].filter((s) => s.trim()).join(' · ')})` : ''}`;
-  text(`De una parte, ${emisor.razonSocial || 'LA MONTADA SOUND, S.L.'}, con NIF ${emisor.nif || 'B21642913'} y domicilio en ${emisor.direccion || 'calle Portugalete 68, 28223 Pozuelo de Alarcón (Madrid)'}, representada por ${v(c.firmante)}, con facultades suficientes, en adelante, “La Montada”.`);
+  text(parteMontada(emisor, c.firmante));
   text(`De otra parte, D./D.ª o entidad ${cliente}, en adelante, el “Cliente”.`);
   text('Ambas partes se reconocen capacidad suficiente para contratar.', { gap: 4 });
 
@@ -265,25 +218,16 @@ export function contratoEventosPdf(c: ContratoEventos, emisor: EmisorContrato, r
     }
   }
 
-  if (y > BOTTOM - 60) next(); else y += 6;
-  text(`En prueba de conformidad, ambas partes firman este contrato y su Anexo I, recibiendo un ejemplar completo en soporte duradero. Lugar: ${v(c.lugarFirma)}. Fecha de firma: ${c.fechaFirma ? fechaLarga(c.fechaFirma) : BLANCO}.`, { gap: 18 });
-  d.setDrawColor(...brown); d.line(X, y, X + 70, y); d.line(X + 95, y, X + 165, y); y += 5.5;
-  d.setFont('helvetica', 'bold'); d.setFontSize(9); d.setTextColor(28, 28, 28);
-  d.text('La Montada Sound, S.L.', X, y); d.text('El Cliente', X + 95, y); y += 4.6;
-  d.setFont('helvetica', 'normal');
-  d.text((d.splitTextToSize(v(c.firmante), 70) as string[])[0], X, y); d.text((d.splitTextToSize(v(c.cliente), 70) as string[])[0], X + 95, y);
+  if (k.y > k.BOTTOM - 60) k.next(); else k.y += 6;
+  text(`En prueba de conformidad, ambas partes firman este contrato y su Anexo I, recibiendo un ejemplar completo en soporte duradero. Lugar: ${v(c.lugarFirma)}. Fecha de firma: ${c.fechaFirma ? fechaLarga(c.fechaFirma) : BLANCO}.`, { gap: 0 });
+  k.firmas(['La Montada Sound, S.L.', v(c.firmante)], ['El Cliente', v(c.cliente)]);
 
-  next();
+  k.next();
   text('ANEXO I - DETALLES DEL EVENTO', { bold: true, size: 12, gap: 4 });
   for (const bloque of anexoContrato(c)) {
     if (bloque.titulo) titulo(bloque.titulo);
     for (const l of bloque.lineas) text(l);
   }
-
-  const n = d.getNumberOfPages();
-  for (let p = 1; p <= n; p++) {
-    d.setPage(p); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(...brown);
-    d.text(`${referencia} · ${p} / ${n}`, X, 288);
-  }
-  return d;
+  k.pie(referencia);
+  return k.d;
 }
