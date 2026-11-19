@@ -54,7 +54,7 @@ describe('contrato de eventos y bodas', () => {
     expect(c2).toContain('2.500,00 € sin IVA');
     expect(c2).toContain('1.512,50 € IVA incluido (1.250,00 € sin IVA)');
     const titulos = anexoContrato(base()).map((b) => b.titulo);
-    expect(titulos).toContain('MODELO DE PARTE DE INCIDENCIA');
+    expect(titulos).not.toContain('MODELO DE PARTE DE INCIDENCIA');
     expect(titulos).not.toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
     expect(anexoContrato({ ...base(), electrico: '2 tomas 16 A' }).map((b) => b.titulo)).toContain('CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS');
     expect(anexoContrato(base()).flatMap((b) => b.lineas).join(' ')).not.toContain('Interlocutor');

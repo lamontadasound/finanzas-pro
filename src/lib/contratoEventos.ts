@@ -215,10 +215,6 @@ export function anexoContrato(c: ContratoEventos): { titulo?: string; lineas: st
     ] },
     ...(tecnicas.length ? [{ titulo: 'CONDICIONES TÉCNICAS Y PREVENCIÓN ACORDADAS', lineas: [tecnicas.join(' ')] }] : []),
     ...(c.particulares.trim() ? [{ titulo: 'CONDICIONES PARTICULARES', lineas: [c.particulares.trim()] }] : []),
-    { titulo: 'MODELO DE PARTE DE INCIDENCIA', lineas: [
-      `Evento y lugar: ${BLANCO}. Fecha y hora: ${BLANCO}. Equipo y número de serie: ${BLANCO}. Estado anterior documentado: ${BLANCO}. Descripción objetiva de los hechos y medidas adoptadas: ${BLANCO}. Posible causante y testigos, si se conocen: ${BLANCO}. Fotografías u otras pruebas: ${BLANCO}. Servicio afectado y duración: ${BLANCO}. Observaciones del Cliente: ${BLANCO}. Documentación económica pendiente: ${BLANCO}. Copia entregada a ${BLANCO} por ${BLANCO} el ${BLANCO}.`,
-      `Firma del técnico: ${BLANCO}. Firma de recepción del Cliente o interlocutor: ${BLANCO}. La firma solo acredita recepción del parte, no conformidad con los hechos, responsabilidad ni deuda. Cualquier acuerdo de responsabilidad, anticipo o pago se documentará separadamente, identificando conceptos, importe y vencimiento.`,
-    ] },
   ];
 }
 
