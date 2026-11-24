@@ -2,12 +2,25 @@
 // El texto legal es fijo; solo se rellenan los datos del Anexo I. Lo que se
 // deja vacío sale en el PDF como una línea en blanco para completar a mano.
 import { BLANCO, BROWN, v, euros, fechaLarga, nuevoDocContrato, parteMontada, type EmisorContrato } from './contratoPdfKit';
+import { dias, horas, valorTermino, errorTerminos, type Termino, type Terminos } from './contratoTerminos';
 
 export const PLANTILLA_ALQUILER = 'alquiler-2026' as const;
 
 export interface EquipoAlquiler { equipo: string; serie: string; cantidad: number; accesorios: string; valor: number }
 
+export const TERMINOS_ALQUILER: readonly Termino[] = [
+  { key: 'fianza', label: 'Devolver la fianza en', unidad: 'días', def: 7, min: 2 },
+  { key: 'defecto', label: 'El cliente avisa de un defecto en', unidad: 'horas', def: 12, min: 2 },
+  { key: 'reparacion', label: 'Días de alquiler cobrables por reparación, máximo', unidad: 'días', def: 30 },
+  { key: 'revision', label: 'Revisión técnica al devolver', unidad: 'días hábiles', def: 3 },
+  { key: 'retraso', label: 'Retraso: veces el precio diario', unidad: 'veces', def: 2 },
+  { key: 'cancelDias', label: 'Cancelación gratis con', unidad: 'días', def: 7, min: 2 },
+  { key: 'cancelHoras', label: 'Cancelación: se cobra el 100 % con menos de', unidad: 'horas', def: 48, min: 2 },
+  { key: 'retencion', label: 'Cancelación intermedia: se retiene', unidad: '%', def: 50, min: 0 },
+];
+
 export interface ContratoAlquiler {
+  terminos?: Terminos;
   firmante: string;
   cliente: string; nif: string; domicilio: string; representante: string; email: string; telefono: string;
   presupuestoRef: string;
@@ -74,7 +87,10 @@ export function validarContratoAlquiler(c: ContratoAlquiler): string | null {
   if (!c.devolucionFecha) return 'Falta la fecha de devolución.';
   if (c.devolucionFecha < c.entregaFecha) return 'La devolución no puede ser anterior a la entrega.';
   if (!equiposConDatos(c).length) return 'Añade al menos un equipo.';
-  if (!(c.precioAlquiler > 0)) return 'Indica el precio del alquiler (IVA incluido).';
+  if (!(c.precioAlquiler > 0)) return 'Indica el precio del alquiler sin IVA.';
+  const et = errorTerminos(TERMINOS_ALQUILER, c.terminos);
+  if (et) return et;
+  if (valorTermino(TERMINOS_ALQUILER, c.terminos, 'cancelDias') * 24 <= valorTermino(TERMINOS_ALQUILER, c.terminos, 'cancelHoras')) return 'Plazos: los días de cancelación gratis tienen que ser más que las horas de cobro del 100 %.';
   return null;
 }
 
@@ -82,7 +98,9 @@ const MODALIDAD = { almacen: 'RECOGIDA Y DEVOLUCIÓN EN ALMACÉN', entrega: 'ENT
 const fechaHora = (f: string, h: string) => `fecha ${f ? fechaLarga(f) : BLANCO}, hora ${v(h)}`;
 
 /** Cláusulas del contrato con los datos ya puestos. */
+const vecesDiario = (n: number) => (n === 1 ? 'el precio diario' : n === 2 ? 'el doble del precio diario' : n === 3 ? 'el triple del precio diario' : `${n.toLocaleString('es-ES')} veces el precio diario`);
 export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parrafos: string[] }[] {
+  const t = (k: string) => valorTermino(TERMINOS_ALQUILER, c.terminos, k);
   const { total, base } = importesAlquiler(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
@@ -106,14 +124,14 @@ export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parraf
     ] },
     { titulo: '5. FIANZA', parrafos: [
       `Como garantía de la devolución de los Equipos en el mismo estado en que se entregaron y del cumplimiento de sus demás obligaciones, el Cliente constituirá una fianza de ${c.fianza > 0 ? euros(c.fianza) : `${BLANCO} €`}, fijada en el Anexo I. La fianza no forma parte del precio y deberá abonarse antes de la entrega de los Equipos, mediante transferencia a la Cuenta Bancaria, retención o preautorización en tarjeta, u otro medio aceptado por escrito por La Montada. Sin fianza no se entregarán los Equipos.`,
-      'Si los Equipos se devuelven completos, a tiempo y en el mismo estado en que se entregaron, La Montada devolverá la fianza íntegra, por el mismo medio empleado, en un plazo máximo de siete días naturales desde su devolución.',
-      'Si al recibir o revisar los Equipos se detectan daños, faltas, suciedad extraordinaria o retrasos, La Montada lo comunicará por escrito al Cliente dentro de ese plazo, con fotografías y el detalle de cada concepto, y descontará de la fianza el coste de reparación o reposición conforme a las cláusulas 8 y 9, los días de retraso conforme a la cláusula 12 y cualquier otra cantidad debida por el Cliente. El resto de la fianza se devolverá en el mismo plazo o, si el coste aún no puede cuantificarse, en los siete días naturales siguientes a disponer del presupuesto o la factura de reparación, que se facilitará al Cliente.',
+      `Si los Equipos se devuelven completos, a tiempo y en el mismo estado en que se entregaron, La Montada devolverá la fianza íntegra, por el mismo medio empleado, en un plazo máximo de ${dias(t('fianza'), 'natural')} desde su devolución.`,
+      `Si al recibir o revisar los Equipos se detectan daños, faltas, suciedad extraordinaria o retrasos, La Montada lo comunicará por escrito al Cliente dentro de ese plazo, con fotografías y el detalle de cada concepto, y descontará de la fianza el coste de reparación o reposición conforme a las cláusulas 8 y 9, los días de retraso conforme a la cláusula 12 y cualquier otra cantidad debida por el Cliente. El resto de la fianza se devolverá en el mismo plazo o, si el coste aún no puede cuantificarse, en los ${dias(t('fianza'), 'natural')} siguientes a disponer del presupuesto o la factura de reparación, que se facilitará al Cliente.`,
       'La fianza no limita la responsabilidad del Cliente. Si las cantidades debidas superan su importe, el Cliente abonará la diferencia en un plazo de diez días naturales desde que se le comunique la liquidación, junto con su soporte.',
     ] },
     { titulo: '6. ENTREGA Y ESTADO DE LOS EQUIPOS', parrafos: [
       'La Montada entregará los Equipos limpios, revisados, en perfecto estado de funcionamiento y con los accesorios, cables, fundas o flight cases indicados en el Anexo I.',
       'En la entrega, las partes firmarán el acta del Anexo II, en la que constarán los Equipos, sus números de serie y los accesorios entregados. La Montada podrá tomar fotografías y vídeos del estado y funcionamiento de los Equipos, que formarán parte del acta. El Cliente podrá comprobar los Equipos antes de recibirlos.',
-      'Si el Cliente no hace constar ninguna observación en el acta, se entenderá que recibe los Equipos completos y en perfecto estado. Cualquier defecto de funcionamiento que el Cliente detecte al usarlos por primera vez deberá comunicarlo de inmediato y, como máximo, en las doce horas siguientes a la entrega; en otro caso, se presumirá que los Equipos funcionaban correctamente.',
+      `Si el Cliente no hace constar ninguna observación en el acta, se entenderá que recibe los Equipos completos y en perfecto estado. Cualquier defecto de funcionamiento que el Cliente detecte al usarlos por primera vez deberá comunicarlo de inmediato y, como máximo, en las ${horas(t('defecto'))} siguientes a la entrega; en otro caso, se presumirá que los Equipos funcionaban correctamente.`,
     ] },
     { titulo: '7. USO Y CUSTODIA DE LOS EQUIPOS', parrafos: [
       'Desde que recibe los Equipos hasta que La Montada los recibe de vuelta, el Cliente es el único responsable de su custodia y conservación, y deberá cuidarlos con la máxima diligencia, usarlos conforme a su destino y a las instrucciones del fabricante, y guardarlos en un lugar cerrado, seco y protegido. No los dejará desatendidos en vehículos, espacios abiertos o lugares de acceso público.',
@@ -122,7 +140,7 @@ export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parraf
     ] },
     { titulo: '8. RESPONSABILIDAD DEL CLIENTE POR DAÑOS', parrafos: [
       'El Cliente deberá devolver los Equipos en el mismo estado en que los recibió. Mientras los tenga bajo su custodia, responderá de todos los daños y desperfectos que sufran, cualquiera que sea la persona que los cause, incluidos sus trabajadores, invitados, asistentes, proveedores, el personal del lugar donde se usen o cualquier tercero, sin perjuicio de su derecho a reclamar a estos lo que haya pagado. Solo quedan excluidos los defectos internos que ya existieran en el momento de la entrega y el desgaste mínimo propio de un uso correcto.',
-      'El Cliente abonará el coste íntegro de diagnóstico y reparación de los Equipos dañados, según el presupuesto o la factura del servicio técnico, que La Montada le facilitará. Si la reparación no es posible o su coste supera el valor de reposición del Equipo, el Cliente abonará el valor de reposición indicado en el Anexo I, que corresponde al precio de un equipo nuevo igual o de prestaciones equivalentes. Además, el Cliente abonará el precio del alquiler diario por cada día en que el Equipo no pueda alquilarse por estar en reparación o pendiente de reposición, con un máximo de treinta días, y los gastos de transporte y gestión de la reparación.',
+      `El Cliente abonará el coste íntegro de diagnóstico y reparación de los Equipos dañados, según el presupuesto o la factura del servicio técnico, que La Montada le facilitará. Si la reparación no es posible o su coste supera el valor de reposición del Equipo, el Cliente abonará el valor de reposición indicado en el Anexo I, que corresponde al precio de un equipo nuevo igual o de prestaciones equivalentes. Además, el Cliente abonará el precio del alquiler diario por cada día en que el Equipo no pueda alquilarse por estar en reparación o pendiente de reposición, con un máximo de ${dias(t('reparacion'))}, y los gastos de transporte y gestión de la reparación.`,
       'Estas cantidades se descontarán de la fianza y, si no son suficientes, el Cliente abonará la diferencia conforme a la cláusula 5. El seguro o el pago de un tercero no liberarán al Cliente mientras La Montada no haya cobrado efectivamente lo debido, y no habrá doble cobro.',
     ] },
     { titulo: '9. PÉRDIDA, ROBO Y NO DEVOLUCIÓN', parrafos: [
@@ -136,16 +154,16 @@ export function clausulasAlquiler(c: ContratoAlquiler): { titulo: string; parraf
     ] },
     { titulo: '11. DEVOLUCIÓN Y REVISIÓN', parrafos: [
       'El Cliente devolverá los Equipos en la fecha, hora y lugar pactados en el Anexo I, completos, con todos sus accesorios, cables y embalajes, limpios y en el mismo estado en que los recibió.',
-      'En el momento de la devolución, La Montada comprobará los Equipos y cumplimentará la parte correspondiente del acta del Anexo II. Como algunos daños solo pueden detectarse al probar los Equipos, La Montada dispondrá de un plazo de tres días hábiles para completar su revisión técnica y comunicar por escrito al Cliente cualquier daño o anomalía, con fotografías o vídeos. La firma del acta de devolución no impedirá reclamar los daños detectados en esa revisión.',
+      `En el momento de la devolución, La Montada comprobará los Equipos y cumplimentará la parte correspondiente del acta del Anexo II. Como algunos daños solo pueden detectarse al probar los Equipos, La Montada dispondrá de un plazo de ${dias(t('revision'), 'hábil')} para completar su revisión técnica y comunicar por escrito al Cliente cualquier daño o anomalía, con fotografías o vídeos. La firma del acta de devolución no impedirá reclamar los daños detectados en esa revisión.`,
       'Si el Cliente no está presente en la revisión o no firma el acta, el estado de los Equipos se acreditará mediante las fotografías y vídeos tomados por La Montada en la entrega y en la devolución, que el Cliente acepta como medio de prueba.',
     ] },
     { titulo: '12. RETRASOS EN LA DEVOLUCIÓN', parrafos: [
-      'Si el Cliente devuelve los Equipos después de la fecha y hora pactadas sin autorización escrita de La Montada, abonará por cada jornada o fracción de retraso el doble del precio diario del alquiler indicado en el Anexo I, además de los daños y perjuicios que se acrediten, como la pérdida de otro alquiler ya comprometido. Estas cantidades podrán descontarse de la fianza.',
+      `Si el Cliente devuelve los Equipos después de la fecha y hora pactadas sin autorización escrita de La Montada, abonará por cada jornada o fracción de retraso ${vecesDiario(t('retraso'))} del alquiler indicado en el Anexo I, además de los daños y perjuicios que se acrediten, como la pérdida de otro alquiler ya comprometido. Estas cantidades podrán descontarse de la fianza.`,
       'Si el Cliente necesita ampliar el alquiler, lo solicitará antes de que termine. La ampliación solo será válida si La Montada la acepta por escrito y el Cliente abona el precio correspondiente.',
     ] },
     { titulo: '13. CANCELACIÓN Y MODIFICACIONES', parrafos: [
       'Los cambios de fechas o Equipos solo serán válidos si La Montada los acepta por escrito y están sujetos a disponibilidad.',
-      'El Cliente podrá cancelar el alquiler comunicándolo por escrito. Si cancela con al menos siete días naturales de antelación a la entrega, La Montada le devolverá el precio abonado. Si cancela con menos de siete días y al menos cuarenta y ocho horas de antelación, La Montada retendrá el 50% del precio. Si cancela con menos de cuarenta y ocho horas, o no recoge o no recibe los Equipos en la fecha pactada, La Montada retendrá el 100% del precio, al haber quedado los Equipos reservados y sin posibilidad de alquilarlos a otro cliente. La fianza se devolverá en todo caso en los siete días naturales siguientes.',
+      `El Cliente podrá cancelar el alquiler comunicándolo por escrito. Si cancela con al menos ${dias(t('cancelDias'), 'natural')} de antelación a la entrega, La Montada le devolverá el precio abonado. Si cancela con menos de ${dias(t('cancelDias'))} y al menos ${horas(t('cancelHoras'))} de antelación, La Montada retendrá el ${t('retencion')}% del precio. Si cancela con menos de ${horas(t('cancelHoras'))}, o no recoge o no recibe los Equipos en la fecha pactada, La Montada retendrá el 100% del precio, al haber quedado los Equipos reservados y sin posibilidad de alquilarlos a otro cliente. La fianza se devolverá en todo caso en los ${dias(t('fianza'), 'natural')} siguientes.`,
       'Si La Montada no puede entregar los Equipos por una causa que le sea imputable, devolverá al Cliente la totalidad de lo abonado. Podrá ofrecer equipos de prestaciones iguales o superiores, que el Cliente podrá aceptar o no.',
     ] },
     { titulo: '14. RESOLUCIÓN POR INCUMPLIMIENTO', parrafos: [
@@ -240,7 +258,7 @@ export function contratoAlquilerPdf(c: ContratoAlquiler, emisor: EmisorContrato,
   titulo('DEVOLUCIÓN');
   text(`Fecha y hora: ${BLANCO}. Lugar: ${BLANCO}. Devuelve (nombre y DNI): ${BLANCO}.`);
   k.tabla(['Equipo y n.º de serie', 'Cant.', 'Accesorios devueltos', 'Estado / incidencias'], filasActa, [36, 8, 26, 30], { altoMin: 8 });
-  text('La firma de la devolución no impide reclamar los daños detectados en la revisión técnica de tres días hábiles prevista en la cláusula 11.', { size: 8.5 });
+  text(`La firma de la devolución no impide reclamar los daños detectados en la revisión técnica de ${dias(valorTermino(TERMINOS_ALQUILER, c.terminos, 'revision'), 'hábil')} prevista en la cláusula 11.`, { size: 8.5 });
   k.firmas(['Recibe La Montada', ''], ['Devuelve el Cliente', ''], 12);
 
   k.pie();

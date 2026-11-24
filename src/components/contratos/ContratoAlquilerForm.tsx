@@ -1,6 +1,7 @@
 import { FormGroup, Field, Chips } from '../kit';
 import { euros } from '../../lib/contratoPdfKit';
-import { ALMACEN, equipoVacio, importesAlquiler, jornadasAlquiler, type ContratoAlquiler, type EquipoAlquiler } from '../../lib/contratoAlquiler';
+import { NumInput, TerminosFields } from './campos';
+import { TERMINOS_ALQUILER, ALMACEN, equipoVacio, importesAlquiler, jornadasAlquiler, type ContratoAlquiler, type EquipoAlquiler } from '../../lib/contratoAlquiler';
 
 type Props = { value: ContratoAlquiler; onChange: (v: ContratoAlquiler) => void; disabled?: boolean };
 
@@ -16,14 +17,14 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
   );
   const num = (k: 'precioDiario' | 'precioAlquiler' | 'transporte' | 'tarifaEspera' | 'fianza', label: string, hint?: string) => (
     <Field label={label} hint={hint}>
-      <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c[k] || ''} onChange={(e) => set(k, Number(e.target.value))} />
+      <NumInput value={c[k] || undefined} onChange={(n) => set(k, n ?? 0)} />
     </Field>
   );
   /** Campo en euros sin IVA; se guarda con IVA (21%). */
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const sinIva = (k: 'precioDiario' | 'precioAlquiler' | 'transporte' | 'tarifaEspera', label: string, hint?: string) => (
     <Field label={label} hint={<>{c[k] > 0 ? `Con IVA: ${euros(c[k])}` : 'El IVA (21%) se calcula solo'}{hint ? ` · ${hint}` : ''}</>}>
-      <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c[k] ? r2(c[k] / 1.21) : ''} onChange={(e) => set(k, r2((Number(e.target.value) || 0) * 1.21))} />
+      <NumInput value={c[k] ? r2(c[k] / 1.21) : undefined} onChange={(n) => set(k, r2((n ?? 0) * 1.21))} />
     </Field>
   );
   const jornadas = jornadasAlquiler(c);
@@ -66,7 +67,7 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
         {txt('autorizados', 'Personas autorizadas a recoger y devolver (nombre, DNI y teléfono)', { wide: true, rows: 2 })}
         {txt('telefonoMontada', 'Teléfono de La Montada')}
         <div className="field text-[13.5px] text-ink-2 self-end">
-          {jornadas ? <>Jornadas de 24 h: <b className="num">{jornadas}</b></> : 'Pon las fechas para calcular las jornadas'}
+          <p>{jornadas ? <>Jornadas de 24 h: <b className="num">{jornadas}</b></> : 'Pon las fechas para calcular las jornadas'}</p>
         </div>
       </FormGroup>
 
@@ -97,7 +98,7 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
         {entrega && sinIva('transporte', 'Transporte sin IVA (€)', 'entrega y recogida')}
         {entrega && sinIva('tarifaEspera', 'Desplazamiento extra o espera sin IVA (€)')}
         <div className="field field-wide text-[13.5px] text-ink-2">
-          Total a pagar antes de la entrega (100%): <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA)
+          <p>Total a pagar antes de la entrega (100%): <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA)</p>
         </div>
         {num('fianza', 'Fianza (€)', 'Aparte del precio')}
         <Field label="Medio de la fianza">
@@ -107,9 +108,11 @@ export function ContratoAlquilerForm({ value: c, onChange, disabled }: Props) {
         </Field>
         {txt('fianzaDevolucion', 'Cuenta o medio para devolver la fianza', { wide: true })}
         <div className="field field-wide text-[13px] text-ink-3">
-          Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}
+          <p>Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}</p>
         </div>
       </FormGroup>
+
+      <TerminosFields defs={TERMINOS_ALQUILER} value={c.terminos} onChange={(t) => set('terminos', t)} />
 
       <FormGroup title="Otras condiciones y firma">
         {txt('particulares', 'Condiciones particulares (opcional)', { wide: true, rows: 3, hint: 'Prevalecen sobre las generales' })}

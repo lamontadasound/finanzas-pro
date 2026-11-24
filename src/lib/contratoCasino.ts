@@ -3,8 +3,18 @@
 // deja vacío sale en el PDF como una línea en blanco para completar a mano.
 // El parte de incidencia NO va dentro del contrato: es una hoja aparte.
 import { BLANCO, BROWN, v, euros, fechaLarga, nuevoDocContrato, parteMontada, type EmisorContrato } from './contratoPdfKit';
+import { dias, horas, valorTermino, errorTerminos, type Termino, type Terminos } from './contratoTerminos';
 
 export const PLANTILLA_CASINO = 'casino-2026' as const;
+
+export const TERMINOS_CASINO: readonly Termino[] = [
+  { key: 'resto', label: 'Pago del resto: días antes del evento', unidad: 'días', def: 10 },
+  { key: 'acceso', label: 'Acceso para montar antes del inicio, mínimo', unidad: 'horas', def: 2 },
+  { key: 'comida', label: 'Comida para el personal a partir de', unidad: 'horas', def: 5 },
+  { key: 'recargo', label: 'Recargo de la hora extra el mismo día', unidad: '%', def: 40, min: 0 },
+  { key: 'cambios', label: 'Cambios con antelación de', unidad: 'días', def: 15 },
+  { key: 'cancelacion', label: 'Cancelación tardía: menos de', unidad: 'días', def: 10 },
+];
 
 export interface MesaCasino { mesa: string; cantidad: number; croupiers: number; material: string; espacio: string; /** Solo contratos antiguos: antes se ponía precio por mesa. */ precioBase?: number }
 
@@ -19,6 +29,7 @@ export interface ContratoCasino {
   mesas: MesaCasino[];
   duracionHoras: string;
   hayHoraExtra: boolean; horaExtraMesaBase: number; // sin IVA
+  horaExtraIncluye?: string; terminos?: Terminos;
   fichasPorAsistente: string; personalizacion: string; vestuario: string; premios: string;
   reposicionFicha: number; reposicionBaraja: number; reposicionOtros: string; // con IVA
   precioBase: number; // precio total sin IVA
@@ -48,7 +59,7 @@ export const nuevoContratoCasino = (previo?: Partial<ContratoCasino>): ContratoC
   presupuestoRef: '',
   mesas: MESAS_TIPICAS.map((m) => ({ ...m })),
   duracionHoras: '3',
-  hayHoraExtra: true, horaExtraMesaBase: previo?.horaExtraMesaBase ?? 0,
+  hayHoraExtra: true, horaExtraMesaBase: previo?.horaExtraMesaBase ?? 0, horaExtraIncluye: 'el croupier y el material de cada mesa', terminos: {},
   fichasPorAsistente: '', personalizacion: 'No', vestuario: 'Estándar de La Montada', premios: 'No',
   reposicionFicha: previo?.reposicionFicha ?? 0, reposicionBaraja: previo?.reposicionBaraja ?? 0, reposicionOtros: previo?.reposicionOtros ?? '',
   precioBase: 0,
@@ -78,11 +89,14 @@ export function validarContratoCasino(c: ContratoCasino): string | null {
   if (!c.fechaEvento) return 'Falta la fecha del evento.';
   if (!mesasConDatos(c).length) return 'Añade al menos una mesa.';
   if (!(importesCasino(c).total > 0)) return 'Pon el precio total sin IVA.';
-  return null;
+  if (Number(c.primerPago) > importesCasino(c).total) return 'El primer pago no puede ser mayor que el total con IVA.';
+  return errorTerminos(TERMINOS_CASINO, c.terminos);
 }
 
 /** Cláusulas del contrato con los datos ya puestos. */
 export function clausulasCasino(c: ContratoCasino): { titulo: string; parrafos: string[] }[] {
+  const t = (k: string) => valorTermino(TERMINOS_CASINO, c.terminos, k);
+  const incluyeHora = (c.horaExtraIncluye ?? '').trim().replace(/\.+$/, '') || 'el croupier y el material de cada mesa';
   const { total, base, iva, reserva, resto, es50 } = importesCasino(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
@@ -98,11 +112,11 @@ export function clausulasCasino(c: ContratoCasino): { titulo: string; parrafos: 
     { titulo: '3. PRECIO Y FORMA DE PAGO', parrafos: [
       `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido, que corresponde a ${euros(base)} sin IVA más ${euros(iva)} de IVA, conforme al desglose del apartado “Casino” del Anexo I.`,
       `A la firma se abonará ${es50 ? 'el 50% del precio total, esto es, ' : 'como primer pago '}${conIva(reserva)}, como pago a cuenta para la reserva de fecha, material y croupiers, a la cuenta bancaria abierta a nombre de La Montada Sound, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. Hasta que se reciba este pago, la fecha no quedará reservada.`,
-      `${es50 ? 'El 50% restante' : 'El resto del precio'}, esto es, ${conIva(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma. La Montada emitirá los justificantes y facturas correspondientes.`,
+      `${es50 ? 'El 50% restante' : 'El resto del precio'}, esto es, ${conIva(resto)}, se abonará como máximo ${dias(t('resto'), 'natural')} antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma. La Montada emitirá los justificantes y facturas correspondientes.`,
       'Ante un impago vencido, La Montada requerirá por escrito su subsanación, concediendo al menos tres días naturales y advirtiendo de sus consecuencias. Si persiste el impago, podrá no prestar el servicio o resolver el contrato mediante comunicación expresa, con liquidación conforme a la cláusula 9. Cuando el Cliente actúe como empresario o profesional, las cantidades vencidas devengarán el interés de demora previsto en la Ley 3/2004, de 29 de diciembre.',
     ] },
     { titulo: '4. MONTAJE PREVIO, HORARIOS Y DESMONTAJE', parrafos: [
-      'La Montada realizará el transporte, el montaje y la preparación de todas las mesas y del material de casino antes de la hora de inicio del servicio, de modo que esté todo listo para jugar a la llegada de los asistentes. Para ello, el Cliente garantizará el acceso al recinto con la antelación indicada en el Anexo I, que no será inferior a dos horas antes del inicio del servicio.',
+      `La Montada realizará el transporte, el montaje y la preparación de todas las mesas y del material de casino antes de la hora de inicio del servicio, de modo que esté todo listo para jugar a la llegada de los asistentes. Para ello, el Cliente garantizará el acceso al recinto con la antelación indicada en el Anexo I, que no será inferior a ${horas(t('acceso'))} antes del inicio del servicio.`,
       'El Cliente coordinará con el recinto el acceso, la carga y descarga, el estacionamiento necesario y los horarios de montaje y desmontaje. Si el acceso se retrasa o el espacio no está disponible por causas ajenas a La Montada, la hora de finalización no se ampliará automáticamente, y La Montada no responderá de que el casino no esté montado a la hora prevista.',
       'El tiempo de servicio de casino se contará desde la hora de inicio pactada en el Anexo I, aunque los asistentes empiecen a jugar más tarde. Al finalizar el servicio, La Montada recogerá las fichas y desmontará el material. El recinto facilitará acceso para retirarlo y el Cliente no podrá retenerlo como garantía de ninguna reclamación.',
     ] },
@@ -110,7 +124,7 @@ export function clausulasCasino(c: ContratoCasino): { titulo: string; parrafos: 
       'Los croupiers serán profesionales seleccionados y coordinados por La Montada, que conserva la dirección del servicio, la organización de las mesas y las reglas de juego. Los croupiers explicarán las reglas a los asistentes, dirigirán las partidas, custodiarán las fichas y velarán por el buen uso del material.',
       'La Montada podrá sustituir a cualquier croupier por otro de experiencia equivalente, sin necesidad de aceptación del Cliente, salvo que se haya contratado nominalmente a una persona concreta. Podrá también sustituir mesas o material por otros de características equivalentes o superiores, sin incremento de precio.',
       'Los croupiers podrán limitar el número de jugadores por mesa, pausar una partida, retirar fichas o no admitir en la mesa a los asistentes que se comporten de forma inadecuada, estén visiblemente ebrios, dañen el material o incumplan las indicaciones. El Cliente colaborará con ellos y no podrá exigirles tareas distintas de las propias del servicio de casino.',
-      'Cuando el servicio dure más de cinco horas, el Cliente proporcionará comida y bebida sin alcohol a los croupiers y al personal de La Montada. Los croupiers dispondrán de las pausas razonables necesarias, que La Montada organizará de forma que se mantenga el funcionamiento de las mesas en la medida de lo posible.',
+      `Cuando el servicio dure más de ${horas(t('comida'))}, el Cliente proporcionará comida y bebida sin alcohol a los croupiers y al personal de La Montada. Los croupiers dispondrán de las pausas razonables necesarias, que La Montada organizará de forma que se mantenga el funcionamiento de las mesas en la medida de lo posible.`,
     ] },
     { titulo: '6. RESPONSABILIDAD SOBRE EL MATERIAL DE CASINO', parrafos: [
       'Las mesas, ruletas, tapetes, fichas, cartas, sabots y demás material de casino permanecerán bajo el control de La Montada durante el servicio. Su instalación no supone su entrega en alquiler al Cliente.',
@@ -125,17 +139,17 @@ export function clausulasCasino(c: ContratoCasino): { titulo: string; parrafos: 
       'Ante derrames, manipulación, agresiones, amenazas o cualquier riesgo para las personas o el material, La Montada podrá cerrar la mesa afectada o suspender el servicio, avisando al Cliente o su interlocutor salvo urgencia. Si el riesgo persiste o se repite, podrá dar por finalizado el servicio y retirar el material, sin devolución del precio cuando la causa sea imputable al Cliente o a los asistentes.',
     ] },
     { titulo: '8. HORAS EXTRA', parrafos: hayHoraExtraCasino(c) ? [
-      'Cada hora adicional de servicio de casino tendrá el precio por mesa indicado en el Anexo I, IVA incluido, si se contrata antes del día del evento, con un recargo del 40% si se solicita el mismo día. El precio incluye el croupier y el material de cada mesa. El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.',
+      `Cada hora adicional de servicio de casino tendrá el precio por mesa indicado en el Anexo I, IVA incluido, ${t('recargo') > 0 ? `si se contrata antes del día del evento, con un recargo del ${t('recargo')}% si se solicita el mismo día` : 'tanto si se contrata antes como el mismo día del evento'}. El precio incluye ${incluyeHora}. El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.`,
       'Las horas extra estarán sujetas a la disponibilidad de los croupiers y a los horarios del recinto. Solo el Cliente o la persona autorizada en el Anexo I podrán contratarlas.',
     ] : [
       'Este contrato no incluye horas adicionales de servicio de casino. Cualquier ampliación del horario requerirá un nuevo acuerdo por escrito, con su precio.',
     ] },
     { titulo: '9. MODIFICACIONES Y CANCELACIONES', parrafos: [
       '(A) Modificaciones',
-      'Los cambios de fecha, lugar, horario, número o tipo de mesas deberán solicitarse por escrito con al menos quince días naturales de antelación y solo serán efectivos cuando ambas partes acepten por escrito las nuevas condiciones y, en su caso, el precio revisado. Las solicitudes posteriores se atenderán según disponibilidad.',
+      `Los cambios de fecha, lugar, horario, número o tipo de mesas deberán solicitarse por escrito con al menos ${dias(t('cambios'), 'natural')} de antelación y solo serán efectivos cuando ambas partes acepten por escrito las nuevas condiciones y, en su caso, el precio revisado. Las solicitudes posteriores se atenderán según disponibilidad.`,
       '(B) Cancelación por el Cliente',
       'El Cliente comunicará la cancelación por escrito. La Montada podrá reclamar el valor de los servicios efectivamente realizados y los costes y perjuicios razonables, acreditados y no recuperables causados por la cancelación, incluidos los compromisos con los croupiers y el beneficio neto perdido por la fecha reservada cuando se acredite. La Montada remitirá una liquidación desglosada dentro de los quince días naturales siguientes.',
-      'Si la cancelación se comunica con menos de diez días naturales de antelación, la reclamación podrá alcanzar el importe total contratado cuando los servicios realizados y los perjuicios justificados alcancen dicha cantidad. El pago a cuenta se aplicará a la liquidación justificada, cuyo importe no excederá del precio total, y el exceso se devolverá en los catorce días naturales siguientes.',
+      `Si la cancelación se comunica con menos de ${dias(t('cancelacion'), 'natural')} de antelación, la reclamación podrá alcanzar el importe total contratado cuando los servicios realizados y los perjuicios justificados alcancen dicha cantidad. El pago a cuenta se aplicará a la liquidación justificada, cuyo importe no excederá del precio total, y el exceso se devolverá en los catorce días naturales siguientes.`,
       '(C) Cancelación por La Montada y fuerza mayor',
       'Si La Montada cancela por una causa que le sea atribuible, devolverá los importes correspondientes a los servicios no prestados, sin perjuicio de los demás derechos que legalmente correspondan al Cliente.',
       'Ante un supuesto de fuerza mayor, la parte afectada lo comunicará sin demora y las partes valorarán un aplazamiento sujeto a disponibilidad. Si no hay acuerdo, se liquidarán los servicios efectivamente prestados y los gastos que legalmente procedan, devolviendo el resto.',
@@ -173,7 +187,7 @@ export function anexoCasino(c: ContratoCasino): { evento: string[]; casino: stri
       `Fecha del evento: ${c.fechaEvento ? fechaLarga(c.fechaEvento) : BLANCO}. Tipo de evento y número previsto de asistentes: ${v(c.tipoYAsistentes)}.`,
       `Recinto, dirección completa y espacio donde se instalará el casino: ${v(c.recinto)}. Interior / cubierto: ${siNo(c.cubierto)}.`,
       `Responsable del recinto, teléfono y correo: ${v(c.responsableRecinto)}.`,
-      `Acceso para montaje: ${v(c.accesoMontaje)} (mínimo dos horas antes del inicio). Casino montado y listo para jugar a las: ${v(c.listoA)}. Inicio y fin del servicio de casino: ${v(c.servicio)}. Desmontaje: ${v(c.desmontaje)}.`,
+      `Acceso para montaje: ${v(c.accesoMontaje)} (mínimo ${horas(valorTermino(TERMINOS_CASINO, c.terminos, 'acceso'))} antes del inicio). Casino montado y listo para jugar a las: ${v(c.listoA)}. Inicio y fin del servicio de casino: ${v(c.servicio)}. Desmontaje: ${v(c.desmontaje)}.`,
       `${c.interlocutor.trim() ? `Interlocutor del Cliente durante el evento: ${c.interlocutor.trim()}. ` : ''}Persona autorizada para contratar horas extra: ${c.autorizado.trim() || 'no se designa; solo el Cliente'}.`,
       `Participación de menores autorizada por el Cliente: ${siNo(c.menores)}.`,
     ],
@@ -184,8 +198,8 @@ export function anexoCasino(c: ContratoCasino): { evento: string[]; casino: stri
       `Vestuario de los croupiers: ${v(c.vestuario)}.`,
       `Premios o regalos que entregará el Cliente, bajo su responsabilidad: ${v(c.premios)}.`,
       `Precio de reposición de material extraviado: ficha ${eurOBlanco(c.reposicionFicha)}; baraja ${eurOBlanco(c.reposicionBaraja)}; otros ${v(c.reposicionOtros)}.`,
-      `Precio total del servicio, IVA incluido: ${euros(total)} (${euros(r2(total / 1.21))} sin IVA). Pago a cuenta a la firma${es50 ? ' (50%)' : ''}: ${euros(reserva)}. Resto${es50 ? ' (50%)' : ''}: ${euros(resto)}, como máximo diez días antes del evento.`,
-      `Comida y bebida para croupiers y personal (si el servicio supera cinco horas): ${v(c.comida)}.`,
+      `Precio total del servicio, IVA incluido: ${euros(total)} (${euros(r2(total / 1.21))} sin IVA). Pago a cuenta a la firma${es50 ? ' (50%)' : ''}: ${euros(reserva)}. Resto${es50 ? ' (50%)' : ''}: ${euros(resto)}, como máximo ${dias(valorTermino(TERMINOS_CASINO, c.terminos, 'resto'))} antes del evento.`,
+      `Comida y bebida para croupiers y personal (si el servicio supera ${horas(valorTermino(TERMINOS_CASINO, c.terminos, 'comida'))}): ${v(c.comida)}.`,
       ...(c.particulares.trim() ? [`Condiciones particulares: ${c.particulares.trim()}.`] : []),
     ],
   };

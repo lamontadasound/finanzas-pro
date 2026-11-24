@@ -1,6 +1,7 @@
 import { FormGroup, Field, Chips } from '../kit';
 import { euros } from '../../lib/contratoPdfKit';
-import { TRABAJOS, importesInstalacion, materialVacio, type ContratoInstalacion, type MaterialInstalacion } from '../../lib/contratoInstalacion';
+import { NumInput, TerminosFields } from './campos';
+import { TERMINOS_INSTALACION, TRABAJOS, importesInstalacion, materialVacio, type ContratoInstalacion, type MaterialInstalacion } from '../../lib/contratoInstalacion';
 
 type Props = { value: ContratoInstalacion; onChange: (v: ContratoInstalacion) => void; disabled?: boolean };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -17,7 +18,7 @@ export function ContratoInstalacionForm({ value: c, onChange, disabled }: Props)
   );
   const sinIva = (k: 'tarifaDesplazamientoBase' | 'horaTecnicoBase', label: string) => (
     <Field label={label} hint={c[k] > 0 ? `Con IVA: ${euros(r2(c[k] * 1.21))}` : 'El IVA (21%) se calcula solo'}>
-      <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c[k] || ''} onChange={(e) => set(k, Number(e.target.value) || 0)} />
+      <NumInput value={c[k] || undefined} onChange={(n) => set(k, n ?? 0)} />
     </Field>
   );
   const imp = importesInstalacion(c);
@@ -44,7 +45,7 @@ export function ContratoInstalacionForm({ value: c, onChange, disabled }: Props)
         <Field label="Fecha de la visita técnica"><input type="date" className="input-form" value={c.fechaVisita} onChange={(e) => set('fechaVisita', e.target.value)} /></Field>
         {txt('descripcion', 'Descripción general', { wide: true, rows: 2, placeholder: 'Proyector fijo en techo con pantalla motorizada, cableado HDMI hasta la mesa de control y configuración' })}
         {txt('tecnico', 'Técnico responsable')}
-        {txt('duracion', 'Duración estimada', { placeholder: 'Una jornada' })}
+        {txt('duracion', 'Duración estimada', { placeholder: 'Una a dos jornadas de trabajo' })}
         {txt('horario', 'Horario de trabajo permitido', { placeholder: 'L-V de 9:00 a 14:00' })}
       </FormGroup>
 
@@ -87,24 +88,23 @@ export function ContratoInstalacionForm({ value: c, onChange, disabled }: Props)
 
       <FormGroup title="Precio y pago">
         <Field label="Precio total sin IVA (€)" hint={imp.total > 0 ? `IVA 21%: ${euros(imp.iva)} · Total con IVA: ${euros(imp.total)}` : 'El IVA (21%) se calcula solo'}>
-          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c.precioBase || ''} onChange={(e) => set('precioBase', Number(e.target.value) || 0)} />
+          <NumInput value={c.precioBase || undefined} onChange={(n) => set('precioBase', n ?? 0)} />
         </Field>
         <Field label="Primer pago a la firma, con IVA (€)" hint={<>
           {imp.es50 ? '50% del total' : `${Math.round(imp.reserva / (imp.total || 1) * 1000) / 10}% del total`} · Resto al terminar la instalación: {euros(imp.resto)}
           {!imp.es50 && <> · <button type="button" className="underline" onClick={() => set('primerPago', 0)}>volver al 50%</button></>}
         </>}>
-          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={imp.total > 0 ? (c.primerPago || imp.reserva) : ''}
-            onChange={(e) => set('primerPago', Number(e.target.value) || 0)} />
+          <NumInput value={c.primerPago || undefined} placeholder={imp.total > 0 ? String(imp.reserva) : undefined} onChange={(n) => set('primerPago', n ?? 0)} />
         </Field>
         <div className="field field-wide text-[13.5px] text-ink-2">
-          Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Primer pago: <b className="num">{euros(imp.reserva)}</b> · Al terminar: <b className="num">{euros(imp.resto)}</b>
+          <p>Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Primer pago: <b className="num">{euros(imp.reserva)}</b> · Al terminar: <b className="num">{euros(imp.resto)}</b></p>
         </div>
-        <Field label="Garantía de la instalación (meses)"><input type="number" min="1" step="1" className="input-form num" value={c.garantiaMeses || ''} onChange={(e) => set('garantiaMeses', Number(e.target.value) || 0)} /></Field>
+        <Field label="Garantía de la instalación (meses)"><NumInput step="1" min="1" placeholder="12" value={c.garantiaMeses || undefined} onChange={(n) => set('garantiaMeses', n ?? 0)} /></Field>
         {sinIva('tarifaDesplazamientoBase', 'Desplazamiento y diagnóstico fuera de garantía, sin IVA (€)')}
         {sinIva('horaTecnicoBase', 'Hora de técnico adicional, sin IVA (€)')}
         {txt('seguro', 'Seguro de responsabilidad civil (aseguradora y póliza)', { wide: true, hint: 'Se recuerda para los siguientes contratos' })}
         <div className="field field-wide text-[13px] text-ink-3">
-          Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}
+          <p>Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}</p>
         </div>
       </FormGroup>
 
@@ -112,6 +112,8 @@ export function ContratoInstalacionForm({ value: c, onChange, disabled }: Props)
         {txt('interlocutor', 'Interlocutor del cliente (nombre, teléfono y correo)', { wide: true, hint: 'Quien estará durante los trabajos y firma el acta' })}
         {txt('autorizado', 'Quién puede aceptar trabajos adicionales', { wide: true, placeholder: 'Vacío = solo el cliente' })}
       </FormGroup>
+
+      <TerminosFields defs={TERMINOS_INSTALACION} value={c.terminos} onChange={(t) => set('terminos', t)} />
 
       <FormGroup title="Otras condiciones y firma">
         <div className="field"><span className="field-label">¿El cliente se opone a que usemos fotos de la instalación?</span>

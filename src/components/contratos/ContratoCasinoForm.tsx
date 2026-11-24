@@ -1,6 +1,8 @@
 import { FormGroup, Field, Chips } from '../kit';
 import { euros } from '../../lib/contratoPdfKit';
-import { importesCasino, mesaVacia, type ContratoCasino, type MesaCasino } from '../../lib/contratoCasino';
+import { NumInput, TerminosFields } from './campos';
+import { valorTermino, dias } from '../../lib/contratoTerminos';
+import { TERMINOS_CASINO, importesCasino, mesaVacia, type ContratoCasino, type MesaCasino } from '../../lib/contratoCasino';
 
 type Props = { value: ContratoCasino; onChange: (v: ContratoCasino) => void; disabled?: boolean };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -77,32 +79,36 @@ export function ContratoCasinoForm({ value: c, onChange, disabled }: Props) {
 
       <FormGroup title="Precio y pago">
         <Field label="Precio total sin IVA (€)" hint={imp.total > 0 ? `IVA 21%: ${euros(imp.iva)} · Total con IVA: ${euros(imp.total)}` : 'El IVA (21%) se calcula solo'}>
-          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={c.precioBase || (imp.base || '')}
-            onChange={(e) => set('precioBase', Number(e.target.value) || 0)} />
+          <NumInput value={c.precioBase || imp.base || undefined} onChange={(n) => set('precioBase', n ?? 0)} />
         </Field>
         <Field label="Primer pago a la firma, con IVA (€)" hint={<>
-          {imp.es50 ? '50% del total' : `${Math.round(imp.reserva / (imp.total || 1) * 1000) / 10}% del total`} · Resto 10 días antes: {euros(imp.resto)}
+          {imp.es50 ? '50% del total' : `${Math.round(imp.reserva / (imp.total || 1) * 1000) / 10}% del total`} · Resto {dias(valorTermino(TERMINOS_CASINO, c.terminos, 'resto'))} antes: {euros(imp.resto)}
           {!imp.es50 && <> · <button type="button" className="underline" onClick={() => set('primerPago', 0)}>volver al 50%</button></>}
         </>}>
-          <input type="number" inputMode="decimal" min="0" step="0.01" className="input-form num" value={imp.total > 0 ? (c.primerPago || imp.reserva) : ''}
-            onChange={(e) => set('primerPago', Number(e.target.value) || 0)} />
+          <NumInput value={c.primerPago || undefined} placeholder={imp.total > 0 ? String(imp.reserva) : undefined} onChange={(n) => set('primerPago', n ?? 0)} />
         </Field>
         <div className="field field-wide text-[13.5px] text-ink-2">
-          Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Primer pago: <b className="num">{euros(imp.reserva)}</b> · Resto 10 días antes: <b className="num">{euros(imp.resto)}</b>
+          <p>Total: <b className="num">{euros(imp.total)}</b> con IVA (<span className="num">{euros(imp.base)}</span> sin IVA) · Primer pago: <b className="num">{euros(imp.reserva)}</b> · Resto {dias(valorTermino(TERMINOS_CASINO, c.terminos, 'resto'))} antes: <b className="num">{euros(imp.resto)}</b></p>
         </div>
         <div className="field">
           <span className="field-label">¿Hay hora extra?</span>
           <Chips label="¿Hay hora extra?" value={c.hayHoraExtra === false ? 'no' : 'si'} onChange={(x) => set('hayHoraExtra', x === 'si')}
             options={[{ value: 'si', label: 'Sí' }, { value: 'no', label: 'No' }]} />
         </div>
-        {c.hayHoraExtra !== false && <Field label="Hora extra por mesa, sin IVA (€)" hint={c.horaExtraMesaBase > 0 ? `Con IVA: ${euros(r2(c.horaExtraMesaBase * 1.21))} · el mismo día +40%` : 'El mismo día: +40%'}>
-          <input type="number" min="0" step="0.01" className="input-form num" value={c.horaExtraMesaBase || ''} onChange={(e) => set('horaExtraMesaBase', Number(e.target.value) || 0)} />
-        </Field>}
-        <Field label="Reposición ficha, con IVA (€)"><input type="number" min="0" step="0.01" className="input-form num" value={c.reposicionFicha || ''} onChange={(e) => set('reposicionFicha', Number(e.target.value) || 0)} /></Field>
-        <Field label="Reposición baraja, con IVA (€)"><input type="number" min="0" step="0.01" className="input-form num" value={c.reposicionBaraja || ''} onChange={(e) => set('reposicionBaraja', Number(e.target.value) || 0)} /></Field>
+        {c.hayHoraExtra !== false && <>
+          <Field label="Hora extra por mesa, sin IVA (€)" hint={c.horaExtraMesaBase > 0 ? `Con IVA: ${euros(r2(c.horaExtraMesaBase * 1.21))}` : 'Vacío o 0 = sin hora extra'}>
+            <NumInput value={c.horaExtraMesaBase || undefined} onChange={(n) => set('horaExtraMesaBase', n ?? 0)} />
+          </Field>
+          <Field label="Recargo si se pide el mismo día (%)" hint={c.horaExtraMesaBase > 0 ? `El mismo día, con IVA: ${euros(r2(c.horaExtraMesaBase * 1.21 * (1 + valorTermino(TERMINOS_CASINO, c.terminos, 'recargo') / 100)))}` : '0 = el mismo precio'}>
+            <NumInput cero step="1" placeholder="40" value={c.terminos?.recargo ?? 40} onChange={(n) => set('terminos', { ...c.terminos, recargo: n })} />
+          </Field>
+          {txt('horaExtraIncluye', 'Qué incluye la hora extra', { wide: true })}
+        </>}
+        <Field label="Reposición ficha, con IVA (€)"><NumInput value={c.reposicionFicha || undefined} onChange={(n) => set('reposicionFicha', n ?? 0)} /></Field>
+        <Field label="Reposición baraja, con IVA (€)"><NumInput value={c.reposicionBaraja || undefined} onChange={(n) => set('reposicionBaraja', n ?? 0)} /></Field>
         {txt('reposicionOtros', 'Reposición de otro material', { wide: true, placeholder: 'Ej. bola de ruleta 25 €' })}
         <div className="field field-wide text-[13px] text-ink-3">
-          Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}
+          <p>Cuenta para los pagos (fija): La Montada Sound · {c.cuentaEntidad || 'banco sin indicar'} · {c.iban || <b className="text-red-700">falta el IBAN en Ajustes → Datos fiscales</b>}</p>
         </div>
       </FormGroup>
 
@@ -110,6 +116,8 @@ export function ContratoCasinoForm({ value: c, onChange, disabled }: Props) {
         {txt('interlocutor', 'Persona de contacto del cliente el día del evento (opcional)', { wide: true, hint: 'Si lo dejas vacío no sale en el contrato' })}
         {txt('autorizado', 'Quién puede contratar horas extra', { wide: true, placeholder: 'Vacío = solo el cliente' })}
       </FormGroup>
+
+      <TerminosFields defs={TERMINOS_CASINO.filter((d) => d.key !== 'recargo')} value={c.terminos} onChange={(t) => set('terminos', t)} />
 
       <FormGroup title="Otras condiciones y firma">
         {txt('particulares', 'Condiciones particulares (opcional)', { wide: true, rows: 3, hint: 'Prevalecen sobre las generales' })}

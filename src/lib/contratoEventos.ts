@@ -3,9 +3,21 @@
 // rellenan los puntos clave. Los campos vacíos salen en el PDF como una
 // línea en blanco para completar a mano.
 import { BLANCO, v, euros, fechaLarga, nuevoDocContrato, parteMontada, type EmisorContrato } from './contratoPdfKit';
+import { dias, horas, valorTermino, errorTerminos, type Termino, type Terminos } from './contratoTerminos';
 export { euros, type EmisorContrato };
 
 export const PLANTILLA_EVENTOS = 'eventos-2026' as const;
+
+export const TERMINOS_EVENTOS: readonly Termino[] = [
+  { key: 'resto', label: 'Pago del resto: días antes del evento', unidad: 'días', def: 10 },
+  { key: 'comida', label: 'Comida para el equipo a partir de', unidad: 'horas', def: 5 },
+  { key: 'contenidos', label: 'Pedir contenidos de proyección con antelación de', unidad: 'días', def: 14 },
+  { key: 'archivos', label: 'El cliente envía archivos y música con antelación de', unidad: 'días', def: 7 },
+  { key: 'cambios', label: 'Cambios con antelación de', unidad: 'días', def: 15 },
+  { key: 'cancelacion', label: 'Cancelación tardía: menos de', unidad: 'días', def: 10 },
+];
+/** Lo que puede incluir la hora extra. */
+export const INCLUYE_HORA = ['DJ', 'personal técnico', 'equipos'] as const;
 
 export interface ContratoEventos {
   tipoEvento: 'boda' | 'evento';
@@ -24,6 +36,10 @@ export interface ContratoEventos {
   recinto: string; responsableRecinto: string;
   montaje: string; pruebas: string; servicio: string; desmontaje: string;
   duracion: string; hayHoraExtra?: boolean; horaExtra: number; tecnicosDjs: string;
+  /** Precio con IVA si se pide el mismo día; 0 = el mismo precio. */
+  horaExtraMismoDia?: number;
+  horaExtraIncluye?: string[]; horaExtraOtros?: string; horaExtraNoIncluye?: string;
+  terminos?: Terminos;
   contrayentes: string; interlocutor: string; autorizado: string; limiteAutorizado: string; contactoMontada: string;
   // Anexo I · servicios
   presupuestoRef: string; servicios: string; personal: string; extras: string;
@@ -46,6 +62,7 @@ export const nuevoContratoEventos = (previo?: Partial<ContratoEventos>): Contrat
   fechaEvento: '', fechaFin: '', tipoYAsistentes: '', recinto: '', responsableRecinto: '',
   montaje: '', pruebas: '', servicio: '', desmontaje: '',
   duracion: '3 horas', hayHoraExtra: true, horaExtra: 250, tecnicosDjs: '',
+  horaExtraMismoDia: 350, horaExtraIncluye: [...INCLUYE_HORA], horaExtraOtros: '', horaExtraNoIncluye: '', terminos: {},
   contrayentes: '', interlocutor: '', autorizado: '', limiteAutorizado: '', contactoMontada: previo?.contactoMontada ?? '',
   presupuestoRef: '', servicios: '', personal: '', extras: 'Ninguno',
   electrico: '', accesos: '', zonaTecnica: '', liquidos: '',
@@ -64,6 +81,26 @@ export const importesContrato = (c: Pick<ContratoEventos, 'precioTotal'> & Parti
   return { total, base, iva: r2(total - base), reserva, resto: r2(total - reserva), es50: reserva === mitad };
 };
 
+/** Abre un contrato guardado. Los anteriores no tenían precio propio para el mismo día: conservan el que salía en su PDF. */
+export const cargarContratoEventos = (datos: Partial<ContratoEventos>): ContratoEventos => ({
+  ...nuevoContratoEventos(), ...datos,
+  horaExtraMismoDia: datos.horaExtraMismoDia ?? Math.max(350, (Number(datos.horaExtra) || 0) + 100),
+});
+/** Frase de lo que incluye (y no incluye) la hora extra. */
+export const textoIncluyeHora = (c: Pick<ContratoEventos, 'horaExtraIncluye' | 'horaExtraOtros' | 'horaExtraNoIncluye'>) => {
+  const lista = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`);
+  const marcado: string[] = c.horaExtraIncluye ?? [...INCLUYE_HORA];
+  const limpia = (s?: string) => (s ?? '').trim().replace(/\.+$/, '');
+  const otros = limpia(c.horaExtraOtros), no = limpia(c.horaExtraNoIncluye);
+  const todo = INCLUYE_HORA.every((x) => marcado.includes(x));
+  const si = [...INCLUYE_HORA.filter((x) => marcado.includes(x)), ...(otros ? [otros] : [])];
+  const fuera = [...INCLUYE_HORA.filter((x) => !marcado.includes(x)), ...(no ? [no] : [])];
+  return [
+    si.length ? `Este precio incluye ${todo ? 'el conjunto del servicio contratado: ' : 'únicamente: '}${lista(si)}.` : '',
+    fuera.length ? `No incluye: ${lista(fuera)}.` : '',
+  ].filter(Boolean).join(' ');
+};
+
 /** Hay hora extra si no se ha marcado que no y el precio es mayor que 0. */
 export const hayHoraExtra = (c: Pick<ContratoEventos, 'hayHoraExtra' | 'horaExtra'>) => c.hayHoraExtra !== false && Number(c.horaExtra) > 0;
 /** «X € IVA incluido (Y € sin IVA)». */
@@ -78,13 +115,19 @@ export function validarContratoEventos(c: ContratoEventos): string | null {
   if (!c.fechaEvento) return 'Falta la fecha del evento.';
   if (c.fechaFin && c.fechaFin < c.fechaEvento) return 'La fecha de fin no puede ser anterior a la del evento.';
   if (!(importesContrato(c).total > 0)) return 'Indica el precio sin IVA.';
+  if (Number(c.primerPago) > importesContrato(c).total) return 'El primer pago no puede ser mayor que el total con IVA.';
   if (!c.servicios.trim()) return 'Describe los servicios y equipos contratados.';
+  if (hayHoraExtra(c) && c.horaExtraIncluye && !c.horaExtraIncluye.length && !c.horaExtraOtros?.trim()) return 'Marca qué incluye la hora extra.';
+  const et = errorTerminos(TERMINOS_EVENTOS, c.terminos);
+  if (et) return et;
   return null;
 }
 
 
 /** Cláusulas del contrato con los datos ya puestos (modelo v2). */
 export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafos: string[] }[] {
+  const t = (k: string) => valorTermino(TERMINOS_EVENTOS, c.terminos, k);
+  const mismoDia = Number(c.horaExtraMismoDia ?? Math.max(350, (Number(c.horaExtra) || 0) + 100));
   const { total, base, iva, reserva, resto, es50 } = importesContrato(c);
   const hora = Number(c.horaExtra) || 0;
   return [
@@ -94,7 +137,7 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
     { titulo: '2. PRECIO Y FORMA DE PAGO', parrafos: [
       `El precio total del servicio es de ${euros(total)}, IVA (21%) incluido, que corresponde a ${euros(base)} sin IVA más ${euros(iva)} de IVA.`,
       `A la firma se abonará ${es50 ? 'el 50% del precio total, esto es, ' : 'como primer pago '}${conIva(reserva)}, como pago a cuenta para la reserva de fecha y la preparación del servicio, a la cuenta bancaria abierta a nombre de ${v(c.cuentaTitular)}, en la entidad ${v(c.cuentaEntidad)}, con número IBAN ${v(c.iban)} (la “Cuenta Bancaria”). La Montada confirmará por escrito la recepción y la reserva. La falta de pago no dejará sin efecto automáticamente el contrato: se aplicará el requerimiento y, en su caso, la resolución previstos a continuación.`,
-      `${es50 ? 'El 50% restante' : 'El resto del precio'}, esto es, ${conIva(resto)}, se abonará como máximo diez días naturales antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
+      `${es50 ? 'El 50% restante' : 'El resto del precio'}, esto es, ${conIva(resto)}, se abonará como máximo ${dias(t('resto'), 'natural')} antes del evento mediante transferencia a la Cuenta Bancaria. Si el contrato se firma dentro de ese plazo, el precio total se abonará a la firma, salvo calendario distinto aceptado por escrito. La Montada emitirá los justificantes y facturas correspondientes.`,
       'Ante un impago vencido, La Montada requerirá por escrito su subsanación, concediendo al menos tres días naturales y advirtiendo de sus consecuencias. Si persiste el impago después del referido plazo de tres días naturales, podrá suspender las prestaciones pendientes o resolver el contrato mediante comunicación expresa, con liquidación conforme a la cláusula 7. Si la contratación próxima al evento exige otro plazo, este deberá acordarse expresamente antes de contratar, quedando dispuesto expresamente en el Anexo I.',
     ] },
     { titulo: '3. RESPONSABILIDAD SOBRE LOS EQUIPOS', parrafos: [
@@ -122,7 +165,7 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
       'Esta información permitirá organizar las pruebas de sonido y el uso de un medidor de decibelios cuando corresponda.',
       'La Montada respetará los límites aplicables y podrá reducir el volumen o interrumpir la actuación cuando sea necesario para cumplirlos. No responderá de las limitaciones del servicio derivadas de restricciones no comunicadas previamente que no le sean atribuibles.',
       '(E) Comida y bebida',
-      'En eventos de más de cinco horas de duración, el Cliente proporcionará comida y bebida sin alcohol al equipo técnico y DJ asignado. La Montada comunicará el número de personas.',
+      `En eventos de más de ${horas(t('comida'))} de duración, el Cliente proporcionará comida y bebida sin alcohol al equipo técnico y DJ asignado. La Montada comunicará el número de personas.`,
     ] },
     { titulo: '5. FUNCIONAMIENTO E INCIDENCIAS TÉCNICAS', parrafos: [
       'La Montada realizará la instalación, el manejo y las comprobaciones de los equipos con la diligencia profesional exigible. Acudirá al recinto con antelación suficiente para efectuar el montaje y las pruebas antes del inicio del evento. Los equipos de sonido, iluminación, vídeo y pantallas son dispositivos electrónicos que, pese a su correcta instalación y mantenimiento, pueden sufrir averías o incidencias técnicas imprevisibles.',
@@ -130,7 +173,7 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
       'En ningún caso serán imputables a La Montada las siguientes incidencias:',
       '•  Suministro eléctrico: cortes, caídas o deficiencias del suministro facilitado por el Cliente o el recinto, al que se conectará el distribuidor eléctrico de La Montada.',
       '•  Equipos inalámbricos: interferencias en micrófonos y otros equipos inalámbricos causadas por señales o dispositivos ajenos.',
-      '•  Proyección y contenidos: errores de reproducción o proyección debidos a archivos con formato, resolución o calidad inadecuados, o entregados fuera del plazo previsto en la cláusula 9. La Montada solicitará los contenidos con al menos catorce días naturales de antelación e intentará adaptar los que no sean compatibles, sin garantía de resultado.',
+      `•  Proyección y contenidos: errores de reproducción o proyección debidos a archivos con formato, resolución o calidad inadecuados, o entregados fuera del plazo previsto en la cláusula 9. La Montada solicitará los contenidos con al menos ${dias(t('contenidos'), 'natural')} de antelación e intentará adaptar los que no sean compatibles, sin garantía de resultado.`,
       '•  Terceros y entorno: incidencias causadas por el recinto, otros proveedores, asistentes, condiciones meteorológicas o la manipulación no autorizada de los equipos.',
       'Las incidencias técnicas descritas en esta cláusula, atendidas por La Montada con la diligencia exigible, no constituirán incumplimiento del contrato ni darán derecho a indemnización, descuento o devolución alguna.',
     ] },
@@ -145,15 +188,15 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
       'Los retrasos atribuibles al Cliente, al recinto o a otros proveedores no ampliarán automáticamente la hora de finalización acordada. Cualquier ampliación deberá aceptarse expresamente. Los retrasos atribuibles a La Montada no se facturarán como horas extra.',
       '(B) Horas extra',
       ...(hayHoraExtra(c) ? [
-        `Cada hora adicional de servicio tendrá un precio de ${euros(hora)}, IVA incluido, si se contrata antes del día del evento. Si se solicita el mismo día del evento, el precio será de ${euros(Math.max(350, hora + 100))} por hora adicional, IVA incluido. Este precio incluye el conjunto del servicio contratado: DJ, personal técnico y equipos. El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.`,
+        `Cada hora adicional de servicio tendrá un precio de ${euros(hora)}, IVA incluido${mismoDia > 0 && mismoDia !== hora ? `, si se contrata antes del día del evento. Si se solicita el mismo día del evento, el precio será de ${euros(mismoDia)} por hora adicional, IVA incluido.` : ', tanto si se contrata antes como el mismo día del evento.'} ${textoIncluyeHora(c)} El pago se realizará al confirmar la ampliación, salvo acuerdo escrito distinto.`,
         'Las horas extra estarán sujetas a la disponibilidad del personal y los equipos, a las condiciones del recinto y a las restricciones de horario y ruido. Las solicitudes de asistentes no autorizados no supondrán una contratación válida.',
       ] : ['Este contrato no incluye horas adicionales de servicio. Cualquier ampliación del horario requerirá un nuevo acuerdo por escrito, con su precio.']),
       '(C) Modificaciones',
-      'Los cambios de fecha, lugar, horario, equipos o servicios deberán solicitarse por escrito con al menos quince días naturales de antelación. Las solicitudes posteriores podrán valorarse, sin garantía de disponibilidad.',
+      `Los cambios de fecha, lugar, horario, equipos o servicios deberán solicitarse por escrito con al menos ${dias(t('cambios'), 'natural')} de antelación. Las solicitudes posteriores podrán valorarse, sin garantía de disponibilidad.`,
       'Las modificaciones solo serán efectivas cuando ambas partes acepten por escrito las nuevas condiciones y, en su caso, el precio revisado.',
       '(D) Cancelación por el Cliente',
       'El Cliente comunicará la cancelación por escrito. La Montada podrá reclamar el valor de los servicios efectivamente realizados y los costes y perjuicios razonables, acreditados y no recuperables causados por la cancelación. Podrán comprender trabajos de preparación realmente ejecutados, compromisos no cancelables con terceros y el beneficio neto perdido por la fecha reservada cuando se acredite. La Montada procurará reducir el perjuicio y remitirá una liquidación desglosada con su soporte dentro de los quince días naturales siguientes a disponer de los datos necesarios, informando si quedan costes pendientes de cuantificar.',
-      'Si la cancelación se comunica con menos de diez días naturales de antelación, la reclamación podrá alcanzar el importe total contratado únicamente cuando los servicios realizados y los perjuicios justificados alcancen dicha cantidad. Se descontarán los gastos ahorrados, las cantidades recuperadas y los ingresos de una contratación sustitutiva que reduzcan el perjuicio.',
+      `Si la cancelación se comunica con menos de ${dias(t('cancelacion'), 'natural')} de antelación, la reclamación podrá alcanzar el importe total contratado únicamente cuando los servicios realizados y los perjuicios justificados alcancen dicha cantidad. Se descontarán los gastos ahorrados, las cantidades recuperadas y los ingresos de una contratación sustitutiva que reduzcan el perjuicio.`,
       'La reserva es un pago a cuenta y no una penalización ni unas arras que el Cliente pierda automáticamente. Se aplicará a la liquidación justificada, cuyo importe agregado no excederá del precio total contratado. El exceso se devolverá en los catorce días naturales siguientes a la liquidación, sin perjuicio de plazos legales más breves.',
       '(E) Cancelación por La Montada y fuerza mayor',
       'Si La Montada cancela por una causa que le sea atribuible, devolverá los importes correspondientes a los servicios no prestados, sin perjuicio de los demás derechos que legalmente correspondan al Cliente. La sustitución por otro proveedor requerirá su aceptación.',
@@ -166,7 +209,7 @@ export function clausulasContrato(c: ContratoEventos): { titulo: string; parrafo
     ] },
     { titulo: '9. ORGANIZACIÓN TÉCNICA, CONTENIDOS Y COLABORADORES', parrafos: [
       'La Montada conserva la dirección técnica y la selección de medios y personal adecuados. Podrá recurrir a profesionales bajo su coordinación, manteniendo frente al Cliente la responsabilidad por su actuación y por el cumplimiento del contrato. La sustitución de un artista o DJ contratado nominalmente, o una alteración esencial de las prestaciones, requerirá aceptación del Cliente. Podrá sustituir equipos por otros de prestaciones equivalentes o superiores, sin incremento de precio ni reducción de las prestaciones pactadas.',
-      'El Cliente remitirá con al menos siete días naturales de antelación los archivos, guiones, listas musicales y necesidades especiales que deba aportar, en formatos previamente acordados, para permitir su prueba. Las entregas tardías o cambios durante el evento se atenderán si son viables, sin garantía de reproducción de materiales no probados por causas ajenas a La Montada. No se garantiza acceso a cuentas o plataformas de terceros ni reproducción de contenidos ilícitos.',
+      `El Cliente remitirá con al menos ${dias(t('archivos'), 'natural')} de antelación los archivos, guiones, listas musicales y necesidades especiales que deba aportar, en formatos previamente acordados, para permitir su prueba. Las entregas tardías o cambios durante el evento se atenderán si son viables, sin garantía de reproducción de materiales no probados por causas ajenas a La Montada. No se garantiza acceso a cuentas o plataformas de terceros ni reproducción de contenidos ilícitos.`,
       'Cada parte será responsable de disponer de los derechos y autorizaciones necesarios sobre los materiales que aporte y de los usos que realice. El Anexo I identificará, cuando sean necesarias, las licencias del evento o recinto y la persona responsable de gestionarlas y abonarlas, en su caso. La mera prestación técnica no incluye una cesión de derechos sobre repertorios musicales, programas, diseños o materiales preexistentes de La Montada. Cualquier producción o entrega audiovisual adicional y sus derechos de uso se pactarán separadamente por escrito.',
     ] },
     { titulo: '10. COMUNICACIONES, INCIDENCIAS Y RESPONSABILIDAD', parrafos: [
@@ -205,7 +248,7 @@ export function anexoContrato(c: ContratoEventos): { titulo?: string; lineas: st
       `Recinto, dirección completa y espacio de instalación: ${v(c.recinto)}.`,
       `Responsable del recinto, teléfono y correo: ${v(c.responsableRecinto)}.`,
       `Acceso y montaje: ${v(c.montaje)}. Pruebas: ${v(c.pruebas)}. Inicio y fin del servicio al público: ${v(c.servicio)}. Desmontaje y retirada: ${v(c.desmontaje)}.`,
-      `Duración contratada del servicio al público: ${v(c.duracion)}. Hora adicional, IVA incluido: ${hayHoraExtra(c) ? euros(hora) : 'no se contempla'}. Número de técnicos y DJs incluidos: ${v(c.tecnicosDjs)}.`,
+      `Duración contratada del servicio al público: ${v(c.duracion)}. Hora adicional, IVA incluido: ${hayHoraExtra(c) ? euros(hora) : 'no se contempla'}${hayHoraExtra(c) && c.horaExtraMismoDia !== undefined && c.horaExtraMismoDia > 0 && c.horaExtraMismoDia !== hora ? ` (${euros(c.horaExtraMismoDia)} si se solicita el mismo día)` : ''}. Número de técnicos y DJs incluidos: ${v(c.tecnicosDjs)}.`,
       `${c.interlocutor.trim() ? `Interlocutor del Cliente durante el evento: ${c.interlocutor.trim()}. ` : ''}Persona autorizada para aceptar modificaciones y extras: ${c.autorizado.trim() || 'no se designa; solo el Cliente'}.`,
     ] },
     { titulo: 'SERVICIOS Y EQUIPO CONTRATADO', lineas: [

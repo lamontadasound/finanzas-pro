@@ -3,8 +3,18 @@
 // deja vacío sale en el PDF como una línea en blanco para completar a mano.
 // El Anexo II (acta de recepción) sí va dentro: la cláusula 9 obliga a firmarla.
 import { BLANCO, BROWN, v, euros, fechaLarga, nuevoDocContrato, parteMontada, type EmisorContrato } from './contratoPdfKit';
+import { dias, horas, numeroEnLetra, valorTermino, errorTerminos, type Termino, type Terminos } from './contratoTerminos';
 
 export const PLANTILLA_INSTALACION = 'instalacion-2026' as const;
+
+export const TERMINOS_INSTALACION: readonly Termino[] = [
+  { key: 'matMin', label: 'El material llega en, mínimo', unidad: 'días', def: 3 },
+  { key: 'matMax', label: 'El material llega en, máximo', unidad: 'días', def: 14, min: 2 },
+  { key: 'suministro', label: 'Se puede resolver si el suministro se retrasa más de', unidad: 'días', def: 60, min: 2 },
+  { key: 'acta', label: 'Plazo para indicar defectos si no firma el acta', unidad: 'horas', def: 48, min: 2 },
+  { key: 'respuesta', label: 'Garantía: respuesta en', unidad: 'horas hábiles', def: 72 },
+  { key: 'visita', label: 'Garantía: visita en', unidad: 'días hábiles', def: 5, min: 2 },
+];
 
 export interface MaterialInstalacion { equipo: string; cantidad: number; ubicacion: string; garantia: string }
 
@@ -20,7 +30,7 @@ export interface ContratoInstalacion {
   trabajos: string[]; trabajosOtros: string;
   excluidos: string; recorridos: string; esteticos: string;
   electricos: 'no' | 'si'; electricosDetalle: string;
-  duracion: string; horario: string;
+  duracion: string; horario: string; terminos?: Terminos;
   precioBase: number; primerPago: number; // primerPago con IVA; 0 = 50%
   garantiaMeses: number;
   tarifaDesplazamientoBase: number; horaTecnicoBase: number; // sin IVA
@@ -47,7 +57,7 @@ export const nuevoContratoInstalacion = (previo?: Partial<ContratoInstalacion>):
   trabajos: ['Montaje y anclaje', 'Tendido de cableado', 'Conexión a tomas existentes', 'Configuración', 'Formación básica', 'Retirada de embalajes'], trabajosOtros: '',
   excluidos: '', recorridos: '', esteticos: '',
   electricos: 'no', electricosDetalle: '',
-  duracion: 'Una jornada', horario: '',
+  duracion: 'Una a dos jornadas de trabajo', horario: '', terminos: {},
   precioBase: 0, primerPago: 0,
   garantiaMeses: previo?.garantiaMeses || 12,
   tarifaDesplazamientoBase: previo?.tarifaDesplazamientoBase ?? 0, horaTecnicoBase: previo?.horaTecnicoBase ?? 0,
@@ -74,13 +84,25 @@ export function validarContratoInstalacion(c: ContratoInstalacion): string | nul
   if (!c.lugar.trim()) return 'Falta el lugar de instalación.';
   if (!materialConDatos(c).length) return 'Añade al menos un equipo a instalar.';
   if (!(importesInstalacion(c).total > 0)) return 'Pon el precio total sin IVA.';
+  if (Number(c.primerPago) > importesInstalacion(c).total) return 'El primer pago no puede ser mayor que el total con IVA.';
+  const et = errorTerminos(TERMINOS_INSTALACION, c.terminos);
+  if (et) return et;
+  if (valorTermino(TERMINOS_INSTALACION, c.terminos, 'matMin') > valorTermino(TERMINOS_INSTALACION, c.terminos, 'matMax')) return 'Plazos: el mínimo de llegada del material no puede ser mayor que el máximo.';
   return null;
 }
 
-const meses = (n: number) => `${n || 12} meses`;
+const meses = (n: number) => (n === 1 ? 'un mes' : `${n || 12} meses`);
+
+const plazoMaterial = (c: Pick<ContratoInstalacion, 'terminos'>) => {
+  const a = valorTermino(TERMINOS_INSTALACION, c.terminos, 'matMin'), b = valorTermino(TERMINOS_INSTALACION, c.terminos, 'matMax');
+  return a === b ? dias(a) : `entre ${numeroEnLetra(a)} y ${dias(b)}`;
+};
 
 /** Cláusulas del contrato con los datos ya puestos. */
 export function clausulasInstalacion(c: ContratoInstalacion): { titulo: string; parrafos: string[] }[] {
+  const t = (k: string) => valorTermino(TERMINOS_INSTALACION, c.terminos, k);
+  const dur = c.duracion.trim().replace(/\.+$/, '');
+  const duracion = dur ? dur.charAt(0).toLowerCase() + dur.slice(1) : 'una a dos jornadas de trabajo';
   const { total, base, iva, reserva, resto, es50 } = importesInstalacion(c);
   return [
     { titulo: '1. OBJETO DEL CONTRATO', parrafos: [
@@ -98,9 +120,9 @@ export function clausulasInstalacion(c: ContratoInstalacion): { titulo: string; 
       'Ante un impago vencido, La Montada requerirá por escrito su subsanación, concediendo al menos tres días naturales y advirtiendo de sus consecuencias. Si persiste el impago, podrá suspender los trabajos pendientes, incluidas la configuración definitiva, la formación y la atención en garantía, o resolver el contrato mediante comunicación expresa, con liquidación conforme a la cláusula 13. Cuando el Cliente actúe como empresario o profesional, las cantidades vencidas devengarán el interés de demora previsto en la Ley 3/2004, de 29 de diciembre, y la compensación por costes de cobro que esta establece.',
     ] },
     { titulo: '4. PEDIDO, PLAZOS DE SUMINISTRO Y EJECUCIÓN', parrafos: [
-      'Una vez recibido el pago a cuenta, La Montada realizará el pedido del Material. El plazo estimado de recepción del Material es de entre tres y catorce días desde la realización del pedido. Este plazo es orientativo, depende de los fabricantes, distribuidores y transportistas, y puede variar por falta de existencias o retrasos ajenos a La Montada, que informará al Cliente de cualquier variación relevante en cuanto la conozca. Los retrasos en el suministro no imputables a La Montada no constituirán incumplimiento ni darán derecho a indemnización, descuento o resolución, salvo que superen los sesenta días naturales, en cuyo caso cualquiera de las partes podrá resolver el contrato con liquidación conforme a la cláusula 13.',
+      `Una vez recibido el pago a cuenta, La Montada realizará el pedido del Material. El plazo estimado de recepción del Material es de ${plazoMaterial(c)} desde la realización del pedido. Este plazo es orientativo, depende de los fabricantes, distribuidores y transportistas, y puede variar por falta de existencias o retrasos ajenos a La Montada, que informará al Cliente de cualquier variación relevante en cuanto la conozca. Los retrasos en el suministro no imputables a La Montada no constituirán incumplimiento ni darán derecho a indemnización, descuento o resolución, salvo que superen los ${dias(t('suministro'), 'natural')}, en cuyo caso cualquiera de las partes podrá resolver el contrato con liquidación conforme a la cláusula 13.`,
       'Recibido el Material, La Montada avisará al Cliente y ambas partes concretarán por escrito la fecha de la Instalación, según la disponibilidad de los equipos técnicos de La Montada y del Lugar de Instalación.',
-      'La duración estimada de la Instalación es de una a dos jornadas de trabajo, conforme al Anexo I. Esta duración es orientativa y podrá ampliarse según la complejidad de los trabajos, las condiciones del Lugar de Instalación, las circunstancias ocultas descubiertas, la coordinación con otros gremios o los cambios solicitados por el Cliente, sin que ello constituya incumplimiento. La Montada informará al Cliente de la previsión de ampliación y procurará reducir las molestias.',
+      `La duración estimada de la Instalación es de ${duracion}, conforme al Anexo I. Esta duración es orientativa y podrá ampliarse según la complejidad de los trabajos, las condiciones del Lugar de Instalación, las circunstancias ocultas descubiertas, la coordinación con otros gremios o los cambios solicitados por el Cliente, sin que ello constituya incumplimiento. La Montada informará al Cliente de la previsión de ampliación y procurará reducir las molestias.`,
       'Si la Instalación no puede iniciarse o continuar en la fecha acordada por causas imputables al Cliente o al Lugar de Instalación, como falta de acceso, de permisos, de suministro eléctrico o de las condiciones comprometidas, La Montada podrá facturar los desplazamientos y las horas de técnico perdidos según la tarifa del Anexo I, y la nueva fecha se fijará según su disponibilidad.',
     ] },
     { titulo: '5. MATERIAL Y RESERVA DE DOMINIO', parrafos: [
@@ -133,7 +155,7 @@ export function clausulasInstalacion(c: ContratoInstalacion): { titulo: string; 
     { titulo: '9. PRUEBAS, PUESTA EN MARCHA Y RECEPCIÓN', parrafos: [
       'Finalizados los trabajos, La Montada realizará en presencia del Cliente o su interlocutor las pruebas de funcionamiento del Material y su configuración básica, y le explicará su uso ordinario. A continuación, las partes firmarán el acta de recepción del Anexo II, en la que el Cliente podrá hacer constar, de forma concreta, las observaciones que estime oportunas.',
       'Si las pruebas se superan satisfactoriamente, se entenderá que la Instalación se ha realizado correctamente y queda recibida. Las observaciones que no impidan el uso normal de la Instalación no impedirán la recepción ni el pago final, y La Montada las atenderá en un plazo razonable si son fundadas.',
-      'Si el Cliente o su interlocutor no asisten a las pruebas, se niegan a firmar el acta sin indicar por escrito defectos concretos en las cuarenta y ocho horas siguientes, o comienzan a utilizar la Instalación, esta se entenderá recibida en la fecha de su finalización. La recepción no excluye la garantía de la cláusula 10 ni los derechos que legalmente correspondan al Cliente por defectos ocultos.',
+      `Si el Cliente o su interlocutor no asisten a las pruebas, se niegan a firmar el acta sin indicar por escrito defectos concretos en las ${horas(t('acta'))} siguientes, o comienzan a utilizar la Instalación, esta se entenderá recibida en la fecha de su finalización. La recepción no excluye la garantía de la cláusula 10 ni los derechos que legalmente correspondan al Cliente por defectos ocultos.`,
       'La Montada entregará al Cliente la documentación técnica básica, las instrucciones de uso del fabricante disponibles y, en su caso, las claves de acceso a la configuración. Las modificaciones de configuración que realice el Cliente o terceros tras la recepción serán de su exclusiva responsabilidad.',
     ] },
     { titulo: '10. GARANTÍA', parrafos: [
@@ -144,7 +166,7 @@ export function clausulasInstalacion(c: ContratoInstalacion): { titulo: string; 
       '(C) Exclusiones',
       'La garantía no cubre: el desgaste normal y los consumibles, como lámparas, filtros, pilas o baterías, ni las horas de uso de lámparas o fuentes de luz; los daños por golpes, caídas, líquidos, humedad, polvo, calor excesivo, sobretensiones, rayos o fallos del suministro eléctrico; el uso contrario a las instrucciones o la falta del mantenimiento recomendado; la manipulación, traslado, reparación o reconfiguración por el Cliente o por terceros; los defectos de la instalación eléctrica, la red o los equipos ajenos al Material; las actualizaciones, licencias o fallos de software y servicios de terceros; los actos vandálicos, sustracciones o causas de fuerza mayor; ni las soluciones de cableado y acabado previstas en la cláusula 8. La manipulación de la Instalación por terceros no autorizados por La Montada extinguirá la garantía de la Instalación sobre los elementos afectados.',
       '(D) Procedimiento',
-      'El Cliente comunicará por escrito la incidencia, describiendo el problema y aportando fotografías o vídeos si es posible. La Montada responderá en un plazo de setenta y dos horas hábiles y, si es necesario, acordará una visita técnica dentro de los cinco días hábiles siguientes, según su disponibilidad. Si se comprueba que la incidencia no está cubierta por la garantía, el Cliente abonará el desplazamiento, el diagnóstico y, en su caso, la reparación, según las tarifas del Anexo I, que se le informarán antes de reparar.',
+      `El Cliente comunicará por escrito la incidencia, describiendo el problema y aportando fotografías o vídeos si es posible. La Montada responderá en un plazo de ${horas(t('respuesta'), true)} y, si es necesario, acordará una visita técnica dentro de los ${dias(t('visita'), 'hábil')} siguientes, según su disponibilidad. Si se comprueba que la incidencia no está cubierta por la garantía, el Cliente abonará el desplazamiento, el diagnóstico y, en su caso, la reparación, según las tarifas del Anexo I, que se le informarán antes de reparar.`,
     ] },
     { titulo: '11. MANTENIMIENTO Y ASISTENCIA POSTERIOR', parrafos: [
       'Salvo inclusión expresa en el Anexo I, el precio no incluye mantenimiento periódico, actualizaciones ni asistencia fuera de garantía. La Montada podrá ofrecer al Cliente un servicio de mantenimiento o asistencia técnica, que se documentará por separado. Las asistencias fuera de garantía se facturarán según las tarifas vigentes, informadas previamente al Cliente.',
@@ -203,7 +225,7 @@ export function anexoInstalacion(c: ContratoInstalacion) {
       `Trabajos eléctricos por empresa instaladora habilitada: ${c.electricos === 'si' ? `SÍ, ${v(c.electricosDetalle)}` : 'NO'}.`,
     ],
     plazos: [
-      `Plazo estimado de recepción del Material desde el pedido: entre tres y catorce días. Duración estimada de la Instalación: ${v(c.duracion)}. Horario de trabajo permitido en el Lugar de Instalación: ${v(c.horario)}.`,
+      `Plazo estimado de recepción del Material desde el pedido: ${plazoMaterial(c)}. Duración estimada de la Instalación: ${v(c.duracion)}. Horario de trabajo permitido en el Lugar de Instalación: ${v(c.horario)}.`,
       `Precio total, IVA incluido: ${euros(total)} (${euros(r2(total / 1.21))} sin IVA). Pago a cuenta a la firma${es50 ? ' (50%)' : ''}: ${euros(reserva)}. Pago final al concluir la Instalación${es50 ? ' (50%)' : ''}: ${euros(resto)}.`,
       `Garantía de la Instalación: ${meses(c.garantiaMeses)} desde la recepción. Tarifa de desplazamiento y diagnóstico fuera de garantía, IVA incluido: ${tarifa(c.tarifaDesplazamientoBase)}. Hora de técnico adicional, IVA incluido: ${tarifa(c.horaTecnicoBase)}.`,
       `Oposición del Cliente al uso de imágenes de la Instalación como referencia: ${c.oposicionImagenes === 'si' ? 'SÍ' : 'NO'}.`,
